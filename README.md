@@ -32,6 +32,7 @@ network-hydraulic --config config/sample_network.yaml
 network-hydraulic --config config/sample_network.yaml \
                   --output results/sample.json
 ```
+- Result files include each section’s `calculation_result.flow` plus matching network-level `fluid.volumetric_flow_rate` and `fluid.standard_flow_rate` derived from solver outputs (0 °C & 1 atm for gas).
 
 ### Library
 ```python
@@ -41,6 +42,20 @@ network = models.Network.from_file("config/sample_network.yaml")
 result = solver.NetworkSolver().solve(network)
 print(result.summary())
 ```
+
+## Configuration Hints
+- Numeric fields accept either bare SI values or `{value, unit}` mappings and are normalized by the loader.
+- Example:
+  ```yaml
+  boundary_pressure:
+    value: 85
+    unit: barg
+  sections:
+    - length:
+        value: 400
+        unit: ft
+  ```
+- Gauge units (e.g., `barg`, `psig`) and temperature aliases (`degC`, `degF`) are resolved automatically.
 
 ## Development
 

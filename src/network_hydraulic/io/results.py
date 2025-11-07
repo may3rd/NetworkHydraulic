@@ -1,17 +1,22 @@
 """Helpers for presenting and serializing solver results."""
 from __future__ import annotations
 
-from copy import deepcopy
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import yaml
 
+from network_hydraulic.models.fluid import GAS_CONSTANT
+
+STANDARD_TEMPERATURE = 273.15  # 0 °C
+STANDARD_PRESSURE = 101_325.0  # 1 atm
+
 if TYPE_CHECKING:  # pragma: no cover - hints only
-    from network_hydraulic.io.loader import ConfigurationLoader
     from network_hydraulic.models.network import Network
     from network_hydraulic.models.pipe_section import PipeSection
     from network_hydraulic.models.results import NetworkResult, ResultSummary, SectionResult, StatePoint
+    from network_hydraulic.models.fluid import Fluid
+    from network_hydraulic.models.pipe_section import Fitting
 
 
 def print_summary(network: "Network", result: "NetworkResult") -> None:
@@ -32,35 +37,38 @@ def print_summary(network: "Network", result: "NetworkResult") -> None:
 
 def write_output(
     path: Path,
-    loader: "ConfigurationLoader",
     network: "Network",
     result: "NetworkResult",
 ) -> None:
-    """Persist calculation results back to YAML alongside the original config."""
-    data = deepcopy(loader.raw or {})
-    network_cfg = data.setdefault("network", {})
-    sections_cfg = network_cfg.setdefault("sections", [])
-    sections_by_id = {sec["id"]: sec for sec in sections_cfg if isinstance(sec, dict) and "id" in sec}
-    actual_sections = {section.id: section for section in network.sections}
+    """Persist calculation results back to YAML using SI-normalized values."""
+    network_cfg = _network_config(network)
+    section_results = {section.section_id: section for section in result.sections}
+    mass_flow_rate = _mass_flow_rate(network.fluid)
+    standard_density = _standard_gas_density(network.fluid)
 
-    for section_result in result.sections:
-        section_cfg = sections_by_id.get(section_result.section_id)
-        if section_cfg is None:
-            section_cfg = {"id": section_result.section_id}
-            sections_cfg.append(section_cfg)
-            sections_by_id[section_result.section_id] = section_cfg
-        _populate_section_config(section_cfg, actual_sections.get(section_result.section_id))
-        section_cfg.setdefault("calculation_result", {})
-        calculation = section_result.calculation
-        section_cfg["calculation_result"]["pressure_drop"] = _pressure_drop_dict(
-            calculation.pressure_drop, section_cfg.get("length")
-        )
-        section_cfg["calculation_result"]["summary"] = _summary_dict(section_result.summary)
+    for section in network.sections:
+        section_cfg = _section_config(section)
+        section_result = section_results.get(section.id)
+        if section_result:
+            section_cfg["calculation_result"] = _section_result_payload(
+                section_result, section_cfg.get("length"), mass_flow_rate, standard_density
+            )
+        network_cfg["sections"].append(section_cfg)
 
-    network_cfg["summary"] = network_cfg.get("summary", {})
-    network_cfg["summary"]["state"] = _summary_dict(result.summary)
-    summary_drop = _pressure_drop_dict(result.aggregate.pressure_drop, None)
-    network_cfg["summary"]["pressure_drop"] = summary_drop
+    flow_summary = _flow_dict(result.summary, mass_flow_rate, standard_density)
+    network_cfg["summary"] = {
+        "state": _summary_dict(result.summary),
+        "pressure_drop": _pressure_drop_dict(result.aggregate.pressure_drop, None),
+        "flow": flow_summary,
+    }
+    fluid_cfg = network_cfg.get("fluid")
+    if fluid_cfg:
+        if flow_summary["volumetric_actual"] is not None:
+            fluid_cfg["volumetric_flow_rate"] = flow_summary["volumetric_actual"]
+        if flow_summary["volumetric_standard"] is not None:
+            fluid_cfg["standard_flow_rate"] = flow_summary["volumetric_standard"]
+
+    data = {"network": network_cfg}
 
     with path.open("w", encoding="utf-8") as handle:
         yaml.safe_dump(data, handle, sort_keys=False)
@@ -133,56 +141,150 @@ def _print_state_table(prefix: str, summary: "ResultSummary") -> None:
         print(f"{prefix}  Remarks: {outlet.remarks}")
 
 
-def _populate_section_config(section_cfg: Dict[str, Any], section: "PipeSection" | None) -> None:
-    if section is None:
-        return
-    for key, value in (
-        ("pipe_diameter", section.pipe_diameter),
-        ("inlet_diameter", section.inlet_diameter),
-        ("outlet_diameter", section.outlet_diameter),
-        ("length", section.length),
-        ("roughness", section.roughness),
-        ("pipe_NPD", section.pipe_NPD),
-        ("erosional_constant", section.erosional_constant),
-    ):
-        if value is not None:
-            section_cfg[key] = value
-    for redundant in ("main_ID", "input_ID", "output_ID"):
-        section_cfg.pop(redundant, None)
-
-    _populate_valve_config(section_cfg, section)
-    _populate_orifice_config(section_cfg, section)
+def _network_config(network: "Network") -> Dict[str, Any]:
+    return {
+        "name": network.name,
+        "description": network.description,
+        "direction": network.direction,
+        "boundary_pressure": network.boundary_pressure,
+        "gas_flow_model": network.gas_flow_model,
+        "fluid": _fluid_dict(network.fluid),
+        "sections": [],
+    }
 
 
-def _populate_valve_config(section_cfg: Dict[str, Any], section: "PipeSection") -> None:
-    valve = section.control_valve
-    if valve is None:
-        return
-    valve_cfg = section_cfg.setdefault("control_valve", {})
-    for attr in (
-        "tag",
-        "cv",
-        "cg",
-        "pressure_drop",
-        "C1",
-        "FL",
-        "Fd",
-        "xT",
-        "inlet_diameter",
-        "outlet_diameter",
-        "valve_diameter",
-    ):
-        value = getattr(valve, attr, None)
-        if value is not None:
-            valve_cfg[attr] = value
+def _fluid_dict(fluid: "Fluid") -> Dict[str, Any]:
+    return {
+        "name": fluid.name,
+        "mass_flow_rate": fluid.mass_flow_rate,
+        "volumetric_flow_rate": fluid.volumetric_flow_rate,
+        "phase": fluid.phase,
+        "temperature": fluid.temperature,
+        "pressure": fluid.pressure,
+        "density": fluid.density,
+        "molecular_weight": fluid.molecular_weight,
+        "z_factor": fluid.z_factor,
+        "specific_heat_ratio": fluid.specific_heat_ratio,
+        "viscosity": fluid.viscosity,
+        "standard_flow_rate": fluid.standard_flow_rate,
+        "vapor_pressure": fluid.vapor_pressure,
+        "critical_pressure": fluid.critical_pressure,
+    }
 
 
-def _populate_orifice_config(section_cfg: Dict[str, Any], section: "PipeSection") -> None:
-    orifice = section.orifice
-    if orifice is None:
-        return
-    orifice_cfg = section_cfg.setdefault("orifice", {})
-    for attr in ("tag", "d_over_D_ratio", "pressure_drop", "pipe_diameter", "orifice_diameter"):
-        value = getattr(orifice, attr, None)
-        if value is not None:
-            orifice_cfg[attr] = value
+def _section_config(section: "PipeSection") -> Dict[str, Any]:
+    base = {
+        "id": section.id,
+        "main_ID": section.main_ID,
+        "input_ID": section.input_ID,
+        "output_ID": section.output_ID,
+        "schedule": section.schedule,
+        "roughness": section.roughness,
+        "length": section.length,
+        "elevation_change": section.elevation_change,
+        "fitting_type": section.fitting_type,
+        "fittings": _fittings_list(section.fittings),
+        "pipe_diameter": section.pipe_diameter,
+        "inlet_diameter": section.inlet_diameter,
+        "outlet_diameter": section.outlet_diameter,
+        "fitting_K": section.fitting_K,
+        "pipe_length_K": section.pipe_length_K,
+        "user_K": section.user_K,
+        "piping_and_fitting_safety_factor": section.piping_and_fitting_safety_factor,
+        "total_K": section.total_K,
+        "user_specified_fixed_loss": section.user_specified_fixed_loss,
+        "pipe_NPD": section.pipe_NPD,
+        "erosional_constant": section.erosional_constant,
+        "mach_number": section.mach_number,
+    }
+    if section.control_valve:
+        base["control_valve"] = _control_valve_dict(section.control_valve)
+    if section.orifice:
+        base["orifice"] = _orifice_dict(section.orifice)
+    return base
+
+
+def _fittings_list(fittings: Optional[List["Fitting"]]) -> List[Dict[str, Any]]:
+    return [{"type": fitting.type, "count": fitting.count} for fitting in fittings or []]
+
+
+def _control_valve_dict(valve) -> Dict[str, Any]:
+    return {
+        "tag": getattr(valve, "tag", None),
+        "cv": getattr(valve, "cv", None),
+        "cg": getattr(valve, "cg", None),
+        "pressure_drop": getattr(valve, "pressure_drop", None),
+        "C1": getattr(valve, "C1", None),
+        "FL": getattr(valve, "FL", None),
+        "Fd": getattr(valve, "Fd", None),
+        "xT": getattr(valve, "xT", None),
+        "inlet_diameter": getattr(valve, "inlet_diameter", None),
+        "outlet_diameter": getattr(valve, "outlet_diameter", None),
+        "valve_diameter": getattr(valve, "valve_diameter", None),
+    }
+
+
+def _orifice_dict(orifice) -> Dict[str, Any]:
+    return {
+        "tag": getattr(orifice, "tag", None),
+        "d_over_D_ratio": getattr(orifice, "d_over_D_ratio", None),
+        "pressure_drop": getattr(orifice, "pressure_drop", None),
+        "pipe_diameter": getattr(orifice, "pipe_diameter", None),
+        "orifice_diameter": getattr(orifice, "orifice_diameter", None),
+        "meter_type": getattr(orifice, "meter_type", None),
+        "taps": getattr(orifice, "taps", None),
+        "tap_position": getattr(orifice, "tap_position", None),
+        "discharge_coefficient": getattr(orifice, "discharge_coefficient", None),
+        "expansibility": getattr(orifice, "expansibility", None),
+    }
+
+
+def _section_result_payload(
+    section_result: "SectionResult",
+    section_length: Optional[float],
+    mass_flow_rate: Optional[float],
+    standard_density: Optional[float],
+) -> Dict[str, Any]:
+    calculation = section_result.calculation
+    return {
+        "pressure_drop": _pressure_drop_dict(calculation.pressure_drop, section_length),
+        "summary": _summary_dict(section_result.summary),
+        "flow": _flow_dict(section_result.summary, mass_flow_rate, standard_density),
+    }
+
+
+def _flow_dict(
+    summary: "ResultSummary",
+    mass_flow_rate: Optional[float],
+    standard_density: Optional[float],
+) -> Dict[str, Optional[float]]:
+    volumetric_actual = None
+    if mass_flow_rate is not None:
+        inlet_density = getattr(summary.inlet, "density", None)
+        if inlet_density and inlet_density > 0:
+            volumetric_actual = mass_flow_rate / inlet_density
+    volumetric_standard = None
+    if mass_flow_rate is not None and standard_density:
+        volumetric_standard = mass_flow_rate / standard_density
+    return {
+        "volumetric_actual": volumetric_actual,
+        "volumetric_standard": volumetric_standard,
+    }
+
+
+def _mass_flow_rate(fluid: "Fluid") -> Optional[float]:
+    try:
+        return fluid.current_mass_flow_rate()
+    except Exception:  # pragma: no cover - defensive fallback
+        return fluid.mass_flow_rate
+
+
+def _standard_gas_density(fluid: "Fluid") -> Optional[float]:
+    if not fluid.is_gas():
+        return None
+    molecular_weight = getattr(fluid, "molecular_weight", None)
+    if molecular_weight is None or molecular_weight <= 0:
+        return None
+    mw = molecular_weight if molecular_weight <= 0.5 else molecular_weight / 1000.0
+    z_factor = fluid.z_factor if fluid.z_factor and fluid.z_factor > 0 else 1.0
+    return STANDARD_PRESSURE * mw / (GAS_CONSTANT * STANDARD_TEMPERATURE * z_factor)

@@ -2,6 +2,7 @@ import pytest
 
 from network_hydraulic.io.loader import ConfigurationLoader
 from network_hydraulic.models.pipe_section import Fitting
+from network_hydraulic.utils.units import convert
 
 
 def section_cfg(**overrides):
@@ -63,6 +64,45 @@ def test_loader_derives_diameter_from_npd():
     loader = ConfigurationLoader(raw={})
     cfg = section_cfg(main_ID=None, pipe_NPD=6.0, schedule="40", pipe_diameter=None, inlet_diameter=None, outlet_diameter=None)
     section = loader._build_section(cfg)
-    # 6\" schedule 40 has an ID of 0.15408 m
+    # 6" schedule 40 has an ID of 0.15408 m
     assert section.main_ID == pytest.approx(0.15408, rel=1e-5)
     assert section.pipe_diameter == pytest.approx(0.15408, rel=1e-5)
+
+
+def test_loader_converts_units_when_specified():
+    loader = ConfigurationLoader(
+        raw={
+            "network": {
+                "boundary_pressure": {"value": 50, "unit": "barg"},
+                "direction": "forward",
+                "fluid": {
+                    "name": "gas",
+                    "phase": "gas",
+                    "mass_flow_rate": 2.0,
+                    "temperature": 300.0,
+                    "pressure": 101325.0,
+                    "density": 15.0,
+                    "molecular_weight": 18.0,
+                    "z_factor": 1.0,
+                    "specific_heat_ratio": 1.3,
+                    "viscosity": 1.1e-5,
+                },
+                "sections": [
+                    section_cfg(
+                        length={"value": 100, "unit": "ft"},
+                        elevation_change={"value": 12, "unit": "ft"},
+                        roughness={"value": 1.5, "unit": "mm"},
+                        control_valve={"pressure_drop": {"value": 5, "unit": "psig"}},
+                    )
+                ],
+            }
+        }
+    )
+    network = loader.build_network()
+    assert network.boundary_pressure == pytest.approx(convert(50, "barg", "Pa"))
+    section = network.sections[0]
+    assert section.length == pytest.approx(convert(100, "ft", "m"))
+    assert section.elevation_change == pytest.approx(convert(12, "ft", "m"))
+    assert section.roughness == pytest.approx(convert(1.5, "mm", "m"))
+    assert section.control_valve is not None
+    assert section.control_valve.pressure_drop == pytest.approx(convert(5, "psig", "Pa"))

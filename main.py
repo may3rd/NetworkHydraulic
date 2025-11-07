@@ -58,7 +58,7 @@ def main() -> None:
     result_io.print_summary(network, result)
 
     if args.output:
-        result_io.write_output(args.output, loader, network, result)
+        result_io.write_output(args.output, network, result)
 
 
 if __name__ == "__main__":

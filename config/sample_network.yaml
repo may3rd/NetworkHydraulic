@@ -2,15 +2,23 @@ network:
   name: sample_network
   description: Demo two-section pipeline with optional control valve.
   direction: forward
-  boundary_pressure: 8.5e6
+  boundary_pressure:
+    value: 85
+    unit: barg
   gas_flow_model: isothermal
   fluid:
     name: natural_gas
     phase: gas
-    mass_flow_rate: 2.5
+    mass_flow_rate:
+      value: 18000
+      unit: kg/h
     volumetric_flow_rate: null
-    temperature: 320
-    pressure: 8.5e6
+    temperature:
+      value: 47
+      unit: degC
+    pressure:
+      value: 85
+      unit: barg
     density: 35.0
     molecular_weight: 18.0
     z_factor: 0.9
@@ -24,8 +32,12 @@ network:
       schedule: "40"
       pipe_NPD: 6.0
       roughness: 4.6e-5
-      length: 120.0
-      elevation_change: 15.0
+      length:
+        value: 400
+        unit: ft
+      elevation_change:
+        value: 50
+        unit: ft
       erosional_constant: 100
       fitting_type: LR
       fittings:
