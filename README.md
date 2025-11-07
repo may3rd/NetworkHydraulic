@@ -58,7 +58,7 @@ git ls-files -ci --exclude-from=.gitignore -z | xargs -0 git rm --cached
 ```
 
 ## Next Steps
-1. Implement actual hydraulic equations in calculator modules.
+1. Validate and extend hydraulic calculators with additional loss models.
 2. Flesh out config schema validation (Pydantic/dataclasses JSON).
 3. Add end-to-end tests with representative networks and fluids.
 4. Benchmark solver performance with synthetic and real networks.
