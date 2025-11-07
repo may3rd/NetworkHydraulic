@@ -1,0 +1,80 @@
+"""Pipe friction and fitting losses."""
+from __future__ import annotations
+
+from dataclasses import dataclass
+from math import pi
+from typing import Optional
+
+from fluids.friction import friction_factor
+
+from network_hydraulic.calculators.base import LossCalculator
+from network_hydraulic.models.fluid import Fluid
+from network_hydraulic.models.pipe_section import PipeSection
+
+
+@dataclass
+class FrictionCalculator(LossCalculator):
+    """Compute straight-pipe resistance using the Darcy–Weisbach equation."""
+
+    fluid: Fluid
+    default_pipe_diameter: Optional[float] = None
+    volumetric_flow_rate: Optional[float] = None
+    friction_factor_override: Optional[float] = None
+
+    def calculate(self, section: PipeSection) -> None:
+        diameter = self._pipe_diameter(section)
+        area = 0.25 * pi * diameter * diameter
+        flow_rate = self._determine_flow_rate()
+        velocity = flow_rate / area
+        density = self.fluid.current_density()
+        viscosity = self._require_positive(self.fluid.viscosity, "viscosity")
+        reynolds = density * abs(velocity) * diameter / viscosity
+        if reynolds <= 0:
+            raise ValueError("Unable to compute Reynolds number for friction calculation")
+
+        length = section.length or 0.0
+        if length > 0:
+            friction = self._friction_factor(reynolds, section.roughness or 0.0, diameter)
+            pipe_k = self._pipe_k(friction, length, diameter)
+        else:
+            pipe_k = 0.0
+        section.pipe_length_K = pipe_k
+        fitting_k = section.fitting_K or 0.0
+        total_k = pipe_k + fitting_k
+        if total_k <= 0:
+            return
+        delta_p = total_k * density * velocity * velocity / 2.0
+
+        pressure_drop = section.calculation_output.pressure_drop
+        pressure_drop.pipe_and_fittings = delta_p
+        total = pressure_drop.total_segment_loss or 0.0
+        pressure_drop.total_segment_loss = total + delta_p
+
+    def _determine_flow_rate(self) -> float:
+        if self.volumetric_flow_rate and self.volumetric_flow_rate > 0:
+            return self.volumetric_flow_rate
+        return self.fluid.current_volumetric_flow_rate()
+
+    def _pipe_diameter(self, section: PipeSection) -> float:
+        for candidate in (section.pipe_diameter, self.default_pipe_diameter):
+            if candidate and candidate > 0:
+                return candidate
+        raise ValueError("Pipe diameter is required for friction calculations")
+
+    @staticmethod
+    def _pipe_k(friction: float, length: float, diameter: float) -> float:
+        if friction <= 0 or length <= 0 or diameter <= 0:
+            return 0.0
+        return friction * (length / diameter)
+
+    def _friction_factor(self, reynolds: float, roughness: float, diameter: float) -> float:
+        if self.friction_factor_override and self.friction_factor_override > 0:
+            return self.friction_factor_override
+        rel_roughness = roughness / diameter if diameter > 0 and roughness > 0 else 0.0
+        return friction_factor(Re=reynolds, eD=rel_roughness)
+
+    @staticmethod
+    def _require_positive(value: Optional[float], name: str) -> float:  # pragma: no cover - defensive
+        if value is None or value <= 0:
+            raise ValueError(f"{name} must be positive for friction calculations")
+        return value
