@@ -1,0 +1,2 @@
+[console_scripts]
+network-hydraulic = network_hydraulic.cli.app:main
