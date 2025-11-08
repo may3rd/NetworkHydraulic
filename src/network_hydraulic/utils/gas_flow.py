@@ -37,33 +37,38 @@ def solve_isothermal(
     if length is None or length <= 0:
         return inlet_pressure, _gas_state(inlet_pressure, temperature, mass_flow, diameter, molar_mass, z_factor, gamma)
     equiv_length = max(length + k_total * diameter / max(friction_factor, 1e-12), 0.0)
+    fd = 4 * friction_factor # Convert Fanning friction factor to Darcy friction factor
+
+    # Estimate average density using inlet conditions for the initial call
+    # The fluids library's isothermal_gas function expects an average density.
+    # For a single pass, we'll use the inlet density as an approximation.
+    rho = (inlet_pressure * molar_mass) / (z_factor * UNIVERSAL_GAS_CONSTANT * temperature)
+
     if is_forward:
         outlet_pressure = isothermal_gas(
+            rho=rho,
+            fd=fd,
             P1=inlet_pressure,
-            T=temperature,
-            m=mass_flow,
-            D=diameter,
             L=equiv_length,
-            mu=None,
-            P2=None,
-            roughness=roughness,
-            MW=molar_mass,
-            Z=z_factor,
+            D=diameter,
+            m=mass_flow,
         )
     else:
-        outlet_pressure = inlet_pressure
+        # For backward calculation, we are given the outlet pressure (which is 'inlet_pressure' in this context)
+        # and we want to find the inlet pressure (P1).
+        # The fluids.compressible.isothermal_gas function solves for the missing parameter.
+        # So, we pass P2 as the known outlet pressure and let it solve for P1.
+        outlet_pressure = inlet_pressure # This is the known outlet pressure
         inlet_pressure = isothermal_gas(
-            P1=outlet_pressure,
-            T=temperature,
-            m=mass_flow,
-            D=diameter,
+            rho=rho,
+            fd=fd,
+            P2=outlet_pressure,
             L=equiv_length,
-            mu=None,
-            P2=None,
-            roughness=roughness,
-            MW=molar_mass,
-            Z=z_factor,
+            D=diameter,
+            m=mass_flow,
         )
+        # The function returns the solved P1, so we need to assign it correctly
+        return inlet_pressure, _gas_state(inlet_pressure, temperature, mass_flow, diameter, molar_mass, z_factor, gamma)
     return outlet_pressure if is_forward else inlet_pressure, _gas_state(inlet_pressure if is_forward else outlet_pressure, temperature, mass_flow, diameter, molar_mass, z_factor, gamma)
 
 

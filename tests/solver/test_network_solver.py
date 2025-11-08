@@ -90,3 +90,25 @@ def test_network_solver_runs_all_calculations():
     assert aggregate == pytest.approx(calc.total_segment_loss)
     assert section.result_summary.inlet.pressure is not None
     assert section.result_summary.outlet.pressure is not None
+
+
+def make_gas_fluid() -> Fluid:
+    return Fluid(
+        name="natural_gas",
+        mass_flow_rate=1.0,  # kg/s
+        volumetric_flow_rate=None,
+        phase="gas",
+        temperature=298.15,  # K
+        pressure=1000000.0,  # Pa (10 bar)
+        density=7.0,  # kg/m3 (example density at reference conditions)
+        molecular_weight=18.0,  # g/mol (example for methane)
+        z_factor=0.9,
+        specific_heat_ratio=1.3,
+        viscosity=1.2e-5,  # Pa.s
+        standard_flow_rate=None,
+        vapor_pressure=None,
+        critical_pressure=None,
+    )
+
+
+

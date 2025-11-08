@@ -22,7 +22,11 @@ from network_hydraulic.models.results import (
     ResultSummary,
     SectionResult,
 )
-from network_hydraulic.utils.gas_flow import UNIVERSAL_GAS_CONSTANT
+from network_hydraulic.utils.gas_flow import (
+    UNIVERSAL_GAS_CONSTANT,
+    solve_adiabatic,
+    solve_isothermal,
+)
 
 EROSIONAL_CONVERSION = 0.3048 * sqrt(16.018463)
 
@@ -133,17 +137,132 @@ class NetworkSolver:
         forward = direction != "backward"
         iterator = sections if forward else reversed(sections)
         current = self._initial_pressure(network, forward, boundary)
-        for section in iterator:
-            summary = section.result_summary
-            loss = section.calculation_output.pressure_drop.total_segment_loss or 0.0
-            if forward:
-                summary.inlet.pressure = current
-                summary.outlet.pressure = self._safe_subtract(current, loss)
-                current = summary.outlet.pressure
-            else:
-                summary.outlet.pressure = current
-                summary.inlet.pressure = self._safe_add(current, loss)
-                current = summary.inlet.pressure
+        vol_flow = self._determine_volumetric_flow(network)
+        mass_flow = self._determine_mass_flow(network, vol_flow)
+        gas_flow_model = self.gas_flow_model or network.gas_flow_model
+
+        if network.fluid.is_gas():
+            for section in iterator:
+                summary = section.result_summary
+                if current is None:
+                    break
+
+                # Gather parameters for gas flow solvers
+                temperature = network.fluid.temperature
+                molar_mass = network.fluid.molecular_weight
+                z_factor = network.fluid.z_factor
+                gamma = network.fluid.specific_heat_ratio
+                length = section.length
+                friction_factor = section.calculation_output.pressure_drop.frictional_factor
+                k_total = section.total_K
+                diameter = section.pipe_diameter or section.main_ID or self.default_pipe_diameter
+                roughness = section.roughness
+
+                if not all([temperature, mass_flow, diameter, molar_mass, z_factor, gamma, length, friction_factor, k_total, current, roughness]) or mass_flow is None:
+                    # If any critical parameter is missing, we cannot perform gas flow calculation
+                    # Set pressures to None and break
+                    summary.inlet.pressure = None
+                    summary.outlet.pressure = None
+                    current = None
+                    continue
+
+                if gas_flow_model == "isothermal":
+                    if forward:
+                        summary.inlet.pressure = current
+                        outlet_pressure, _ = solve_isothermal(
+                            inlet_pressure=current,
+                            temperature=temperature,
+                            mass_flow=mass_flow,
+                            diameter=diameter,
+                            length=length,
+                            roughness=roughness,
+                            friction_factor=friction_factor,
+                            k_total=k_total,
+                            molar_mass=molar_mass,
+                            z_factor=z_factor,
+                            gamma=gamma,
+                            is_forward=True,
+                        )
+                        summary.outlet.pressure = outlet_pressure
+                        current = outlet_pressure
+                    else:
+                        summary.outlet.pressure = current
+                        inlet_pressure, _ = solve_isothermal(
+                            inlet_pressure=current, # Pass current as inlet_pressure for backward calculation
+                            temperature=temperature,
+                            mass_flow=mass_flow,
+                            diameter=diameter,
+                            length=length,
+                            roughness=roughness,
+                            friction_factor=friction_factor,
+                            k_total=k_total,
+                            molar_mass=molar_mass,
+                            z_factor=z_factor,
+                            gamma=gamma,
+                            is_forward=False,
+                        )
+                        summary.inlet.pressure = inlet_pressure
+                        current = inlet_pressure
+                elif gas_flow_model == "adiabatic":
+                    if forward:
+                        summary.inlet.pressure = current
+                        outlet_pressure, _ = solve_adiabatic(
+                            boundary_pressure=current, # Use boundary_pressure
+                            temperature=temperature,
+                            mass_flow=mass_flow,
+                            diameter=diameter,
+                            length=length,
+                            roughness=roughness,
+                            friction_factor=friction_factor,
+                            k_total=k_total,
+                            molar_mass=molar_mass,
+                            z_factor=z_factor,
+                            gamma=gamma,
+                            is_forward=True,
+                        )
+                        summary.outlet.pressure = outlet_pressure
+                        current = outlet_pressure
+                    else:
+                        summary.outlet.pressure = current
+                        inlet_pressure, _ = solve_adiabatic(
+                            boundary_pressure=current, # Use boundary_pressure
+                            temperature=temperature,
+                            mass_flow=mass_flow,
+                            diameter=diameter,
+                            length=length,
+                            roughness=roughness,
+                            friction_factor=friction_factor,
+                            k_total=k_total,
+                            molar_mass=molar_mass,
+                            z_factor=z_factor,
+                            gamma=gamma,
+                            is_forward=False,
+                        )
+                        summary.inlet.pressure = inlet_pressure
+                        current = inlet_pressure
+                else:
+                    # Fallback for unknown gas flow model, treat as liquid
+                    loss = section.calculation_output.pressure_drop.total_segment_loss or 0.0
+                    if forward:
+                        summary.inlet.pressure = current
+                        summary.outlet.pressure = self._safe_subtract(current, loss)
+                        current = summary.outlet.pressure
+                    else:
+                        summary.outlet.pressure = current
+                        summary.inlet.pressure = self._safe_add(current, loss)
+                        current = summary.inlet.pressure
+        else: # Liquid flow logic
+            for section in iterator:
+                summary = section.result_summary
+                loss = section.calculation_output.pressure_drop.total_segment_loss or 0.0
+                if forward:
+                    summary.inlet.pressure = current
+                    summary.outlet.pressure = self._safe_subtract(current, loss)
+                    current = summary.outlet.pressure
+                else:
+                    summary.outlet.pressure = current
+                    summary.inlet.pressure = self._safe_add(current, loss)
+                    current = summary.inlet.pressure
 
         if forward:
             network.result_summary.inlet.pressure = sections[0].result_summary.inlet.pressure
