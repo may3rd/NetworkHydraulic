@@ -77,3 +77,23 @@ git ls-files -ci --exclude-from=.gitignore -z | xargs -0 git rm --cached
 2. Flesh out config schema validation (Pydantic/dataclasses JSON).
 3. Add end-to-end tests with representative networks and fluids.
 4. Benchmark solver performance with synthetic and real networks.
+
+## Gaps and Potential Improvements
+
+### 1. Network Topology (Most Significant Gap)
+*   **Current Limitation**: The solver currently only handles linear, sequential pipelines (a simple list of `PipeSection` objects). It cannot model real-world networks with branches (tees) or loops.
+*   **Improvement**: Evolve the `Network` model into a graph-based structure (e.g., using `networkx`). This would enable the implementation of a true network solver (e.g., using the Hardy Cross method or a simultaneous equation approach) to balance flows and pressures across a complex system.
+
+### 2. Component Library
+*   **Gap**: No support for components that add energy, such as **pumps** or **compressors**.
+*   **Gap**: Control valve and orifice models are passive (calculating drop for a given flow) and do not simulate active control (e.g., a valve maintaining a set downstream pressure).
+*   **Improvement**: Introduce new calculator and model classes for pumps and compressors. Enhance valve models to support iterative solutions for achieving setpoint conditions.
+
+### 3. Fluid & Thermal Modeling
+*   **Gap**: The solver is strictly **single-phase**. It cannot handle two-phase flow (gas/liquid, slurries).
+*   **Gap**: Fluid properties (viscosity, and for liquids, density) are assumed constant. No heat transfer model is present to account for temperature changes.
+*   **Improvement**: Introduce two-phase flow correlations. Implement a thermal model to track temperature changes and update fluid properties dynamically. Integrate with a dedicated thermodynamic property library.
+
+### 4. Solver Flexibility
+*   **Gap**: It can only solve for pressure given a fixed flow rate. A common requirement is to solve for the flow rate given fixed inlet and outlet pressures.
+*   **Improvement**: Implement a new solver mode that iteratively adjusts the flow rate until the calculated outlet pressure matches the specified boundary condition. This would be a natural extension of a more advanced network solver.
