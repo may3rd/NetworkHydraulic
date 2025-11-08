@@ -144,7 +144,11 @@ class NetworkSolver:
         if network.fluid.is_gas():
             for section in iterator:
                 summary = section.result_summary
-                if current is None:
+                
+                # Use section's boundary pressure if provided, otherwise use the current pressure from the previous section
+                section_start_pressure = section.boundary_pressure if section.boundary_pressure is not None else current
+
+                if section_start_pressure is None:
                     break
 
                 # Gather parameters for gas flow solvers
@@ -158,7 +162,7 @@ class NetworkSolver:
                 diameter = section.pipe_diameter or section.main_ID or self.default_pipe_diameter
                 roughness = section.roughness
 
-                if not all([temperature, mass_flow, diameter, molar_mass, z_factor, gamma, length, friction_factor, k_total, current, roughness]) or mass_flow is None:
+                if not all([temperature, mass_flow, diameter, molar_mass, z_factor, gamma, length, friction_factor, k_total, section_start_pressure, roughness]) or mass_flow is None:
                     # If any critical parameter is missing, we cannot perform gas flow calculation
                     # Set pressures to None and break
                     summary.inlet.pressure = None
@@ -168,9 +172,9 @@ class NetworkSolver:
 
                 if gas_flow_model == "isothermal":
                     if forward:
-                        summary.inlet.pressure = current
+                        summary.inlet.pressure = section_start_pressure
                         outlet_pressure, _ = solve_isothermal(
-                            inlet_pressure=current,
+                            inlet_pressure=section_start_pressure,
                             temperature=temperature,
                             mass_flow=mass_flow,
                             diameter=diameter,
@@ -186,9 +190,9 @@ class NetworkSolver:
                         summary.outlet.pressure = outlet_pressure
                         current = outlet_pressure
                     else:
-                        summary.outlet.pressure = current
+                        summary.outlet.pressure = section_start_pressure
                         inlet_pressure, _ = solve_isothermal(
-                            inlet_pressure=current, # Pass current as inlet_pressure for backward calculation
+                            inlet_pressure=section_start_pressure, # Pass current as inlet_pressure for backward calculation
                             temperature=temperature,
                             mass_flow=mass_flow,
                             diameter=diameter,
@@ -205,9 +209,9 @@ class NetworkSolver:
                         current = inlet_pressure
                 elif gas_flow_model == "adiabatic":
                     if forward:
-                        summary.inlet.pressure = current
+                        summary.inlet.pressure = section_start_pressure
                         outlet_pressure, _ = solve_adiabatic(
-                            boundary_pressure=current, # Use boundary_pressure
+                            boundary_pressure=section_start_pressure, # Use boundary_pressure
                             temperature=temperature,
                             mass_flow=mass_flow,
                             diameter=diameter,
@@ -223,9 +227,9 @@ class NetworkSolver:
                         summary.outlet.pressure = outlet_pressure
                         current = outlet_pressure
                     else:
-                        summary.outlet.pressure = current
+                        summary.outlet.pressure = section_start_pressure
                         inlet_pressure, _ = solve_adiabatic(
-                            boundary_pressure=current, # Use boundary_pressure
+                            boundary_pressure=section_start_pressure, # Use boundary_pressure
                             temperature=temperature,
                             mass_flow=mass_flow,
                             diameter=diameter,
@@ -244,24 +248,31 @@ class NetworkSolver:
                     # Fallback for unknown gas flow model, treat as liquid
                     loss = section.calculation_output.pressure_drop.total_segment_loss or 0.0
                     if forward:
-                        summary.inlet.pressure = current
-                        summary.outlet.pressure = self._safe_subtract(current, loss)
+                        summary.inlet.pressure = section_start_pressure
+                        summary.outlet.pressure = self._safe_subtract(section_start_pressure, loss)
                         current = summary.outlet.pressure
                     else:
-                        summary.outlet.pressure = current
-                        summary.inlet.pressure = self._safe_add(current, loss)
+                        summary.outlet.pressure = section_start_pressure
+                        summary.inlet.pressure = self._safe_add(section_start_pressure, loss)
                         current = summary.inlet.pressure
         else: # Liquid flow logic
             for section in iterator:
                 summary = section.result_summary
+                
+                # Use section's boundary pressure if provided, otherwise use the current pressure from the previous section
+                section_start_pressure = section.boundary_pressure if section.boundary_pressure is not None else current
+
+                if section_start_pressure is None:
+                    break
+
                 loss = section.calculation_output.pressure_drop.total_segment_loss or 0.0
                 if forward:
-                    summary.inlet.pressure = current
-                    summary.outlet.pressure = self._safe_subtract(current, loss)
+                    summary.inlet.pressure = section_start_pressure
+                    summary.outlet.pressure = self._safe_subtract(section_start_pressure, loss)
                     current = summary.outlet.pressure
                 else:
-                    summary.outlet.pressure = current
-                    summary.inlet.pressure = self._safe_add(current, loss)
+                    summary.outlet.pressure = section_start_pressure
+                    summary.inlet.pressure = self._safe_add(section_start_pressure, loss)
                     current = summary.inlet.pressure
 
         if forward:

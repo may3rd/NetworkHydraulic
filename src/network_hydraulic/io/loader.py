@@ -97,6 +97,7 @@ class ConfigurationLoader:
         roughness = self._quantity(cfg.get("roughness"), "roughness", target_unit="m", default=0.0)
         length = self._quantity(cfg.get("length"), "length", target_unit="m")
         elevation_change = self._quantity(cfg.get("elevation_change"), "elevation_change", target_unit="m")
+        boundary_pressure = self._quantity(cfg.get("boundary_pressure"), "section.boundary_pressure", target_unit="Pa")
         pipe_section = PipeSection(
             id=cfg["id"],
             main_ID=main_d,
@@ -123,6 +124,7 @@ class ConfigurationLoader:
             erosional_constant=cfg.get("erosional_constant"),
             control_valve=control_valve,
             orifice=orifice,
+            boundary_pressure=boundary_pressure,
         )
         return pipe_section
 

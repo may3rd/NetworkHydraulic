@@ -69,6 +69,7 @@ class PipeSection:
     outlet_diameter: Optional[float] = None
     erosional_constant: Optional[float] = None
     mach_number: Optional[float] = None
+    boundary_pressure: Optional[float] = None
     control_valve: Optional[ControlValve] = None
     orifice: Optional[Orifice] = None
     calculation_output: CalculationOutput = field(default_factory=CalculationOutput)
