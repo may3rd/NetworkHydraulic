@@ -25,11 +25,24 @@ def print_summary(network: "Network", result: "NetworkResult") -> None:
     for section_result in result.sections:
         pd = section_result.calculation.pressure_drop
         print(f"Section {section_result.section_id}:")
+        print(f"FITTINGS SUMMARY")
+        print(f"  Fitting K: {pd.fitting_K or 0:.3f}")
+        print(f"  Pipe Length K: {pd.pipe_length_K or 0:.3f}")
+        print(f"  User Supply K: {pd.user_K or 0:.3f}")
+        print(f"  Piping and Fitting Factor: {pd.piping_and_fitting_safety_factor or 0:.3f}")
+        print(f"  Total K: {pd.total_K or 0:.3f}")
+        print(f"CHACTERISTIC SUMMARY")
+        print(f"  Reynolds Number: {pd.reynolds_number or 0:.3f}")
+        print(f"  Flow Regime: {pd.flow_scheme or 'N/A'}")
+        print(f"  Friction Factor: {pd.frictional_factor or 0:.3f}")
+        print(f"PRESSURE LOSS SUMMARY")
         print(f"  Pipe+Fittings Loss: {pd.pipe_and_fittings or 0:.3f} Pa")
         print(f"  Elevation Loss: {pd.elevation_change or 0:.3f} Pa")
         print(f"  Control Valve Loss: {pd.control_valve_pressure_drop or 0:.3f} Pa")
         print(f"  Orifice Loss: {pd.orifice_pressure_drop or 0:.3f} Pa")
+        print(f"  User Specified Fixed Loss: {pd.user_specified_fixed_loss or 0:.3f} Pa")
         print(f"  Total Segment Loss: {pd.total_segment_loss or 0:.3f} Pa")
+        print(f"  Normalized Friction Loss: {pd.normalized_friction_loss or 0:.3f}")
         _print_state_table("    ", section_result.summary)
     print("Overall Network State:")
     _print_state_table("    ", network.result_summary)
@@ -51,7 +64,7 @@ def write_output(
         section_result = section_results.get(section.id)
         if section_result:
             section_cfg["calculation_result"] = _section_result_payload(
-                section_result, section_cfg.get("length"), mass_flow_rate, standard_density
+                section_result, section_cfg.get("length"), mass_flow_rate, standard_density, section
             )
         network_cfg["sections"].append(section_cfg)
 
@@ -79,6 +92,14 @@ def _pressure_drop_dict(details, length: float | None) -> Dict[str, Any]:
     if length and length > 0 and details.pipe_and_fittings:
         normalized = details.pipe_and_fittings / length * 100.0
     return {
+        "fitting_K": details.fitting_K,
+        "pipe_length_K": details.pipe_length_K,
+        "user_K": details.user_K,
+        "piping_and_fitting_safety_factor": details.piping_and_fitting_safety_factor,
+        "total_K": details.total_K,
+        "reynolds_number": details.reynolds_number,
+        "flow_scheme": details.flow_scheme,
+        "frictional_factor": details.frictional_factor,
         "pipe_and_fittings": details.pipe_and_fittings,
         "elevation_change": details.elevation_change,
         "control_valve": details.control_valve_pressure_drop,
@@ -244,10 +265,17 @@ def _section_result_payload(
     section_length: Optional[float],
     mass_flow_rate: Optional[float],
     standard_density: Optional[float],
+    section: "PipeSection",
 ) -> Dict[str, Any]:
     calculation = section_result.calculation
+    pressure_drop_dict = _pressure_drop_dict(calculation.pressure_drop, section_length)
+    pressure_drop_dict["fitting_K"] = section.fitting_K
+    pressure_drop_dict["pipe_length_K"] = section.pipe_length_K
+    pressure_drop_dict["user_K"] = section.user_K
+    pressure_drop_dict["piping_and_fitting_safety_factor"] = section.piping_and_fitting_safety_factor
+    pressure_drop_dict["total_K"] = section.total_K
     return {
-        "pressure_drop": _pressure_drop_dict(calculation.pressure_drop, section_length),
+        "pressure_drop": pressure_drop_dict,
         "summary": _summary_dict(section_result.summary),
         "flow": _flow_dict(section_result.summary, mass_flow_rate, standard_density),
     }

@@ -33,6 +33,7 @@ class FrictionCalculator(LossCalculator):
             raise ValueError("Unable to compute Reynolds number for friction calculation")
 
         length = section.length or 0.0
+        friction = 0.0  # Initialize friction
         if length > 0:
             friction = self._friction_factor(reynolds, section.roughness or 0.0, diameter)
             pipe_k = self._pipe_k(friction, length, diameter)
@@ -42,13 +43,25 @@ class FrictionCalculator(LossCalculator):
         fitting_k = section.fitting_K or 0.0
         total_k = pipe_k + fitting_k
         if total_k <= 0:
-            return
-        delta_p = total_k * density * velocity * velocity / 2.0
+            delta_p = 0.0
+        else:
+            delta_p = total_k * density * velocity * velocity / 2.0
 
         pressure_drop = section.calculation_output.pressure_drop
         pressure_drop.pipe_and_fittings = delta_p
         total = pressure_drop.total_segment_loss or 0.0
         pressure_drop.total_segment_loss = total + delta_p
+        pressure_drop.reynolds_number = reynolds
+        pressure_drop.frictional_factor = friction
+        pressure_drop.flow_scheme = self._determine_flow_scheme(reynolds)
+
+    def _determine_flow_scheme(self, reynolds: float) -> str:
+        if reynolds < 2000:
+            return "laminar"
+        elif reynolds > 4000:
+            return "turbulent"
+        else:
+            return "transition"
 
     def _determine_flow_rate(self) -> float:
         if self.volumetric_flow_rate and self.volumetric_flow_rate > 0:

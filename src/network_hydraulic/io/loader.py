@@ -89,8 +89,8 @@ class ConfigurationLoader:
         fittings = self._build_fittings(cfg.get("fittings"), inlet_diameter, outlet_diameter, pipe_diameter)
         roughness = self._quantity(cfg.get("roughness"), "roughness", target_unit="m", default=0.0)
         length = self._quantity(cfg.get("length"), "length", target_unit="m")
-        elevation_change = self._quantity(cfg.get("elevation_change"), "elevation_change", target_unit="m", default=0.0)
-        return PipeSection(
+        elevation_change = self._quantity(cfg.get("elevation_change"), "elevation_change", target_unit="m")
+        pipe_section = PipeSection(
             id=cfg["id"],
             main_ID=main_d,
             input_ID=inlet_diameter,
@@ -117,6 +117,7 @@ class ConfigurationLoader:
             control_valve=control_valve,
             orifice=orifice,
         )
+        return pipe_section
 
     def _build_control_valve(self, cfg: Optional[Dict[str, Any]]) -> Optional[ControlValve]:
         if not cfg:
@@ -258,6 +259,8 @@ class ConfigurationLoader:
         unit_str = str(unit).strip()
         if not unit_str:
             raise ValueError(f"{name} unit must be a non-empty string")
+        if target_unit and unit_str == target_unit: # Added condition
+            return magnitude_f # Return directly if units are the same
         if target_unit:
             return convert_units(magnitude_f, unit_str, target_unit)
         return magnitude_f

@@ -14,6 +14,14 @@ class PressureDropDetails:
     user_specified_fixed_loss: Optional[float] = None
     total_segment_loss: Optional[float] = None
     normalized_friction_loss: Optional[float] = None
+    reynolds_number: Optional[float] = None
+    frictional_factor: Optional[float] = None
+    flow_scheme: Optional[str] = None
+    fitting_K: Optional[float] = None
+    pipe_length_K: Optional[float] = None
+    user_K: Optional[float] = None
+    piping_and_fitting_safety_factor: Optional[float] = None
+    total_K: Optional[float] = None
 
 
 @dataclass(slots=True)

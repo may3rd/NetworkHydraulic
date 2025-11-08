@@ -25,9 +25,9 @@ class QuantityParser(object):
                 value = D(r.group("value").replace(',', '.'))
             else:
                 value = D(r.group("value"))
-            return Quantity(value, unit)
         else:
-            return unit
+            value = D(1)  # Default to 1 if no value is provided
+        return Quantity(value, unit)
 
 
 class UnitParser(object):

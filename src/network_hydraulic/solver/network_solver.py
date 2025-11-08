@@ -11,6 +11,7 @@ from network_hydraulic.calculators.fittings import FittingLossCalculator
 from network_hydraulic.calculators.hydraulics import FrictionCalculator
 from network_hydraulic.calculators.normalization import NormalizedLossCalculator
 from network_hydraulic.calculators.orifices import OrificeCalculator
+from network_hydraulic.calculators.user_fixed_loss import UserFixedLossCalculator
 from network_hydraulic.calculators.valves import ControlValveCalculator
 from network_hydraulic.models.network import Network
 from network_hydraulic.models.pipe_section import PipeSection
@@ -45,6 +46,20 @@ class NetworkSolver:
             self._reset_section(section)
             for calculator in calculators:
                 calculator.calculate(section)
+            # Calculate total_K
+            fitting_K = section.fitting_K or 0.0
+            pipe_length_K = section.pipe_length_K or 0.0
+            user_K = section.user_K or 0.0
+            piping_and_fitting_safety_factor = section.piping_and_fitting_safety_factor or 1.0
+            section.total_K = (fitting_K + pipe_length_K + user_K) * piping_and_fitting_safety_factor
+
+            # Assign K-factors to pressure_drop details
+            pressure_drop = section.calculation_output.pressure_drop
+            pressure_drop.fitting_K = section.fitting_K
+            pressure_drop.pipe_length_K = section.pipe_length_K
+            pressure_drop.user_K = section.user_K
+            pressure_drop.piping_and_fitting_safety_factor = section.piping_and_fitting_safety_factor
+            pressure_drop.total_K = section.total_K
 
         self._apply_pressure_profile(
             sections,
@@ -94,6 +109,7 @@ class NetworkSolver:
                 default_pipe_diameter=self.default_pipe_diameter,
             ),
             NormalizedLossCalculator(),
+            UserFixedLossCalculator(),
         ]
 
     @staticmethod
@@ -166,12 +182,18 @@ class NetworkSolver:
 
     @staticmethod
     def _accumulate(target: PressureDropDetails, source: PressureDropDetails) -> None:
-        for field in fields(PressureDropDetails):
-            value = getattr(source, field.name)
-            if value is None:
-                continue
-            current = getattr(target, field.name)
-            setattr(target, field.name, (current or 0.0) + value)
+        for field_name in [
+            "pipe_and_fittings",
+            "elevation_change",
+            "control_valve_pressure_drop",
+            "orifice_pressure_drop",
+            "user_specified_fixed_loss",
+            "total_segment_loss",
+            "normalized_friction_loss",
+        ]:
+            value = getattr(source, field_name)
+            current = getattr(target, field_name)
+            setattr(target, field_name, (current or 0.0) + (value or 0.0))
 
     def _populate_states(self, sections: Iterable[PipeSection], network: Network) -> None:
         sections = list(sections)
@@ -220,7 +242,7 @@ class NetworkSolver:
         reference_pressure = fluid.pressure if fluid.pressure and fluid.pressure > 0 else None
         inlet_density = base_density
         outlet_density = base_density
-        if base_density and reference_pressure:
+        if fluid.is_gas() and base_density and reference_pressure: # Added fluid.is_gas() check
             if summary.inlet.pressure:
                 inlet_density = base_density * summary.inlet.pressure / reference_pressure
             if summary.outlet.pressure:
