@@ -112,7 +112,6 @@ class NetworkSolver:
                 fluid=fluid,
                 default_pipe_diameter=self.default_pipe_diameter,
             ),
-            NormalizedLossCalculator(),
             UserFixedLossCalculator(),
         ]
 
@@ -189,24 +188,24 @@ class NetworkSolver:
                         )
                         summary.outlet.pressure = outlet_pressure
                         current = outlet_pressure
-                    else:
-                        summary.outlet.pressure = section_start_pressure
-                        inlet_pressure, _ = solve_isothermal(
-                            inlet_pressure=section_start_pressure, # Pass current as inlet_pressure for backward calculation
-                            temperature=temperature,
-                            mass_flow=mass_flow,
-                            diameter=diameter,
-                            length=length,
-                            roughness=roughness,
-                            friction_factor=friction_factor,
-                            k_total=k_total,
-                            molar_mass=molar_mass,
-                            z_factor=z_factor,
-                            gamma=gamma,
-                            is_forward=False,
-                        )
-                        summary.inlet.pressure = inlet_pressure
-                        current = inlet_pressure
+                    
+                    # Update pipe_and_fittings and total_segment_loss for gas flow
+                    if summary.inlet.pressure is not None and summary.outlet.pressure is not None:
+                        total_pressure_drop = abs(summary.inlet.pressure - summary.outlet.pressure)
+                        other_losses = (section.calculation_output.pressure_drop.elevation_change or 0.0) + \
+                                       (section.calculation_output.pressure_drop.control_valve_pressure_drop or 0.0) + \
+                                       (section.calculation_output.pressure_drop.orifice_pressure_drop or 0.0) + \
+                                       (section.calculation_output.pressure_drop.user_specified_fixed_loss or 0.0)
+                        
+                        # Ensure frictional_loss is not negative
+                        frictional_loss = max(0.0, total_pressure_drop - other_losses)
+                        
+                        section.calculation_output.pressure_drop.pipe_and_fittings = frictional_loss
+                        section.calculation_output.pressure_drop.total_segment_loss = total_pressure_drop
+                    
+                    # Recalculate normalized loss after pipe_and_fittings is updated
+                    NormalizedLossCalculator().calculate(section)
+
                 elif gas_flow_model == "adiabatic":
                     if forward:
                         summary.inlet.pressure = section_start_pressure
@@ -244,6 +243,24 @@ class NetworkSolver:
                         )
                         summary.inlet.pressure = inlet_pressure
                         current = inlet_pressure
+
+                    # Update pipe_and_fittings and total_segment_loss for gas flow
+                    if summary.inlet.pressure is not None and summary.outlet.pressure is not None:
+                        total_pressure_drop = abs(summary.inlet.pressure - summary.outlet.pressure)
+                        other_losses = (section.calculation_output.pressure_drop.elevation_change or 0.0) + \
+                                       (section.calculation_output.pressure_drop.control_valve_pressure_drop or 0.0) + \
+                                       (section.calculation_output.pressure_drop.orifice_pressure_drop or 0.0) + \
+                                       (section.calculation_output.pressure_drop.user_specified_fixed_loss or 0.0)
+                        
+                        # Ensure frictional_loss is not negative
+                        frictional_loss = max(0.0, total_pressure_drop - other_losses)
+                        
+                        section.calculation_output.pressure_drop.pipe_and_fittings = frictional_loss
+                        section.calculation_output.pressure_drop.total_segment_loss = total_pressure_drop
+                    
+                    # Recalculate normalized loss after pipe_and_fittings is updated
+                    NormalizedLossCalculator().calculate(section)
+
                 else:
                     # Fallback for unknown gas flow model, treat as liquid
                     loss = section.calculation_output.pressure_drop.total_segment_loss or 0.0
@@ -255,6 +272,9 @@ class NetworkSolver:
                         summary.outlet.pressure = section_start_pressure
                         summary.inlet.pressure = self._safe_add(section_start_pressure, loss)
                         current = summary.inlet.pressure
+                    
+                    # Recalculate normalized loss after pipe_and_fittings is updated
+                    NormalizedLossCalculator().calculate(section)
         else: # Liquid flow logic
             for section in iterator:
                 summary = section.result_summary
@@ -274,6 +294,9 @@ class NetworkSolver:
                     summary.outlet.pressure = section_start_pressure
                     summary.inlet.pressure = self._safe_add(section_start_pressure, loss)
                     current = summary.inlet.pressure
+                
+                # Recalculate normalized loss after pipe_and_fittings is updated
+                NormalizedLossCalculator().calculate(section)
 
         if forward:
             network.result_summary.inlet.pressure = sections[0].result_summary.inlet.pressure
