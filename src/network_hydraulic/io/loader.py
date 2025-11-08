@@ -5,6 +5,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+import json
 
 from ruamel.yaml import YAML
 
@@ -33,6 +34,12 @@ class ConfigurationLoader:
         yaml = _yaml_loader()
         with path.open("r", encoding="utf-8") as handle:
             data = yaml.load(handle) or {}
+        return cls(raw=data)
+
+    @classmethod
+    def from_json_path(cls, path: Path) -> "ConfigurationLoader":
+        with path.open("r", encoding="utf-8") as handle:
+            data = json.load(handle) or {}
         return cls(raw=data)
 
     def build_network(self) -> Network:
