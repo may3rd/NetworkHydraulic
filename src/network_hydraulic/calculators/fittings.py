@@ -10,6 +10,7 @@ from fluids.friction import friction_factor
 from network_hydraulic.calculators.base import LossCalculator
 from network_hydraulic.models.fluid import Fluid
 from network_hydraulic.models.pipe_section import Fitting, PipeSection
+from network_hydraulic.models.results import FittingBreakdown
 
 INCHES_PER_METER = 39.3700787402
 
@@ -53,7 +54,7 @@ FITTING_COEFFICIENTS: Dict[str, object] = {
     "globe_valve": (1500.0, 4.0),
     "diaphragm_valve": (1000.0, 2.0),
     "butterfly_valve": (800.0, 0.25),
-    "swing_check_valve": (1500.0, 1.5),
+    "check_valve_swing": (1500.0, 1.5),
     "lift_check_valve": (2000.0, 10.0),
     "tilting_check_valve": (1000.0, 0.5),
 }
@@ -67,6 +68,8 @@ class FittingLossCalculator(LossCalculator):
     default_pipe_diameter: Optional[float] = None
 
     def calculate(self, section: PipeSection) -> None:
+        details = section.calculation_output.pressure_drop
+        details.fitting_breakdown = []
         if not section.fittings:
             section.fitting_K = 0.0
             return
@@ -80,10 +83,22 @@ class FittingLossCalculator(LossCalculator):
             raise ValueError("Unable to compute Reynolds number for fittings calculation")
 
         total_k = 0.0
+        breakdown: list[FittingBreakdown] = []
         for fitting in section.fittings:
-            total_k += self._fitting_k(fitting, section, reynolds, diameter)
+            k_value = self._fitting_k(fitting, section, reynolds, diameter)
+            count = fitting.count or 1
+            breakdown.append(
+                FittingBreakdown(
+                    type=fitting.type,
+                    count=count,
+                    k_each=k_value / count,
+                    k_total=k_value,
+                )
+            )
+            total_k += k_value
 
         section.fitting_K = total_k
+        details.fitting_breakdown = breakdown
 
     def _pipe_diameter(self, section: PipeSection) -> float:
         for candidate in (section.pipe_diameter, self.default_pipe_diameter):

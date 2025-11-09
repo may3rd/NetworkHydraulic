@@ -98,3 +98,20 @@ def test_missing_pipe_diameter_raises():
     calculator = FittingLossCalculator(fluid=fluid)
     with pytest.raises(ValueError):
         calculator.calculate(section)
+
+
+def test_fitting_breakdown_captures_each_component():
+    fluid = make_fluid()
+    fittings = [Fitting("elbow_90", 2), Fitting("tee_elbow", 1)]
+    section = make_section(fittings)
+    calculator = FittingLossCalculator(fluid=fluid)
+    calculator.calculate(section)
+
+    breakdown = section.calculation_output.pressure_drop.fitting_breakdown
+    assert len(breakdown) == 2
+    elbow = next(item for item in breakdown if item.type == "elbow_90")
+    tee = next(item for item in breakdown if item.type == "tee_elbow")
+    assert elbow.count == 2
+    assert elbow.k_each == pytest.approx(elbow.k_total / elbow.count, rel=1e-6)
+    assert tee.k_each == pytest.approx(tee.k_total / max(tee.count, 1), rel=1e-6)
+    assert section.fitting_K == pytest.approx(elbow.k_total + tee.k_total, rel=1e-6)

@@ -39,7 +39,7 @@ network:  # Top-level network metadata
         - {type: globe_valve, count: 0}  # Globe valve, count in ea
         - {type: diaphragm_valve, count: 0}  # Diaphragm valve, count in ea
         - {type: butterfly_valve, count: 0}  # Butterfly valve, count in ea
-        - {type: swing_check_valve, count: 0}  # Swing check valve, count in ea
+        - {type: check_valve_swing, count: 0}  # Swing check valve, count in ea
         - {type: lift_check_valve, count: 0}  # Lift check valve, count in ea
         - {type: tilting_check_valve, count: 0}  # Tilting check valve, count in ea
         - {type: pipe_entrance_normal, count: 0}  # Sharp-edged pipe entrance, count in ea

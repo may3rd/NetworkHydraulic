@@ -20,9 +20,9 @@ ALLOWED_FITTING_TYPES = [
     "globe_valve",
     "diaphragm_valve",
     "butterfly_valve",
-    "swing_check_valve",
-    "lift_check_valve",
-    "tilting_check_valve",
+    "check_valve_swing",
+    "check_valve_lift",
+    "check_valve_tilting",
     "pipe_entrance_normal",
     "pipe_entrance_raise",
     "pipe_exit",
@@ -68,6 +68,8 @@ class PipeSection:
     mach_number: Optional[float] = None
     boundary_pressure: Optional[float] = None
     direction: Optional[str] = None
+    inlet_diameter_specified: bool = False
+    outlet_diameter_specified: bool = False
     control_valve: Optional[ControlValve] = None
     orifice: Optional[Orifice] = None
     calculation_output: CalculationOutput = field(default_factory=CalculationOutput)

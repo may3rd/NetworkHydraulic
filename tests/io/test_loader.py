@@ -111,6 +111,18 @@ def test_loader_converts_units_when_specified():
 
 
 def test_loader_aligns_adjacent_pipe_diameters():
+    upstream = section_cfg(id="s1", pipe_diameter=0.1, fittings=[])
+    upstream["output_ID"] = None
+    upstream.pop("outlet_diameter", None)
+    downstream = section_cfg(
+        id="s2",
+        pipe_diameter=0.2,
+        fittings=[],
+    )
+    downstream["input_ID"] = None
+    downstream.pop("inlet_diameter", None)
+    downstream["outlet_diameter"] = 0.2
+
     raw = {
         "network": {
             "name": "adjacent",
@@ -124,14 +136,8 @@ def test_loader_aligns_adjacent_pipe_diameters():
                 "viscosity": 1e-3,
             },
             "sections": [
-                section_cfg(id="s1", pipe_diameter=0.1, inlet_diameter=0.1, outlet_diameter=0.1),
-                section_cfg(
-                    id="s2",
-                    pipe_diameter=0.2,
-                    inlet_diameter=None,
-                    outlet_diameter=0.2,
-                    fittings=[],
-                ),
+                upstream,
+                downstream,
             ],
         }
     }
@@ -142,9 +148,53 @@ def test_loader_aligns_adjacent_pipe_diameters():
     assert first.pipe_diameter == pytest.approx(0.1)
     assert second.pipe_diameter == pytest.approx(0.2)
     assert second.inlet_diameter == pytest.approx(first.pipe_diameter)
-    assert first.inlet_diameter == pytest.approx(0.1)
     summary = {f.type: f.count for f in second.fittings}
     assert summary.get("inlet_swage") == 1
+
+
+def test_loader_respects_user_defined_diameters_between_sections():
+    raw = {
+        "network": {
+            "name": "adjacent",
+            "direction": "forward",
+            "fluid": {
+                "name": "water",
+                "phase": "liquid",
+                "temperature": 300.0,
+                "pressure": 101325.0,
+                "density": 1000.0,
+                "viscosity": 1e-3,
+            },
+            "sections": [
+                section_cfg(
+                    id="s1",
+                    pipe_diameter=0.1,
+                    outlet_diameter=0.2,
+                    fittings=[],
+                ),
+                section_cfg(
+                    id="s2",
+                    pipe_diameter=0.2,
+                    inlet_diameter=0.2,
+                    fittings=[],
+                ),
+            ],
+        }
+    }
+    loader = ConfigurationLoader(raw=raw)
+    network = loader.build_network()
+    first, second = network.sections
+    assert not any(f.type == "inlet_swage" for f in second.fittings)
+    assert second.inlet_diameter == pytest.approx(0.2)
+    assert first.outlet_diameter == pytest.approx(0.2)
+
+
+def test_loader_defaults_elevation_change_to_zero_when_missing():
+    loader = ConfigurationLoader(raw={})
+    cfg = section_cfg()
+    cfg.pop("elevation_change")
+    section = loader._build_section(cfg)
+    assert section.elevation_change == 0.0
 
 
 def test_loader_from_json_path(tmp_path: Path):

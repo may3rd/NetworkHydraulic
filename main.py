@@ -38,6 +38,11 @@ def parse_args() -> argparse.Namespace:
         type=float,
         help="Override volumetric flow rate (m^3/s) for calculators",
     )
+    parser.add_argument(
+        "--debug-fittings",
+        action="store_true",
+        help="Print per-fitting K contributions for each section",
+    )
     return parser.parse_args()
 
 
@@ -55,7 +60,7 @@ def main() -> None:
         print(f"Calculation failed: {exc}")
         return
 
-    result_io.print_summary(network, result)
+    result_io.print_summary(network, result, debug=args.debug_fittings)
 
     if args.output:
         result_io.write_output(args.output, network, result)

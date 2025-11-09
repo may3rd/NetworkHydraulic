@@ -14,12 +14,18 @@ STANDARD_PRESSURE = 101_325.0  # 1 atm
 if TYPE_CHECKING:  # pragma: no cover - hints only
     from network_hydraulic.models.network import Network
     from network_hydraulic.models.pipe_section import PipeSection
-    from network_hydraulic.models.results import NetworkResult, ResultSummary, SectionResult, StatePoint
+    from network_hydraulic.models.results import (
+        FittingBreakdown,
+        NetworkResult,
+        ResultSummary,
+        SectionResult,
+        StatePoint,
+    )
     from network_hydraulic.models.fluid import Fluid
     from network_hydraulic.models.pipe_section import Fitting
 
 
-def print_summary(network: "Network", result: "NetworkResult") -> None:
+def print_summary(network: "Network", result: "NetworkResult", *, debug: bool = False) -> None:
     """Pretty-print a human readable summary to stdout."""
     print("Network:", network.name)
     for section_result in result.sections:
@@ -31,6 +37,8 @@ def print_summary(network: "Network", result: "NetworkResult") -> None:
         print(f"  User Supply K: {pd.user_K or 0:.3f}")
         print(f"  Piping and Fitting Factor: {pd.piping_and_fitting_safety_factor or 0:.3f}")
         print(f"  Total K: {pd.total_K or 0:.3f}")
+        if debug:
+            _print_fitting_breakdown("    ", pd.fitting_breakdown)
         print(f"CHACTERISTIC SUMMARY")
         print(f"  Reynolds Number: {pd.reynolds_number or 0:.3f}")
         print(f"  Flow Regime: {pd.flow_scheme or 'N/A'}")
@@ -97,6 +105,7 @@ def _pressure_drop_dict(details, length: float | None) -> Dict[str, Any]:
         "user_K": details.user_K,
         "piping_and_fitting_safety_factor": details.piping_and_fitting_safety_factor,
         "total_K": details.total_K,
+        "fitting_breakdown": _fitting_breakdown_dict(details.fitting_breakdown),
         "reynolds_number": details.reynolds_number,
         "flow_scheme": details.flow_scheme,
         "frictional_factor": details.frictional_factor,
@@ -160,6 +169,31 @@ def _print_state_table(prefix: str, summary: "ResultSummary") -> None:
     print(f"{prefix}  Flow Momentum (rho V^2): {fmt(outlet.flow_momentum)}")
     if outlet.remarks:
         print(f"{prefix}  Remarks: {outlet.remarks}")
+
+def _print_fitting_breakdown(prefix: str, breakdown: Optional[List["FittingBreakdown"]]) -> None:
+    if not breakdown:
+        print(f"{prefix}FITTING DETAILS: none")
+        return
+    print(f"{prefix}FITTING DETAILS")
+    for item in breakdown:
+        print(
+            f"{prefix}  - {item.type} x{item.count}: "
+            f"K_each={item.k_each:.3f}, K_total={item.k_total:.3f}"
+        )
+
+
+def _fitting_breakdown_dict(breakdown: Optional[List["FittingBreakdown"]]) -> Optional[List[Dict[str, Any]]]:
+    if not breakdown:
+        return None
+    return [
+        {
+            "type": item.type,
+            "count": item.count,
+            "k_each": item.k_each,
+            "k_total": item.k_total,
+        }
+        for item in breakdown
+    ]
 
 
 def _network_config(network: "Network") -> Dict[str, Any]:

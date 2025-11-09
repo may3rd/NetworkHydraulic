@@ -6,6 +6,14 @@ from typing import List, Optional
 
 
 @dataclass(slots=True)
+class FittingBreakdown:
+    type: str
+    count: int
+    k_each: float
+    k_total: float
+
+
+@dataclass(slots=True)
 class PressureDropDetails:
     pipe_and_fittings: Optional[float] = None
     elevation_change: Optional[float] = None
@@ -22,6 +30,7 @@ class PressureDropDetails:
     user_K: Optional[float] = None
     piping_and_fitting_safety_factor: Optional[float] = None
     total_K: Optional[float] = None
+    fitting_breakdown: List["FittingBreakdown"] = field(default_factory=list)
 
 
 @dataclass(slots=True)

@@ -153,12 +153,16 @@ class ConfigurationLoader:
         inlet_d = self._diameter(cfg.get("input_ID"), "input_ID", default=main_d)
         outlet_d = self._diameter(cfg.get("output_ID"), "output_ID", default=main_d)
         pipe_diameter = self._diameter(cfg.get("pipe_diameter"), "pipe_diameter", default=main_d)
+        inlet_specified = cfg.get("inlet_diameter") is not None or cfg.get("input_ID") is not None
+        outlet_specified = cfg.get("outlet_diameter") is not None or cfg.get("output_ID") is not None
         inlet_diameter = self._diameter(cfg.get("inlet_diameter"), "inlet_diameter", default=inlet_d)
         outlet_diameter = self._diameter(cfg.get("outlet_diameter"), "outlet_diameter", default=outlet_d)
         fittings = self._build_fittings(cfg.get("fittings"), inlet_diameter, outlet_diameter, pipe_diameter)
         roughness = self._quantity(cfg.get("roughness"), "roughness", target_unit="m", default=0.0)
         length = self._quantity(cfg.get("length"), "length", target_unit="m")
-        elevation_change = self._quantity(cfg.get("elevation_change"), "elevation_change", target_unit="m")
+        elevation_change = self._quantity(
+            cfg.get("elevation_change"), "elevation_change", target_unit="m", default=0.0
+        )
         boundary_pressure = self._quantity(cfg.get("boundary_pressure"), "section.boundary_pressure", target_unit="Pa")
         pipe_section = PipeSection(
             id=cfg["id"],
@@ -181,6 +185,8 @@ class ConfigurationLoader:
             inlet_diameter=inlet_diameter,
             outlet_diameter=outlet_diameter,
             erosional_constant=cfg.get("erosional_constant"),
+            inlet_diameter_specified=inlet_specified,
+            outlet_diameter_specified=outlet_specified,
             control_valve=control_valve,
             orifice=orifice,
             boundary_pressure=boundary_pressure,
@@ -192,17 +198,19 @@ class ConfigurationLoader:
         if not sections:
             return
         for upstream, downstream in zip(sections, sections[1:]):
-            upstream_d = upstream.pipe_diameter
-            downstream_d = downstream.pipe_diameter
-            if upstream_d is None or downstream_d is None:
+            upstream_exit = (
+                upstream.outlet_diameter if upstream.outlet_diameter_specified else upstream.pipe_diameter
+            )
+            downstream_entry = (
+                downstream.inlet_diameter if downstream.inlet_diameter_specified else downstream.pipe_diameter
+            )
+            if upstream_exit is None or downstream_entry is None:
                 continue
-            if abs(upstream_d - downstream_d) <= SWAGE_TOLERANCE:
+            if abs(upstream_exit - downstream_entry) <= SWAGE_TOLERANCE:
                 continue
-            inlet = downstream.inlet_diameter
-            if inlet is not None and abs(inlet - downstream_d) > SWAGE_TOLERANCE:
-                # Respect explicit inlet diameter
+            if upstream.outlet_diameter_specified or downstream.inlet_diameter_specified:
                 continue
-            downstream.inlet_diameter = upstream_d
+            downstream.inlet_diameter = upstream_exit
             self._ensure_swage_fitting(downstream, "inlet_swage")
 
     def _ensure_swage_fitting(self, section: PipeSection, fit_type: str) -> None:
