@@ -188,6 +188,24 @@ class NetworkSolver:
                         )
                         summary.outlet.pressure = outlet_pressure
                         current = outlet_pressure
+                    else:
+                        summary.outlet.pressure = section_start_pressure
+                        inlet_pressure, _ = solve_isothermal(
+                            inlet_pressure=section_start_pressure, # Pass current as inlet_pressure for backward calculation
+                            temperature=temperature,
+                            mass_flow=mass_flow,
+                            diameter=diameter,
+                            length=length,
+                            roughness=roughness,
+                            friction_factor=friction_factor,
+                            k_total=k_total,
+                            molar_mass=molar_mass,
+                            z_factor=z_factor,
+                            gamma=gamma,
+                            is_forward=False,
+                        )
+                        summary.inlet.pressure = inlet_pressure
+                        current = inlet_pressure
                     
                     # Update pipe_and_fittings and total_segment_loss for gas flow
                     if summary.inlet.pressure is not None and summary.outlet.pressure is not None:
