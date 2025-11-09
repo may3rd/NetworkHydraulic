@@ -63,7 +63,13 @@ print(result.summary())
   - When optional flow rates are omitted, the solver derives them from the provided properties.
 - **Boundary pressures**:
   - Prefer setting `upstream_pressure` / `downstream_pressure` on the network block and leave `direction: auto`; the solver infers flow direction from whichever boundary is provided.
-  - If both boundaries and a component-only section (valve/orifice) are defined, the solver automatically assigns the component’s pressure drop from those constraints.
+- If both boundaries and a component-only section (valve/orifice) are defined, the solver automatically assigns the component’s pressure drop from those constraints.
+
+## Helpful References
+- Sample network definition: `config/sample_network.yaml`.
+- Expected results skeleton: `config/sample_results.yaml`.
+- Example fittings metadata: `config/fittings_skeleton.yaml`.
+- Fanno flow overview (basis for the adiabatic solver): [Flows with friction (Fanno flows)](https://kyleniemeyer.github.io/gas-dynamics-notes/compressible-flows/friction.html).
 
 ## Development
 

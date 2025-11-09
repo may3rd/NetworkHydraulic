@@ -288,6 +288,7 @@ class NetworkSolver:
                             z_factor=z_factor,
                             gamma=gamma,
                             is_forward=True,
+                            label=section.id,
                         )
                         summary.outlet.pressure = outlet_pressure
                         current = outlet_pressure
@@ -306,6 +307,7 @@ class NetworkSolver:
                             z_factor=z_factor,
                             gamma=gamma,
                             is_forward=False,
+                            label=section.id,
                         )
                         summary.inlet.pressure = inlet_pressure
                         current = inlet_pressure
@@ -656,7 +658,6 @@ class NetworkSolver:
                 section.orifice.pressure_drop = drop_value
                 pressure_drop.orifice_pressure_drop = drop_value
             NormalizedLossCalculator().calculate(section)
-            break
         return overrides
 
     @staticmethod

@@ -3,12 +3,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from math import log, sqrt, pi
-from typing import Tuple
+from typing import Optional, Tuple
 
 from fluids.compressible import isothermal_gas
 from scipy.optimize import brentq # Import brentq
 
 UNIVERSAL_GAS_CONSTANT = 8314.462618  # J/(kmol*K)
+MIN_FANNO_TARGET = 1e-9
+MIN_MACH = 1e-6
+MIN_DARCY_F = 1e-8
+MIN_LENGTH = 1e-9
 
 
 @dataclass
@@ -126,69 +130,58 @@ def solve_adiabatic(
     z_factor: float,
     gamma: float,
     is_forward: bool = True,
+    *,
+    label: Optional[str] = None,
 ) -> Tuple[float, GasState]:
-    """Full Fanno Flow solver for adiabatic piping segments."""
-    if length is None or length <= 0:
-        return boundary_pressure, _gas_state(boundary_pressure, temperature, mass_flow, diameter, molar_mass, z_factor, gamma)
+    """Fanno-flow solver for adiabatic piping segments."""
+    base_state = _gas_state(boundary_pressure, temperature, mass_flow, diameter, molar_mass, z_factor, gamma)
+    M1 = max(base_state.mach, MIN_MACH)
+    P1 = base_state.pressure
+    T1 = base_state.temperature
 
-    # Calculate initial Mach number and other properties
-    initial_state = _gas_state(boundary_pressure, temperature, mass_flow, diameter, molar_mass, z_factor, gamma)
-    M1 = initial_state.mach
-    P1 = initial_state.pressure
-    T1 = initial_state.temperature
+    pipe_length = max(length or 0.0, 0.0)
+    additional_length = 0.0
+    fd = max(4.0 * friction_factor, MIN_DARCY_F)
+    if k_total and k_total > 0:
+        additional_length = (k_total * diameter) / fd
+    equiv_length = pipe_length + additional_length
 
-    if M1 <= 1e-6: # Handle very low Mach number case
-        return P1, initial_state
+    if equiv_length <= MIN_LENGTH:
+        return boundary_pressure, base_state
 
-    # Calculate Fanno friction parameter for the pipe
-    fd = 4 * friction_factor # Convert Fanning friction factor to Darcy friction factor
-    # Equivalent length includes minor losses (k_total)
-    equiv_length = length + k_total * diameter / max(fd, 1e-12)
     fanno_param_pipe = fd * equiv_length / diameter
+    if fanno_param_pipe <= 0:
+        return boundary_pressure, base_state
 
-    # Determine initial Fanno friction parameter (4fL*/D)1
-    fL_D_1 = _fanno_fL_D(M1, gamma)
+    f_initial = _fanno_fL_D(M1, gamma)
+    target = f_initial - fanno_param_pipe if is_forward else f_initial + fanno_param_pipe
+    choked = False
+    if is_forward and target <= MIN_FANNO_TARGET:
+        target = MIN_FANNO_TARGET
+        choked = True
 
-    # Calculate Fanno friction parameter at the outlet (or inlet for backward flow)
-    if is_forward:
-        fL_D_2 = fL_D_1 - fanno_param_pipe
-    else:
-        # For backward flow, boundary_pressure is the outlet pressure.
-        # So M1, P1, T1 are actually M_outlet, P_outlet, T_outlet.
-        # We need to find the inlet conditions.
-        # fL_D_1 is (4fL*/D)_outlet.
-        # We want (4fL*/D)_inlet = (4fL*/D)_outlet + (4fL/D)_pipe
-        fL_D_2 = fL_D_1 + fanno_param_pipe # This fL_D_2 is actually fL_D_inlet
+    target = max(target, MIN_FANNO_TARGET)
+    try:
+        M2 = _fanno_mach_from_fL_D(target, gamma, M1)
+    except ValueError:
+        M2 = 1.0 - 1e-6
+        choked = True
 
-    # Ensure fL_D_2 is non-negative to avoid physical impossibilities (choking)
-    fL_D_2 = max(0.0, fL_D_2)
-
-    # Solve for Mach number at the outlet (or inlet for backward flow)
-    if abs(fL_D_2) < 1e-9: # If fL_D_2 is approximately 0, then M2 is 1.0 (sonic)
-        M2 = 1.0
-    else:
-        M2 = _fanno_mach_from_fL_D(fL_D_2, gamma, M1)
-
-    # Calculate final pressure and temperature
-    # P2/P1 = (P/P*)_final / (P/P*)_initial
-    # T2/T1 = (T/T*)_final / (T/T*)_initial
     P_ratio_final = _fanno_pressure_ratio(M2, gamma)
     P_ratio_initial = _fanno_pressure_ratio(M1, gamma)
     T_ratio_final = _fanno_temperature_ratio(M2, gamma)
     T_ratio_initial = _fanno_temperature_ratio(M1, gamma)
 
-    if is_forward:
-        outlet_pressure = P1 * (P_ratio_final / P_ratio_initial)
-        outlet_temperature = T1 * (T_ratio_final / T_ratio_initial)
-        final_pressure = outlet_pressure
-        final_temperature = outlet_temperature
-    else:
-        # For backward flow, M2 is M_inlet, P_ratio_final is (P/P*)_inlet, T_ratio_final is (T/T*)_inlet
-        # P1 is P_outlet, T1 is T_outlet
-        inlet_pressure = P1 * (P_ratio_final / P_ratio_initial)
-        inlet_temperature = T1 * (T_ratio_final / T_ratio_initial)
-        final_pressure = inlet_pressure
-        final_temperature = inlet_temperature
+    final_pressure = P1 * (P_ratio_final / P_ratio_initial)
+    final_temperature = T1 * (T_ratio_final / T_ratio_initial)
+
+    if choked and label:
+        from logging import getLogger
+
+        getLogger(__name__).warning(
+            "Section %s reached sonic conditions under adiabatic flow; limiting to Mach 1.",
+            label,
+        )
 
     return final_pressure, _gas_state(final_pressure, final_temperature, mass_flow, diameter, molar_mass, z_factor, gamma)
 
@@ -211,7 +204,7 @@ def find_ma(mach1: float, gamma: float, k_total: float, factor: int) -> float:
 
 
 def _gas_state(pressure: float, temperature: float, mass_flow: float, diameter: float, molar_mass: float, z_factor: float, gamma: float) -> GasState:
-    density = (pressure * molar_mass) / (UNIVERSAL_GAS_CONSTANT * temperature)
+    density = (pressure * molar_mass) / (z_factor * UNIVERSAL_GAS_CONSTANT * temperature)
     area = pi * diameter * diameter / 4.0
     velocity = mass_flow / (density * area)
     sonic = sqrt(gamma * z_factor * UNIVERSAL_GAS_CONSTANT * temperature / molar_mass) # Corrected sonic speed calculation
