@@ -21,9 +21,6 @@ network:
     critical_pressure: null
   sections:
   - id: '1'
-    main_ID: 0.20274
-    input_ID: 0.20274
-    output_ID: 0.20274
     schedule: '40'
     roughness: 4.6e-05
     length: 37.599
@@ -88,9 +85,6 @@ network:
         volumetric_actual: 0.03209428984767254
         volumetric_standard: null
   - id: '2'
-    main_ID: 0.20274
-    input_ID: 0.20274
-    output_ID: 0.10226
     schedule: '40'
     roughness: 4.6e-05
     length: 8.639

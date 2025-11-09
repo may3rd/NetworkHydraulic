@@ -187,9 +187,6 @@ def make_real_sections() -> list[PipeSection]:
         sections.append(
             PipeSection(
                 id=segment["id"],
-                main_ID=main_diameter,
-                input_ID=inlet_diameter,
-                output_ID=outlet_diameter,
                 schedule=segment["schedule"],
                 roughness=roughness_m,
                 length=segment["length_m"],
@@ -207,6 +204,8 @@ def make_real_sections() -> list[PipeSection]:
                 inlet_diameter=inlet_diameter,
                 outlet_diameter=outlet_diameter,
                 erosional_constant=segment.get("erosional_constant", EROSIONAL_CONSTANT),
+                mach_number=None,
+                boundary_pressure=None,
                 control_valve=None,
                 orifice=None,
             )

@@ -20,9 +20,6 @@ from network_hydraulic.models.results import (
 def build_section(section_id: str = "sec-1") -> PipeSection:
     return PipeSection(
         id=section_id,
-        main_ID=0.1,
-        input_ID=0.1,
-        output_ID=0.1,
         schedule="40",
         roughness=1e-4,
         length=5.0,
@@ -41,6 +38,7 @@ def build_section(section_id: str = "sec-1") -> PipeSection:
         outlet_diameter=0.1,
         erosional_constant=None,
         mach_number=None,
+        boundary_pressure=None,
         control_valve=None,
         orifice=None,
     )
@@ -112,3 +110,5 @@ def test_write_output_includes_flow_rates(tmp_path: Path):
     section_flow = data["network"]["sections"][0]["calculation_result"]["flow"]
     assert section_flow["volumetric_actual"] == pytest.approx(actual_expected)
     assert section_flow["volumetric_standard"] == pytest.approx(standard_expected)
+    assert data["network"]["upstream_pressure"] is None
+    assert data["network"]["downstream_pressure"] is None

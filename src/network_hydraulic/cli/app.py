@@ -14,7 +14,7 @@ app = typer.Typer(help="Hydraulic calculation framework")
 @app.command()
 def run(config: Path) -> None:
     """Run a network calculation from a YAML config file."""
-    loader = ConfigurationLoader.from_path(config)
+    loader = ConfigurationLoader.from_yaml_path(config)
     network = loader.build_network()
     solver = NetworkSolver()
     try:

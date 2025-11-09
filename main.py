@@ -43,7 +43,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    loader = ConfigurationLoader.from_path(args.config)
+    loader = ConfigurationLoader.from_yaml_path(args.config)
     network = loader.build_network()
     solver = NetworkSolver(
         default_pipe_diameter=args.default_diameter,

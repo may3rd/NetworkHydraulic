@@ -21,9 +21,6 @@ network:
     critical_pressure: 45000000.0
   sections:
   - id: inlet_to_valve
-    main_ID: 0.15408000000000002
-    input_ID: 0.15408000000000002
-    output_ID: 0.15408000000000002
     schedule: '40'
     roughness: 4.6e-05
     length: 121.92
@@ -93,9 +90,6 @@ network:
         volumetric_actual: 0.0773681731347409
         volumetric_standard: 5.6034923861502595
   - id: valve_to_export
-    main_ID: 0.19369999999999998
-    input_ID: 0.19369999999999998
-    output_ID: 0.19369999999999998
     schedule: '80'
     roughness: 4.6e-05
     length: null

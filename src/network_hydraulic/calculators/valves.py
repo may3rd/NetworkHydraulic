@@ -18,7 +18,12 @@ class ControlValveCalculator(LossCalculator):
     fluid: Fluid
     volumetric_flow_rate: Optional[float] = None
 
-    def calculate(self, section: PipeSection) -> None:
+    def calculate(
+        self,
+        section: PipeSection,
+        *,
+        inlet_pressure_override: Optional[float] = None,
+    ) -> None:
         valve = section.control_valve
         if valve is None:
             return
@@ -29,7 +34,13 @@ class ControlValveCalculator(LossCalculator):
 
         flow = self._determine_flow_rate()
         phase = self.fluid.phase.lower()
-        inlet_pressure = self._inlet_pressure(section)
+        inlet_pressure = (
+            inlet_pressure_override
+            if inlet_pressure_override is not None
+            else self._inlet_pressure(section)
+        )
+        if inlet_pressure is None or inlet_pressure <= 0:
+            raise ValueError("Control valve inlet pressure must be positive")
         drop: float
 
         if valve.pressure_drop is not None:

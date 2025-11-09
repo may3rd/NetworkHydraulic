@@ -5,9 +5,6 @@ from network_hydraulic.models.pipe_section import PipeSection
 def make_section(**overrides):
     base = dict(
         id="sec",
-        main_ID=0.15,
-        input_ID=0.15,
-        output_ID=0.15,
         schedule="40",
         roughness=1e-4,
         length=100.0,
@@ -20,9 +17,13 @@ def make_section(**overrides):
         piping_and_fitting_safety_factor=None,
         total_K=None,
         user_specified_fixed_loss=None,
-        pipe_diameter=None,
-        inlet_diameter=None,
-        outlet_diameter=None,
+        pipe_NPD=None,
+        pipe_diameter=0.15,
+        inlet_diameter=0.15,
+        outlet_diameter=0.15,
+        erosional_constant=None,
+        mach_number=None,
+        boundary_pressure=None,
         control_valve=None,
         orifice=None,
     )

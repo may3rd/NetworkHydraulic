@@ -14,8 +14,10 @@ class Network:
     name: str
     description: Optional[str]
     fluid: Fluid
-    direction: str = "forward"
+    direction: str = "auto"
     boundary_pressure: Optional[float] = None
+    upstream_pressure: Optional[float] = None
+    downstream_pressure: Optional[float] = None
     gas_flow_model: str = "isothermal"
     sections: List[PipeSection] = field(default_factory=list)
     calculation_output: CalculationOutput = field(default_factory=CalculationOutput)

@@ -48,9 +48,6 @@ class Fitting:
 @dataclass(slots=True)
 class PipeSection:
     id: str
-    main_ID: float
-    input_ID: float
-    output_ID: float
     schedule: str
     roughness: float
     length: float
@@ -70,6 +67,7 @@ class PipeSection:
     erosional_constant: Optional[float] = None
     mach_number: Optional[float] = None
     boundary_pressure: Optional[float] = None
+    direction: Optional[str] = None
     control_valve: Optional[ControlValve] = None
     orifice: Optional[Orifice] = None
     calculation_output: CalculationOutput = field(default_factory=CalculationOutput)

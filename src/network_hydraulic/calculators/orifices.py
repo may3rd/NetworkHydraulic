@@ -23,7 +23,12 @@ class OrificeCalculator(LossCalculator):
     default_pipe_diameter: Optional[float] = None
     mass_flow_rate: Optional[float] = None
 
-    def calculate(self, section: PipeSection) -> None:
+    def calculate(
+        self,
+        section: PipeSection,
+        *,
+        inlet_pressure_override: Optional[float] = None,
+    ) -> None:
         orifice = section.orifice
         if orifice is None:
             return
@@ -32,17 +37,28 @@ class OrificeCalculator(LossCalculator):
         if orifice.pressure_drop is not None:
             drop = max(orifice.pressure_drop, 0.0)
         else:
-            drop = self._compute_drop(section, orifice)
+            drop = self._compute_drop(section, orifice, inlet_pressure_override)
             orifice.pressure_drop = drop
 
         pressure_drop.orifice_pressure_drop = drop
         baseline = pressure_drop.total_segment_loss or 0.0
         pressure_drop.total_segment_loss = baseline + drop
 
-    def _compute_drop(self, section: PipeSection, orifice: Orifice) -> float:
+    def _compute_drop(
+        self,
+        section: PipeSection,
+        orifice: Orifice,
+        inlet_pressure_override: Optional[float],
+    ) -> float:
         pipe_diameter = self._pipe_diameter(section)
         orifice_diameter = self._orifice_diameter(orifice, pipe_diameter)
-        inlet_pressure = self._inlet_pressure(section)
+        inlet_pressure = (
+            inlet_pressure_override
+            if inlet_pressure_override is not None
+            else self._inlet_pressure(section)
+        )
+        if inlet_pressure is None or inlet_pressure <= 0:
+            raise ValueError("Orifice inlet pressure must be positive")
         mass_flow = self._mass_flow_rate()
         density = self._fluid_density()
         viscosity = self._fluid_viscosity()

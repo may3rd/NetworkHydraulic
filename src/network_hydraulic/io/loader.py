@@ -1,11 +1,12 @@
 """Configuration loader utilities."""
 from __future__ import annotations
 
+import json
 import re
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-import json
 
 from ruamel.yaml import YAML
 
@@ -30,11 +31,20 @@ class ConfigurationLoader:
     raw: Dict[str, Any]
 
     @classmethod
-    def from_path(cls, path: Path) -> "ConfigurationLoader":
+    def from_yaml_path(cls, path: Path) -> "ConfigurationLoader":
         yaml = _yaml_loader()
         with path.open("r", encoding="utf-8") as handle:
             data = yaml.load(handle) or {}
         return cls(raw=data)
+
+    @classmethod
+    def from_path(cls, path: Path) -> "ConfigurationLoader":
+        warnings.warn(
+            "ConfigurationLoader.from_path is deprecated; use from_yaml_path instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return cls.from_yaml_path(path)
 
     @classmethod
     def from_json_path(cls, path: Path) -> "ConfigurationLoader":
@@ -46,20 +56,69 @@ class ConfigurationLoader:
         network_cfg = self.raw.get("network", {})
         fluid_cfg = network_cfg.get("fluid", {})
         boundary_pressure = self._quantity(network_cfg.get("boundary_pressure"), "network.boundary_pressure", target_unit="Pa")
+        upstream_pressure = self._quantity(
+            network_cfg.get("upstream_pressure"), "network.upstream_pressure", target_unit="Pa"
+        )
+        downstream_pressure = self._quantity(
+            network_cfg.get("downstream_pressure"), "network.downstream_pressure", target_unit="Pa"
+        )
+        phase = fluid_cfg.get("phase", "liquid")
+        temperature = self._require_positive_quantity(
+            fluid_cfg.get("temperature"),
+            "fluid.temperature",
+            target_unit="K",
+        )
+        pressure = self._require_positive_quantity(
+            fluid_cfg.get("pressure"),
+            "fluid.pressure",
+            target_unit="Pa",
+        )
+        density_value = self._quantity(
+            fluid_cfg.get("density"),
+            "fluid.density",
+            target_unit="kg/m^3",
+        )
+        viscosity = self._require_positive_quantity(
+            fluid_cfg.get("viscosity"),
+            "fluid.viscosity",
+            target_unit="Pa*s",
+        )
+        molecular_weight = self._coerce_optional_float(
+            fluid_cfg.get("molecular_weight"),
+            "fluid.molecular_weight",
+        )
+        z_factor = self._coerce_optional_float(
+            fluid_cfg.get("z_factor", 1.0),
+            "fluid.z_factor",
+        )
+        specific_heat_ratio = self._coerce_optional_float(
+            fluid_cfg.get("specific_heat_ratio", 1.0),
+            "fluid.specific_heat_ratio",
+        )
+        self._validate_fluid_inputs(
+            phase=phase,
+            temperature=temperature,
+            pressure=pressure,
+            density=density_value,
+            viscosity=viscosity,
+            molecular_weight=molecular_weight,
+            z_factor=z_factor,
+            specific_heat_ratio=specific_heat_ratio,
+        )
         fluid = Fluid(
             name=fluid_cfg.get("name"),
             mass_flow_rate=self._quantity(fluid_cfg.get("mass_flow_rate"), "fluid.mass_flow_rate", target_unit="kg/s"),
             volumetric_flow_rate=self._quantity(
                 fluid_cfg.get("volumetric_flow_rate"), "fluid.volumetric_flow_rate", target_unit="m^3/s"
             ),
-            phase=fluid_cfg.get("phase", "liquid"),
-            temperature=self._quantity(fluid_cfg.get("temperature"), "fluid.temperature", target_unit="K", default=0.0),
-            pressure=self._quantity(fluid_cfg.get("pressure"), "fluid.pressure", target_unit="Pa", default=0.0),
-            density=self._quantity(fluid_cfg.get("density"), "fluid.density", target_unit="kg/m^3", default=0.0),
-            molecular_weight=fluid_cfg.get("molecular_weight", 0.0),
-            z_factor=fluid_cfg.get("z_factor", 1.0),
-            specific_heat_ratio=fluid_cfg.get("specific_heat_ratio", 1.0),
-            viscosity=self._quantity(fluid_cfg.get("viscosity"), "fluid.viscosity", target_unit="Pa*s", default=0.0),
+            phase=phase,
+            temperature=temperature,
+            pressure=pressure,
+            density=density_value if density_value is not None else 0.0,
+            molecular_weight=molecular_weight if molecular_weight is not None else 0.0,
+            z_factor=z_factor if z_factor is not None else 1.0,
+            specific_heat_ratio=specific_heat_ratio if specific_heat_ratio is not None else 1.0,
+            viscosity=viscosity,
             standard_flow_rate=self._quantity(
                 fluid_cfg.get("standard_flow_rate"), "fluid.standard_flow_rate", target_unit="m^3/s"
             ),
@@ -70,7 +129,8 @@ class ConfigurationLoader:
         )
         sections_cfg: List[Dict[str, Any]] = network_cfg.get("sections", [])
         sections = [self._build_section(cfg) for cfg in sections_cfg]
-        direction = network_cfg.get("direction", "forward")
+        self._align_adjacent_diameters(sections)
+        direction = network_cfg.get("direction", "auto")
         gas_flow_model = network_cfg.get("gas_flow_model", network_cfg.get("gas_flow_type", "isothermal"))
         return Network(
             name=network_cfg.get("name", "network"),
@@ -78,6 +138,8 @@ class ConfigurationLoader:
             fluid=fluid,
             direction=direction,
             boundary_pressure=boundary_pressure,
+            upstream_pressure=upstream_pressure,
+            downstream_pressure=downstream_pressure,
             gas_flow_model=gas_flow_model,
             sections=sections,
         )
@@ -100,14 +162,11 @@ class ConfigurationLoader:
         boundary_pressure = self._quantity(cfg.get("boundary_pressure"), "section.boundary_pressure", target_unit="Pa")
         pipe_section = PipeSection(
             id=cfg["id"],
-            main_ID=main_d,
-            input_ID=inlet_diameter,
-            output_ID=outlet_diameter,
             schedule=schedule,
             roughness=roughness,
             length=length,
             elevation_change=elevation_change,
-            fitting_type=cfg.get("fitting_type", "SCRD"),
+            fitting_type=cfg.get("fitting_type", "LR"),
             fittings=fittings,
             fitting_K=cfg.get("fitting_K"),
             pipe_length_K=cfg.get("pipe_length_K"),
@@ -125,8 +184,31 @@ class ConfigurationLoader:
             control_valve=control_valve,
             orifice=orifice,
             boundary_pressure=boundary_pressure,
+            direction=cfg.get("direction"),
         )
         return pipe_section
+
+    def _align_adjacent_diameters(self, sections: List[PipeSection]) -> None:
+        if not sections:
+            return
+        for upstream, downstream in zip(sections, sections[1:]):
+            upstream_d = upstream.pipe_diameter
+            downstream_d = downstream.pipe_diameter
+            if upstream_d is None or downstream_d is None:
+                continue
+            if abs(upstream_d - downstream_d) <= SWAGE_TOLERANCE:
+                continue
+            inlet = downstream.inlet_diameter
+            if inlet is not None and abs(inlet - downstream_d) > SWAGE_TOLERANCE:
+                # Respect explicit inlet diameter
+                continue
+            downstream.inlet_diameter = upstream_d
+            self._ensure_swage_fitting(downstream, "inlet_swage")
+
+    def _ensure_swage_fitting(self, section: PipeSection, fit_type: str) -> None:
+        if self._has_fitting(section.fittings, fit_type):
+            return
+        section.fittings.append(Fitting(type=fit_type, count=1))
 
     def _build_control_valve(self, cfg: Optional[Dict[str, Any]]) -> Optional[ControlValve]:
         if not cfg:
@@ -281,3 +363,62 @@ class ConfigurationLoader:
         magnitude = float(match.group(1))
         unit = match.group(2).strip()
         return convert_units(magnitude, unit, target_unit)
+
+    def _require_positive_quantity(
+        self,
+        raw: Optional[Any],
+        name: str,
+        *,
+        target_unit: Optional[str] = None,
+    ) -> float:
+        value = self._quantity(raw, name, target_unit=target_unit)
+        if value is None:
+            raise ValueError(f"{name} must be provided")
+        if value <= 0:
+            raise ValueError(f"{name} must be positive")
+        return value
+
+    @staticmethod
+    def _coerce_optional_float(value: Optional[Any], name: str) -> Optional[float]:
+        if value is None:
+            return None
+        try:
+            return float(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"{name} must be numeric") from exc
+
+    @staticmethod
+    def _validate_fluid_inputs(
+        *,
+        phase: str,
+        temperature: float,
+        pressure: float,
+        density: Optional[float],
+        viscosity: float,
+        molecular_weight: Optional[float],
+        z_factor: Optional[float],
+        specific_heat_ratio: Optional[float],
+    ) -> None:
+        errors: list[str] = []
+        if temperature <= 0:
+            errors.append("fluid.temperature must be positive")
+        if pressure <= 0:
+            errors.append("fluid.pressure must be positive")
+        if viscosity <= 0:
+            errors.append("fluid.viscosity must be positive")
+
+        normalized_phase = (phase or "").strip().lower()
+        if normalized_phase == "liquid":
+            if density is None or density <= 0:
+                errors.append("fluid.density must be provided and positive for liquids")
+        else:
+            # Gas / vapor requirements
+            if molecular_weight is None or molecular_weight <= 0:
+                errors.append("fluid.molecular_weight must be provided and positive for gases")
+            if z_factor is None or z_factor <= 0:
+                errors.append("fluid.z_factor must be provided and positive for gases")
+            if specific_heat_ratio is None or specific_heat_ratio <= 0:
+                errors.append("fluid.specific_heat_ratio must be provided and positive for gases")
+
+        if errors:
+            raise ValueError("; ".join(errors))

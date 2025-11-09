@@ -1,3 +1,6 @@
+import json
+from pathlib import Path
+
 import pytest
 
 from network_hydraulic.io.loader import ConfigurationLoader
@@ -65,7 +68,6 @@ def test_loader_derives_diameter_from_npd():
     cfg = section_cfg(main_ID=None, pipe_NPD=6.0, schedule="40", pipe_diameter=None, inlet_diameter=None, outlet_diameter=None)
     section = loader._build_section(cfg)
     # 6" schedule 40 has an ID of 0.15408 m
-    assert section.main_ID == pytest.approx(0.15408, rel=1e-5)
     assert section.pipe_diameter == pytest.approx(0.15408, rel=1e-5)
 
 
@@ -106,3 +108,76 @@ def test_loader_converts_units_when_specified():
     assert section.roughness == pytest.approx(convert(1.5, "mm", "m"))
     assert section.control_valve is not None
     assert section.control_valve.pressure_drop == pytest.approx(convert(5, "psig", "Pa"))
+
+
+def test_loader_aligns_adjacent_pipe_diameters():
+    raw = {
+        "network": {
+            "name": "adjacent",
+            "direction": "forward",
+            "fluid": {
+                "name": "water",
+                "phase": "liquid",
+                "temperature": 300.0,
+                "pressure": 101325.0,
+                "density": 1000.0,
+                "viscosity": 1e-3,
+            },
+            "sections": [
+                section_cfg(id="s1", pipe_diameter=0.1, inlet_diameter=0.1, outlet_diameter=0.1),
+                section_cfg(
+                    id="s2",
+                    pipe_diameter=0.2,
+                    inlet_diameter=None,
+                    outlet_diameter=0.2,
+                    fittings=[],
+                ),
+            ],
+        }
+    }
+    loader = ConfigurationLoader(raw=raw)
+    network = loader.build_network()
+    first, second = network.sections
+
+    assert first.pipe_diameter == pytest.approx(0.1)
+    assert second.pipe_diameter == pytest.approx(0.2)
+    assert second.inlet_diameter == pytest.approx(first.pipe_diameter)
+    assert first.inlet_diameter == pytest.approx(0.1)
+    summary = {f.type: f.count for f in second.fittings}
+    assert summary.get("inlet_swage") == 1
+
+
+def test_loader_from_json_path(tmp_path: Path):
+    config = {
+        "network": {
+            "name": "json-network",
+            "direction": "forward",
+            "boundary_pressure": 101325.0,
+            "fluid": {
+                "name": "water",
+                "phase": "liquid",
+                "temperature": {"value": 25.0, "unit": "degC"},
+                "pressure": 250000.0,
+                "density": 997.0,
+                "viscosity": 1.0e-3,
+            },
+            "sections": [
+                section_cfg(
+                    length=50.0,
+                    elevation_change=0.0,
+                    fittings=[{"type": "elbow_90", "count": 2}],
+                )
+            ],
+        }
+    }
+    json_path = tmp_path / "network.json"
+    json_path.write_text(json.dumps(config), encoding="utf-8")
+
+    loader = ConfigurationLoader.from_json_path(json_path)
+    network = loader.build_network()
+
+    assert network.name == "json-network"
+    assert len(network.sections) == 1
+    section = network.sections[0]
+    assert section.length == 50.0
+    assert section.fittings[0].type == "elbow_90"

@@ -1,10 +1,11 @@
 """Orchestrates per-section hydraulic calculations."""
 from __future__ import annotations
 
+import logging
 from copy import deepcopy
 from dataclasses import dataclass, fields
 from math import pi, sqrt
-from typing import Iterable, Optional
+from typing import Iterable, Optional, Set
 
 from network_hydraulic.calculators.elevation import ElevationCalculator
 from network_hydraulic.calculators.fittings import FittingLossCalculator
@@ -29,6 +30,7 @@ from network_hydraulic.utils.gas_flow import (
 )
 
 EROSIONAL_CONVERSION = 0.3048 * sqrt(16.018463)
+logger = logging.getLogger(__name__)
 
 @dataclass
 class NetworkSolver:
@@ -104,14 +106,6 @@ class NetworkSolver:
                 volumetric_flow_rate=self.volumetric_flow_rate,
             ),
             elevation,
-            ControlValveCalculator(
-                fluid=fluid,
-                volumetric_flow_rate=self.volumetric_flow_rate,
-            ),
-            OrificeCalculator(
-                fluid=fluid,
-                default_pipe_diameter=self.default_pipe_diameter,
-            ),
             UserFixedLossCalculator(),
         ]
 
@@ -132,23 +126,48 @@ class NetworkSolver:
         sections = list(sections)
         if not sections:
             return
-        direction = (direction or "forward").lower()
-        forward = direction != "backward"
+        resolved_direction = self._resolve_direction(network, direction)
+        network.direction = resolved_direction
+        forward = resolved_direction != "backward"
         iterator = sections if forward else reversed(sections)
-        current = self._initial_pressure(network, forward, boundary)
+        boundary_hint = boundary if boundary is not None else self._default_boundary(network, forward)
+        component_overrides = self._initialize_component_sections(sections, network)
+        current = self._initial_pressure(network, forward, boundary_hint)
         vol_flow = self._determine_volumetric_flow(network)
         mass_flow = self._determine_mass_flow(network, vol_flow)
         gas_flow_model = self.gas_flow_model or network.gas_flow_model
 
+        control_valve_calculator = ControlValveCalculator(
+            fluid=network.fluid,
+            volumetric_flow_rate=self.volumetric_flow_rate,
+        )
+        orifice_calculator = OrificeCalculator(
+            fluid=network.fluid,
+            default_pipe_diameter=self.default_pipe_diameter,
+            mass_flow_rate=mass_flow,
+        )
+
         if network.fluid.is_gas():
             for section in iterator:
                 summary = section.result_summary
+                if id(section) in component_overrides:
+                    current = summary.outlet.pressure if forward else summary.inlet.pressure
+                    continue
                 
                 # Use section's boundary pressure if provided, otherwise use the current pressure from the previous section
                 section_start_pressure = section.boundary_pressure if section.boundary_pressure is not None else current
 
                 if section_start_pressure is None:
                     break
+
+                self._apply_pressure_dependent_losses(
+                    section,
+                    inlet_pressure=section_start_pressure,
+                    control_valve_calculator=control_valve_calculator,
+                    orifice_calculator=orifice_calculator,
+                )
+
+                loss = section.calculation_output.pressure_drop.total_segment_loss or 0.0
 
                 # Gather parameters for gas flow solvers
                 temperature = network.fluid.temperature
@@ -158,12 +177,41 @@ class NetworkSolver:
                 length = section.length
                 friction_factor = section.calculation_output.pressure_drop.frictional_factor
                 k_total = section.total_K
-                diameter = section.pipe_diameter or section.main_ID or self.default_pipe_diameter
+                diameter = section.pipe_diameter or self.default_pipe_diameter
                 roughness = section.roughness
 
-                if not all([temperature, mass_flow, diameter, molar_mass, z_factor, gamma, length, friction_factor, k_total, section_start_pressure, roughness]) or mass_flow is None:
-                    # If any critical parameter is missing, we cannot perform gas flow calculation
-                    # Set pressures to None and break
+                missing_params: list[str] = []
+                positive_required = {
+                    "temperature": temperature,
+                    "mass_flow": mass_flow,
+                    "diameter": diameter,
+                    "molar_mass": molar_mass,
+                    "z_factor": z_factor,
+                    "gamma": gamma,
+                }
+                for name, value in positive_required.items():
+                    if value is None or value <= 0:
+                        missing_params.append(name)
+
+                nullable_required = {
+                    "length": length,
+                    "friction_factor": friction_factor,
+                    "k_total": k_total,
+                    "roughness": roughness,
+                }
+                for name, value in nullable_required.items():
+                    if value is None:
+                        missing_params.append(name)
+
+                if section_start_pressure is None:
+                    missing_params.append("section_start_pressure")
+
+                if missing_params:
+                    logger.warning(
+                        "Skipping gas section %s due to missing parameters: %s",
+                        section.id,
+                        ", ".join(missing_params),
+                    )
                     summary.inlet.pressure = None
                     summary.outlet.pressure = None
                     current = None
@@ -297,12 +345,22 @@ class NetworkSolver:
             for section in iterator:
                 summary = section.result_summary
                 
+                if id(section) in component_overrides:
+                    current = summary.outlet.pressure if forward else summary.inlet.pressure
+                    continue
+                
                 # Use section's boundary pressure if provided, otherwise use the current pressure from the previous section
                 section_start_pressure = section.boundary_pressure if section.boundary_pressure is not None else current
 
                 if section_start_pressure is None:
                     break
 
+                self._apply_pressure_dependent_losses(
+                    section,
+                    inlet_pressure=section_start_pressure,
+                    control_valve_calculator=control_valve_calculator,
+                    orifice_calculator=orifice_calculator,
+                )
                 loss = section.calculation_output.pressure_drop.total_segment_loss or 0.0
                 if forward:
                     summary.inlet.pressure = section_start_pressure
@@ -323,6 +381,28 @@ class NetworkSolver:
             network.result_summary.outlet.pressure = sections[-1].result_summary.outlet.pressure
             network.result_summary.inlet.pressure = sections[0].result_summary.inlet.pressure
 
+    def _apply_pressure_dependent_losses(
+        self,
+        section: PipeSection,
+        *,
+        inlet_pressure: Optional[float],
+        control_valve_calculator: ControlValveCalculator,
+        orifice_calculator: OrificeCalculator,
+    ) -> None:
+        if inlet_pressure is None or inlet_pressure <= 0:
+            return
+
+        if section.control_valve:
+            control_valve_calculator.calculate(
+                section,
+                inlet_pressure_override=inlet_pressure,
+            )
+        if section.orifice:
+            orifice_calculator.calculate(
+                section,
+                inlet_pressure_override=inlet_pressure,
+            )
+
     def _initial_pressure(
         self,
         network: Network,
@@ -332,11 +412,24 @@ class NetworkSolver:
         if boundary and boundary > 0:
             return boundary
         summary = network.result_summary
-        candidate = summary.inlet.pressure if forward else summary.outlet.pressure
-        if candidate and candidate > 0:
-            return candidate
-        if network.fluid.pressure and network.fluid.pressure > 0:
-            return network.fluid.pressure
+        candidates = (
+            [
+                summary.inlet.pressure,
+                network.upstream_pressure,
+                network.boundary_pressure,
+                network.fluid.pressure,
+            ]
+            if forward
+            else [
+                summary.outlet.pressure,
+                network.downstream_pressure,
+                network.boundary_pressure,
+                network.fluid.pressure,
+            ]
+        )
+        for candidate in candidates:
+            if candidate and candidate > 0:
+                return candidate
         return None
 
     @staticmethod
@@ -382,16 +475,27 @@ class NetworkSolver:
         fluid = network.fluid
         if fluid.volumetric_flow_rate and fluid.volumetric_flow_rate > 0:
             return fluid.volumetric_flow_rate
-        if fluid.mass_flow_rate and fluid.mass_flow_rate > 0 and fluid.density > 0:
-            return fluid.mass_flow_rate / fluid.density
+        if fluid.mass_flow_rate and fluid.mass_flow_rate > 0:
+            try:
+                density = fluid.current_density()
+            except ValueError:
+                density = fluid.density if fluid.density and fluid.density > 0 else None
+            if density and density > 0:
+                return fluid.mass_flow_rate / density
         return None
 
     def _determine_mass_flow(self, network: Network, vol_flow: Optional[float]) -> Optional[float]:
         fluid = network.fluid
         if fluid.mass_flow_rate and fluid.mass_flow_rate > 0:
             return fluid.mass_flow_rate
-        if vol_flow and vol_flow > 0 and fluid.density > 0:
-            return vol_flow * fluid.density
+        density: Optional[float] = None
+        try:
+            density = fluid.current_density()
+        except ValueError:
+            if fluid.density and fluid.density > 0:
+                density = fluid.density
+        if vol_flow and vol_flow > 0 and density and density > 0:
+            return vol_flow * density
         return None
 
     def _populate_section_state(
@@ -402,7 +506,7 @@ class NetworkSolver:
         mass_flow: Optional[float],
     ) -> None:
         summary = section.result_summary
-        diameter = section.pipe_diameter or section.main_ID or self.default_pipe_diameter
+        diameter = section.pipe_diameter or self.default_pipe_diameter
         if not diameter or diameter <= 0:
             return
         area = pi * diameter * diameter * 0.25
@@ -507,3 +611,58 @@ class NetworkSolver:
             inlet=deepcopy(sections[0].result_summary.inlet),
             outlet=deepcopy(sections[-1].result_summary.outlet),
         )
+
+    def _resolve_direction(self, network: Network, requested: Optional[str]) -> str:
+        candidate = (requested or "").lower()
+        if candidate in {"forward", "backward"}:
+            return candidate
+        net_dir = (network.direction or "").lower()
+        if net_dir in {"forward", "backward"}:
+            return net_dir
+        if network.upstream_pressure and not network.downstream_pressure:
+            return "forward"
+        if network.downstream_pressure and not network.upstream_pressure:
+            return "backward"
+        return "forward"
+
+    def _default_boundary(self, network: Network, forward: bool) -> Optional[float]:
+        return (
+            network.upstream_pressure if forward else network.downstream_pressure
+        ) or network.boundary_pressure
+
+    def _initialize_component_sections(
+        self,
+        sections: Iterable[PipeSection],
+        network: Network,
+    ) -> Set[int]:
+        overrides: Set[int] = set()
+        if network.upstream_pressure is None or network.downstream_pressure is None:
+            return overrides
+        for section in sections:
+            if not self._is_component_only(section):
+                continue
+            overrides.add(id(section))
+            section.direction = section.direction or "bidirectional"
+            summary = section.result_summary
+            summary.inlet.pressure = network.upstream_pressure
+            summary.outlet.pressure = network.downstream_pressure
+            drop_value = abs(network.upstream_pressure - network.downstream_pressure)
+            pressure_drop = section.calculation_output.pressure_drop
+            pressure_drop.total_segment_loss = drop_value
+            if section.control_valve:
+                section.control_valve.pressure_drop = drop_value
+                pressure_drop.control_valve_pressure_drop = drop_value
+            if section.orifice:
+                section.orifice.pressure_drop = drop_value
+                pressure_drop.orifice_pressure_drop = drop_value
+            NormalizedLossCalculator().calculate(section)
+            break
+        return overrides
+
+    @staticmethod
+    def _is_component_only(section: PipeSection) -> bool:
+        has_length = section.length is not None and section.length > 0
+        has_fittings = bool(section.fittings)
+        has_control = section.control_valve is not None
+        has_orifice = section.orifice is not None
+        return (not has_length) and (not has_fittings) and (has_control or has_orifice)

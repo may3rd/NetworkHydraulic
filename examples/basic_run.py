@@ -8,7 +8,7 @@ from network_hydraulic.solver import network_solver
 
 def main() -> None:
     config_path = Path(__file__).parent.parent / "config" / "sample_network.yaml"
-    config = loader.ConfigurationLoader.from_path(config_path)
+    config = loader.ConfigurationLoader.from_yaml_path(config_path)
     network = config.build_network()
     solver = network_solver.NetworkSolver()
     results = solver.run(network)
