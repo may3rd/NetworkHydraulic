@@ -91,8 +91,8 @@ git ls-files -ci --exclude-from=.gitignore -z | xargs -0 git rm --cached
 
 ### 3. Fluid & Thermal Modeling
 *   **Gap**: The solver is strictly **single-phase**. It cannot handle two-phase flow (gas/liquid, slurries).
-*   **Gap**: Fluid properties (viscosity, and for liquids, density) are assumed constant. No heat transfer model is present to account for temperature changes.
-*   **Gap**: The current adiabatic gas flow model is simplified and does not accurately account for temperature changes, which is a critical aspect of true adiabatic processes.
+*   **Gap**: Fluid properties (viscosity, and for liquids, density) are assumed constant.
+*   **Addressed**: The adiabatic gas flow model now accurately accounts for temperature changes using full Fanno Flow equations.
 *   **Improvement**: Introduce two-phase flow correlations. Implement a thermal model to track temperature changes and update fluid properties dynamically. Integrate with a dedicated thermodynamic property library.
 
 ### 4. Solver Flexibility
