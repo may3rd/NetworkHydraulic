@@ -27,12 +27,14 @@ class ControlValveCalculator(LossCalculator):
         valve = section.control_valve
         if valve is None:
             return
+        self._apply_section_defaults(section, valve)
+
         if valve.cv is None and valve.cg:
             valve.cv = self._cv_from_cg(valve.cg, valve)
         if valve.pressure_drop is None and valve.cv is None:
             return
 
-        flow = self._determine_flow_rate()
+        flow = self._determine_flow_rate(section)
         phase = self.fluid.phase.lower()
         inlet_pressure = (
             inlet_pressure_override
@@ -66,6 +68,7 @@ class ControlValveCalculator(LossCalculator):
             valve.cv = convert_flow_coefficient(kv, "Kv", "Cv")
             if valve.cg is None:
                 valve.cg = self._cg_from_cv(valve.cv, valve)
+        valve.pressure_drop = drop
         return drop
 
     def _solve_drop_from_cv(
@@ -160,7 +163,19 @@ class ControlValveCalculator(LossCalculator):
                 upper = mid
         return 0.5 * (lower + upper)
 
-    def _determine_flow_rate(self) -> float:
+    @staticmethod
+    def _apply_section_defaults(section: PipeSection, valve) -> None:
+        if valve.inlet_diameter is None:
+            valve.inlet_diameter = section.inlet_diameter or section.pipe_diameter
+        if valve.outlet_diameter is None:
+            valve.outlet_diameter = section.outlet_diameter or section.pipe_diameter
+        if valve.valve_diameter is None:
+            valve.valve_diameter = section.pipe_diameter
+
+    def _determine_flow_rate(self, section: PipeSection) -> float:
+        flow = section.design_volumetric_flow_rate
+        if flow and flow > 0:
+            return flow
         if self.volumetric_flow_rate and self.volumetric_flow_rate > 0:
             return self.volumetric_flow_rate
         return self.fluid.current_volumetric_flow_rate()

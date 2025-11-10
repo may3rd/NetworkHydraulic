@@ -197,6 +197,65 @@ def test_loader_defaults_elevation_change_to_zero_when_missing():
     assert section.elevation_change == 0.0
 
 
+def test_loader_parses_output_units_block():
+    raw = {
+        "network": {
+            "name": "units",
+            "direction": "forward",
+            "output_units": {
+                "pressure": "kPag",
+                "pressure_drop": "kPa",
+                "temperature": "degC",
+            },
+            "fluid": {
+                "name": "water",
+                "phase": "liquid",
+                "temperature": 300.0,
+                "pressure": 101325.0,
+                "density": 1000.0,
+                "viscosity": 1e-3,
+            },
+            "sections": [
+                section_cfg(),
+            ],
+        }
+    }
+    loader = ConfigurationLoader(raw=raw)
+    network = loader.build_network()
+    units = network.output_units
+    assert units.pressure == "kPag"
+    assert units.pressure_drop == "kPa"
+    assert units.temperature == "degC"
+
+
+def test_loader_design_margin_honors_section_override():
+    raw = {
+        "network": {
+            "name": "margin",
+            "direction": "forward",
+            "design_margin": 8.0,
+            "fluid": {
+                "name": "water",
+                "phase": "liquid",
+                "temperature": 300.0,
+                "pressure": 101325.0,
+                "density": 1000.0,
+                "viscosity": 1e-3,
+            },
+            "sections": [
+                section_cfg(id="s1", design_margin=12.0),
+                section_cfg(id="s2"),
+            ],
+        }
+    }
+    loader = ConfigurationLoader(raw=raw)
+    network = loader.build_network()
+    s1, s2 = network.sections
+    assert s1.design_margin == 12.0
+    assert s2.design_margin is None
+    assert network.design_margin == 8.0
+
+
 def test_loader_from_json_path(tmp_path: Path):
     config = {
         "network": {

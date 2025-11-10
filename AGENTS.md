@@ -29,6 +29,8 @@ Cheat sheet for coding agents who need quick context about the hydraulic solver 
 - **Calculators**: Each module mutates `PipeSection.calculation_output`. Implement new loss models by conforming to `LossCalculator` protocol in `calculators/base.py` and append them in `NetworkSolver._build_calculators`.
 - **Solver flow**: `NetworkSolver.run()` resets section state, runs calculators in order, applies directional pressure profile (forward/backward), then backfills network summaries and volumetric/mass flow data. Respect `_apply_pressure_profile` semantics when changing boundary conditions.
 - **IO**: `ConfigurationLoader.from_yaml_path()` is the single entry for YAML ingestion. Keep new schema fields additive and ensure they propagate through loader -> models -> calculators to maintain CLI compatibility.
+- **Output units**: `network.output_units` is optional in configs; when provided it sets the units used by result writers/printouts (pressure vs pressure_drop, temperature, density, velocity, volumetric & mass flow). Defaults remain SI.
+- **Design margins**: `design_margin` (percent) can be set at the network level and overridden per section; the CLI summary reports design-adjusted mass/volumetric flow rates using `(1 + margin/100)`.
 - **Network direction**: Leave `direction` as `"auto"` when possible so upstream/downstream pressures can determine flow direction. Use `upstream_pressure` / `downstream_pressure` in configs when you need boundary-driven runs.
 
 ## Development Workflow

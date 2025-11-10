@@ -14,6 +14,7 @@ from network_hydraulic.models.components import ControlValve, Orifice
 from network_hydraulic.models.fluid import Fluid
 from network_hydraulic.models.network import Network
 from network_hydraulic.models.pipe_section import Fitting, PipeSection
+from network_hydraulic.models.output_units import OutputUnits
 from network_hydraulic.utils.pipe_dimensions import inner_diameter_from_nps
 from network_hydraulic.utils.units import convert as convert_units
 
@@ -132,6 +133,7 @@ class ConfigurationLoader:
         self._align_adjacent_diameters(sections)
         direction = network_cfg.get("direction", "auto")
         gas_flow_model = network_cfg.get("gas_flow_model", network_cfg.get("gas_flow_type", "isothermal"))
+        output_units = self._build_output_units(network_cfg.get("output_units"))
         return Network(
             name=network_cfg.get("name", "network"),
             description=network_cfg.get("description"),
@@ -142,6 +144,8 @@ class ConfigurationLoader:
             downstream_pressure=downstream_pressure,
             gas_flow_model=gas_flow_model,
             sections=sections,
+            output_units=output_units,
+            design_margin=self._coerce_optional_float(network_cfg.get("design_margin"), "network.design_margin"),
         )
 
     def _build_section(self, cfg: Dict[str, Any]) -> PipeSection:
@@ -181,6 +185,8 @@ class ConfigurationLoader:
                 cfg.get("user_specified_fixed_loss"), "user_specified_fixed_loss", target_unit="Pa"
             ),
             pipe_NPD=pipe_npd,
+            description=cfg.get("description"),
+            design_margin=self._coerce_optional_float(cfg.get("design_margin"), "section.design_margin"),
             pipe_diameter=pipe_diameter,
             inlet_diameter=inlet_diameter,
             outlet_diameter=outlet_diameter,
@@ -193,6 +199,19 @@ class ConfigurationLoader:
             direction=cfg.get("direction"),
         )
         return pipe_section
+
+    def _build_output_units(self, cfg: Optional[Dict[str, Any]]) -> OutputUnits:
+        if not cfg:
+            return OutputUnits()
+        valid_keys = set(OutputUnits.__dataclass_fields__.keys())
+        normalized: Dict[str, str] = {}
+        for key, value in cfg.items():
+            if key not in valid_keys:
+                raise ValueError(f"Unknown output unit key '{key}'. Valid keys: {sorted(valid_keys)}")
+            if value is None:
+                continue
+            normalized[key] = str(value).strip()
+        return OutputUnits(**normalized)
 
     def _align_adjacent_diameters(self, sections: List[PipeSection]) -> None:
         if not sections:

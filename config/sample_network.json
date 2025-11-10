@@ -8,6 +8,14 @@
       "unit": "kPag"
     },
     "gas_flow_model": null,
+    "output_units": {
+      "pressure": "kPag",
+      "pressure_drop": "kPa",
+      "temperature": "degC",
+      "volumetric_flow_rate": "m^3/h",
+      "mass_flow_rate": "kg/h",
+      "flow_momentum": "kPa"
+    },
     "fluid": {
       "name": "liquid",
       "phase": "liquid",

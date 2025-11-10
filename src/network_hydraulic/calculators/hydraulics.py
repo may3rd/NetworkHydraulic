@@ -24,7 +24,7 @@ class FrictionCalculator(LossCalculator):
     def calculate(self, section: PipeSection) -> None:
         diameter = self._pipe_diameter(section)
         area = 0.25 * pi * diameter * diameter
-        flow_rate = self._determine_flow_rate()
+        flow_rate = self._determine_flow_rate(section)
         velocity = flow_rate / area
         density = self.fluid.current_density()
         viscosity = self._require_positive(self.fluid.viscosity, "viscosity")
@@ -63,7 +63,10 @@ class FrictionCalculator(LossCalculator):
         else:
             return "transition"
 
-    def _determine_flow_rate(self) -> float:
+    def _determine_flow_rate(self, section: PipeSection) -> float:
+        flow_rate = section.design_volumetric_flow_rate
+        if flow_rate and flow_rate > 0:
+            return flow_rate
         if self.volumetric_flow_rate and self.volumetric_flow_rate > 0:
             return self.volumetric_flow_rate
         return self.fluid.current_volumetric_flow_rate()

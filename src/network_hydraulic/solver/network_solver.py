@@ -50,6 +50,11 @@ class NetworkSolver:
         sections = list(network.sections)
         for section in sections:
             self._reset_section(section)
+
+        base_vol_flow = self._determine_volumetric_flow(network)
+        base_mass_flow = self._determine_mass_flow(network, base_vol_flow)
+        self._assign_design_flows(sections, network, base_vol_flow, base_mass_flow)
+        for section in sections:
             for calculator in calculators:
                 calculator.calculate(section)
             # Calculate total_K
@@ -72,6 +77,8 @@ class NetworkSolver:
             network,
             direction=self.direction or network.direction,
             boundary=self.boundary_pressure if self.boundary_pressure is not None else network.boundary_pressure,
+            base_vol_flow=base_vol_flow,
+            base_mass_flow=base_mass_flow,
         )
         self._populate_states(sections, network)
         self._set_network_summary(network, sections)
@@ -115,6 +122,37 @@ class NetworkSolver:
         section.result_summary = ResultSummary()
         section.fitting_K = None
         section.pipe_length_K = None
+        section.design_flow_multiplier = 1.0
+        section.design_mass_flow_rate = None
+        section.design_volumetric_flow_rate = None
+
+    def _assign_design_flows(
+        self,
+        sections: Iterable[PipeSection],
+        network: Network,
+        base_vol_flow: Optional[float],
+        base_mass_flow: Optional[float],
+    ) -> None:
+        for section in sections:
+            multiplier = self._design_multiplier(section, network)
+            section.design_flow_multiplier = multiplier
+            section.design_volumetric_flow_rate = (
+                base_vol_flow * multiplier if base_vol_flow is not None else None
+            )
+            section.design_mass_flow_rate = (
+                base_mass_flow * multiplier if base_mass_flow is not None else None
+            )
+
+    @staticmethod
+    def _design_multiplier(section: PipeSection, network: Network) -> float:
+        margin = (
+            section.design_margin
+            if section.design_margin is not None
+            else network.design_margin
+        )
+        if margin is None:
+            return 1.0
+        return 1.0 + margin / 100.0
 
     def _apply_pressure_profile(
         self,
@@ -122,6 +160,8 @@ class NetworkSolver:
         network: Network,
         direction: str,
         boundary: Optional[float],
+        base_vol_flow: Optional[float] = None,
+        base_mass_flow: Optional[float] = None,
     ) -> None:
         sections = list(sections)
         if not sections:
@@ -133,8 +173,8 @@ class NetworkSolver:
         boundary_hint = boundary if boundary is not None else self._default_boundary(network, forward)
         component_overrides = self._initialize_component_sections(sections, network)
         current = self._initial_pressure(network, forward, boundary_hint)
-        vol_flow = self._determine_volumetric_flow(network)
-        mass_flow = self._determine_mass_flow(network, vol_flow)
+        vol_flow = base_vol_flow if base_vol_flow is not None else self._determine_volumetric_flow(network)
+        mass_flow = base_mass_flow if base_mass_flow is not None else self._determine_mass_flow(network, vol_flow)
         gas_flow_model = self.gas_flow_model or network.gas_flow_model
 
         control_valve_calculator = ControlValveCalculator(
@@ -180,10 +220,11 @@ class NetworkSolver:
                 diameter = section.pipe_diameter or self.default_pipe_diameter
                 roughness = section.roughness
 
+                section_mass_flow = section.design_mass_flow_rate or mass_flow
                 missing_params: list[str] = []
                 positive_required = {
                     "temperature": temperature,
-                    "mass_flow": mass_flow,
+                    "mass_flow": section_mass_flow,
                     "diameter": diameter,
                     "molar_mass": molar_mass,
                     "z_factor": z_factor,
@@ -223,7 +264,7 @@ class NetworkSolver:
                         outlet_pressure, _ = solve_isothermal(
                             inlet_pressure=section_start_pressure,
                             temperature=temperature,
-                            mass_flow=mass_flow,
+                            mass_flow=section_mass_flow,
                             diameter=diameter,
                             length=length,
                             roughness=roughness,
@@ -241,7 +282,7 @@ class NetworkSolver:
                         inlet_pressure, _ = solve_isothermal(
                             inlet_pressure=section_start_pressure, # Pass current as inlet_pressure for backward calculation
                             temperature=temperature,
-                            mass_flow=mass_flow,
+                            mass_flow=section_mass_flow,
                             diameter=diameter,
                             length=length,
                             roughness=roughness,
@@ -278,7 +319,7 @@ class NetworkSolver:
                         outlet_pressure, _ = solve_adiabatic(
                             boundary_pressure=section_start_pressure, # Use boundary_pressure
                             temperature=temperature,
-                            mass_flow=mass_flow,
+                            mass_flow=section_mass_flow,
                             diameter=diameter,
                             length=length,
                             roughness=roughness,
@@ -297,7 +338,7 @@ class NetworkSolver:
                         inlet_pressure, _ = solve_adiabatic(
                             boundary_pressure=section_start_pressure, # Use boundary_pressure
                             temperature=temperature,
-                            mass_flow=mass_flow,
+                            mass_flow=section_mass_flow,
                             diameter=diameter,
                             length=length,
                             roughness=roughness,
@@ -465,11 +506,14 @@ class NetworkSolver:
         sections = list(sections)
         if not sections:
             return
-        vol_flow = self._determine_volumetric_flow(network)
-        mass_flow = self._determine_mass_flow(network, vol_flow)
         fluid = network.fluid
         for section in sections:
-            self._populate_section_state(section, fluid, vol_flow, mass_flow)
+            self._populate_section_state(
+                section,
+                fluid,
+                section.design_volumetric_flow_rate,
+                section.design_mass_flow_rate,
+            )
 
     def _determine_volumetric_flow(self, network: Network) -> Optional[float]:
         if self.volumetric_flow_rate and self.volumetric_flow_rate > 0:

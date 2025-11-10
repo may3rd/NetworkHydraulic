@@ -15,6 +15,8 @@ from network_hydraulic.models.results import (
     SectionResult,
     StatePoint,
 )
+from network_hydraulic.models.output_units import OutputUnits
+from network_hydraulic.utils.units import convert
 
 
 def build_section(section_id: str = "sec-1") -> PipeSection:
@@ -112,3 +114,66 @@ def test_write_output_includes_flow_rates(tmp_path: Path):
     assert section_flow["volumetric_standard"] == pytest.approx(standard_expected)
     assert data["network"]["upstream_pressure"] is None
     assert data["network"]["downstream_pressure"] is None
+    assert data["network"]["output_units"] == {
+        "pressure": "Pa",
+        "pressure_drop": "Pa",
+        "temperature": "K",
+        "density": "kg/m^3",
+        "velocity": "m/s",
+        "volumetric_flow_rate": "m^3/s",
+        "mass_flow_rate": "kg/s",
+        "flow_momentum": "Pa",
+    }
+
+
+def test_write_output_respects_custom_output_units(tmp_path: Path):
+    section = build_section()
+    fluid = build_fluid()
+    network = Network(
+        name="demo",
+        description=None,
+        fluid=fluid,
+        direction="forward",
+        boundary_pressure=150000.0,
+        gas_flow_model="isothermal",
+        sections=[section],
+    )
+    network.output_units = OutputUnits(
+        pressure="kPag",
+        pressure_drop="kPa",
+        temperature="degC",
+        density="kg/m^3",
+        velocity="ft/s",
+        volumetric_flow_rate="m^3/h",
+        mass_flow_rate="kg/h",
+    )
+    summary = make_summary(density=4.0)
+    section_result = make_results(summary)
+    pd = section_result.calculation.pressure_drop
+    pd.pipe_and_fittings = 5000.0
+    pd.total_segment_loss = 5000.0
+    network_result = NetworkResult(sections=[section_result], aggregate=CalculationOutput(), summary=summary)
+
+    out_path = tmp_path / "custom_units.yaml"
+    results_io.write_output(out_path, network, network_result)
+
+    with out_path.open("r", encoding="utf-8") as handle:
+        data = yaml.safe_load(handle)
+
+    units_block = data["network"]["output_units"]
+    assert units_block["pressure"] == "kPag"
+    boundary_expected = convert(150000.0, "Pa", "kPag")
+    assert data["network"]["boundary_pressure"] == pytest.approx(boundary_expected)
+
+    fluid_block = data["network"]["fluid"]
+    assert fluid_block["pressure"] == pytest.approx(boundary_expected)
+    assert fluid_block["temperature"] == pytest.approx(convert(300.0, "K", "degC"))
+    assert fluid_block["mass_flow_rate"] == pytest.approx(convert(2.0, "kg/s", "kg/h"))
+
+    flow_summary = data["network"]["summary"]["flow"]
+    actual_expected = convert(2.0 / summary.inlet.density, "m^3/s", "m^3/h")
+    assert flow_summary["volumetric_actual"] == pytest.approx(actual_expected)
+
+    section_drop = data["network"]["sections"][0]["calculation_result"]["pressure_drop"]
+    assert section_drop["pipe_and_fittings"] == pytest.approx(convert(5000.0, "Pa", "kPa"))
+    assert section_drop["total"] == pytest.approx(convert(5000.0, "Pa", "kPa"))

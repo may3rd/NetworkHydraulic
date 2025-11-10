@@ -24,8 +24,10 @@ UNIT_ALIASES: Final[dict[str, str]] = {
 def convert(value: float, from_unit: str, to_unit: str) -> float:
     normalized_from = _normalize_unit(from_unit)
     normalized_to = _normalize_unit(to_unit)
-    convert_value = converts(f"{value} {normalized_from}", normalized_to)
-    return float(convert_value)
+    magnitude = abs(value)
+    convert_value = converts(f"{magnitude} {normalized_from}", normalized_to)
+    result = float(convert_value)
+    return result if value >= 0 else -result
 
 
 def _normalize_unit(unit: str) -> str:

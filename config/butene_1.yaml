@@ -1,0 +1,46 @@
+network:
+  name: OSBL Butene -1 
+  description: 
+  direction: forward
+  boundary_pressure:
+    value: 32.2
+    unit: kPag
+  gas_flow_model: null
+  design_margin: 0.0
+  output_units:
+    pressure: kPag
+    pressure_drop: kPa
+    temperature: degC
+    volumetric_flow_rate: m^3/h
+    mass_flow_rate: kg/h
+  fluid:
+    name: Butene-1
+    phase: liquid
+    mass_flow_rate:
+      value: 1000.0
+      unit: kg/h
+    volumetric_flow_rate: null
+    temperature:
+      value: 42.0
+      unit: degC
+    pressure:
+      value: 32.2
+      unit: kPag
+    density:
+      value: 580
+      unit: kg/m^3
+    viscosity: 0.00013
+  sections:
+    - id: "1"
+      schedule: "40"
+      pipe_NPD: 2.0
+      roughness: 4.57e-5
+      length:
+        value: 0.0
+        unit: m
+      erosional_constant: 100
+      fitting_type: LR
+      orifice:
+        tag: FE
+        d_over_D_ratio: 0.0500255
+        

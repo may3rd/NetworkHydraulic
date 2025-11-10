@@ -33,14 +33,18 @@ def make_section(**overrides) -> PipeSection:
 
 def test_normalized_loss_from_friction():
     section = make_section()
-    section.calculation_output.pressure_drop.pipe_and_fittings = 5000.0
+    section.pipe_length_K = 2.0
+    section.fitting_K = 1.0
+    section.calculation_output.pressure_drop.pipe_and_fittings = 6000.0
     calc = NormalizedLossCalculator()
     calc.calculate(section)
-    assert section.calculation_output.pressure_drop.normalized_friction_loss == 10000.0
+    # Pipe-only drop = 6000 * (2 / (2 + 1)) = 4000
+    assert section.calculation_output.pressure_drop.normalized_friction_loss == 8000.0
 
 
 def test_missing_friction_keeps_none():
     section = make_section()
+    section.pipe_length_K = None
     calc = NormalizedLossCalculator()
     calc.calculate(section)
     assert section.calculation_output.pressure_drop.normalized_friction_loss is None

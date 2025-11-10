@@ -1,6 +1,8 @@
 """Orifice pressure loss calculations."""
 from __future__ import annotations
 
+import logging
+import logging
 from dataclasses import dataclass
 from typing import Optional
 
@@ -15,6 +17,8 @@ from network_hydraulic.calculators.base import LossCalculator
 from network_hydraulic.models.components import Orifice
 from network_hydraulic.models.fluid import Fluid
 from network_hydraulic.models.pipe_section import PipeSection
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -52,6 +56,10 @@ class OrificeCalculator(LossCalculator):
     ) -> float:
         pipe_diameter = self._pipe_diameter(section)
         orifice_diameter = self._orifice_diameter(orifice, pipe_diameter)
+        if orifice.pipe_diameter is None:
+            orifice.pipe_diameter = pipe_diameter
+        if orifice.orifice_diameter is None:
+            orifice.orifice_diameter = orifice_diameter
         inlet_pressure = (
             inlet_pressure_override
             if inlet_pressure_override is not None
@@ -59,42 +67,56 @@ class OrificeCalculator(LossCalculator):
         )
         if inlet_pressure is None or inlet_pressure <= 0:
             raise ValueError("Orifice inlet pressure must be positive")
-        mass_flow = self._mass_flow_rate()
+        mass_flow = self._mass_flow_rate(section)
         density = self._fluid_density()
         viscosity = self._fluid_viscosity()
         isentropic_exponent = self._isentropic_exponent()
         meter_type = orifice.meter_type or ISO_5167_ORIFICE
 
-        outlet_pressure = differential_pressure_meter_solver(
-            D=pipe_diameter,
-            D2=orifice_diameter,
-            P1=inlet_pressure,
-            P2=None,
-            rho=density,
-            mu=viscosity,
-            k=isentropic_exponent,
-            m=mass_flow,
-            meter_type=meter_type,
-            taps=orifice.taps,
-            tap_position=orifice.tap_position,
-            C_specified=orifice.discharge_coefficient,
-            epsilon_specified=orifice.expansibility,
-        )
-        discharge_coefficient, _ = differential_pressure_meter_C_epsilon(
-            D=pipe_diameter,
-            D2=orifice_diameter,
-            m=mass_flow,
-            P1=inlet_pressure,
-            P2=outlet_pressure,
-            rho=density,
-            mu=viscosity,
-            k=isentropic_exponent,
-            meter_type=meter_type,
-            taps=orifice.taps,
-            tap_position=orifice.tap_position,
-            C_specified=orifice.discharge_coefficient,
-            epsilon_specified=orifice.expansibility,
-        )
+        try:
+            outlet_pressure = differential_pressure_meter_solver(
+                D=pipe_diameter,
+                D2=orifice_diameter,
+                P1=inlet_pressure,
+                P2=None,
+                rho=density,
+                mu=viscosity,
+                k=isentropic_exponent,
+                m=mass_flow,
+                meter_type=meter_type,
+                taps=orifice.taps,
+                tap_position=orifice.tap_position,
+                C_specified=orifice.discharge_coefficient,
+                epsilon_specified=orifice.expansibility,
+            )
+            discharge_coefficient, expansibility = differential_pressure_meter_C_epsilon(
+                D=pipe_diameter,
+                D2=orifice_diameter,
+                m=mass_flow,
+                P1=inlet_pressure,
+                P2=outlet_pressure,
+                rho=density,
+                mu=viscosity,
+                k=isentropic_exponent,
+                meter_type=meter_type,
+                taps=orifice.taps,
+                tap_position=orifice.tap_position,
+                C_specified=orifice.discharge_coefficient,
+                epsilon_specified=orifice.expansibility,
+            )
+            orifice.discharge_coefficient = discharge_coefficient
+            orifice.expansibility = expansibility
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.warning(
+                "Failed to solve orifice drop for section %s (tag=%s): %s",
+                section.id,
+                getattr(orifice, "tag", None),
+                exc,
+            )
+            outlet_pressure = inlet_pressure
+            discharge_coefficient = 0.0
+            orifice.discharge_coefficient = discharge_coefficient
+            orifice.expansibility = None
         return dP_orifice(
             pipe_diameter,
             orifice_diameter,
@@ -142,7 +164,10 @@ class OrificeCalculator(LossCalculator):
             return self.fluid.specific_heat_ratio
         return 1.4
 
-    def _mass_flow_rate(self) -> float:
+    def _mass_flow_rate(self, section: PipeSection) -> float:
+        mass_flow = section.design_mass_flow_rate
+        if mass_flow and mass_flow > 0:
+            return mass_flow
         if self.mass_flow_rate and self.mass_flow_rate > 0:
             return self.mass_flow_rate
         return self.fluid.current_mass_flow_rate()

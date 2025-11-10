@@ -61,6 +61,8 @@ class PipeSection:
     total_K: Optional[float]
     user_specified_fixed_loss: Optional[float]
     pipe_NPD: Optional[float] = None
+    description: Optional[str] = None
+    design_margin: Optional[float] = None
     pipe_diameter: Optional[float] = None
     inlet_diameter: Optional[float] = None
     outlet_diameter: Optional[float] = None
@@ -74,3 +76,6 @@ class PipeSection:
     orifice: Optional[Orifice] = None
     calculation_output: CalculationOutput = field(default_factory=CalculationOutput)
     result_summary: ResultSummary = field(default_factory=ResultSummary)
+    design_flow_multiplier: float = 1.0
+    design_mass_flow_rate: Optional[float] = None
+    design_volumetric_flow_rate: Optional[float] = None

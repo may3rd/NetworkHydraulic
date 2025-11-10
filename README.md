@@ -45,6 +45,8 @@ print(result.summary())
 
 ## Configuration Hints
 - Numeric fields accept either bare SI values or `{value, unit}` mappings and are normalized by the loader.
+- Add optional `output_units` inside the `network` block to control how result writers/printouts are labeled (pressure vs pressure_drop, temperature, density, velocity, volumetric & mass flow). Defaults remain SI.
+- Use `design_margin` (percent) on `network` or individual `sections` to document design flows; section values override the network margin when present.
 - Example:
   ```yaml
   boundary_pressure:
