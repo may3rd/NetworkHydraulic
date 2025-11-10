@@ -38,8 +38,19 @@ class OrificeCalculator(LossCalculator):
             return
 
         pressure_drop = section.calculation_output.pressure_drop
-        if orifice.pressure_drop is not None:
-            drop = max(orifice.pressure_drop, 0.0)
+        has_ratio = bool(orifice.d_over_D_ratio and orifice.d_over_D_ratio > 0)
+        has_orifice_diameter = bool(orifice.orifice_diameter and orifice.orifice_diameter > 0)
+        has_drop = orifice.pressure_drop is not None
+
+        if not (has_ratio or has_orifice_diameter or has_drop):
+            raise ValueError(
+                "Orifice requires d_over_D_ratio, orifice_diameter, or pressure_drop to be specified"
+            )
+
+        if has_drop:
+            pipe_diameter = self._maybe_pipe_diameter(section)
+            drop = max(orifice.pressure_drop or 0.0, 0.0)
+            self._backfill_geometry_from_drop(orifice, pipe_diameter)
         else:
             drop = self._compute_drop(section, orifice, inlet_pressure_override)
             orifice.pressure_drop = drop
@@ -125,6 +136,31 @@ class OrificeCalculator(LossCalculator):
             discharge_coefficient,
         )
 
+    def _maybe_pipe_diameter(self, section: PipeSection) -> Optional[float]:
+        try:
+            diameter = self._pipe_diameter(section)
+        except ValueError:
+            return None
+        return diameter
+
+    def _backfill_geometry_from_drop(
+        self,
+        orifice: Orifice,
+        pipe_diameter: Optional[float],
+    ) -> None:
+        if orifice.pipe_diameter is None and pipe_diameter is not None:
+            orifice.pipe_diameter = pipe_diameter
+
+        if pipe_diameter is None:
+            return
+
+        if orifice.orifice_diameter and orifice.orifice_diameter > 0:
+            orifice.d_over_D_ratio = orifice.orifice_diameter / pipe_diameter
+            return
+
+        if orifice.d_over_D_ratio and orifice.d_over_D_ratio > 0:
+            orifice.orifice_diameter = orifice.d_over_D_ratio * pipe_diameter
+
     def _pipe_diameter(self, section: PipeSection) -> float:
         if section.orifice and section.orifice.pipe_diameter and section.orifice.pipe_diameter > 0:
             return section.orifice.pipe_diameter
@@ -135,10 +171,16 @@ class OrificeCalculator(LossCalculator):
         raise ValueError("Pipe diameter is required for orifice calculations")
 
     def _orifice_diameter(self, orifice: Orifice, pipe_diameter: float) -> float:
-        if orifice.orifice_diameter and orifice.orifice_diameter > 0:
-            return orifice.orifice_diameter
         if orifice.d_over_D_ratio and orifice.d_over_D_ratio > 0:
-            return orifice.d_over_D_ratio * pipe_diameter
+            diameter = orifice.d_over_D_ratio * pipe_diameter
+            if orifice.orifice_diameter is None:
+                orifice.orifice_diameter = diameter
+            return diameter
+        if orifice.orifice_diameter and orifice.orifice_diameter > 0:
+            if orifice.pipe_diameter is None:
+                orifice.pipe_diameter = pipe_diameter
+            orifice.d_over_D_ratio = orifice.orifice_diameter / pipe_diameter
+            return orifice.orifice_diameter
         raise ValueError("Either orifice diameter or d_over_D_ratio must be provided")
 
     def _inlet_pressure(self, section: PipeSection) -> float:
