@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import pytest
@@ -177,3 +178,28 @@ def test_write_output_respects_custom_output_units(tmp_path: Path):
     section_drop = data["network"]["sections"][0]["calculation_result"]["pressure_drop"]
     assert section_drop["pipe_and_fittings"] == pytest.approx(convert(5000.0, "Pa", "kPa"))
     assert section_drop["total"] == pytest.approx(convert(5000.0, "Pa", "kPa"))
+
+
+def test_write_output_writes_json_when_requested(tmp_path: Path):
+    section = build_section()
+    fluid = build_fluid()
+    network = Network(
+        name="demo",
+        description=None,
+        fluid=fluid,
+        direction="forward",
+        boundary_pressure=150000.0,
+        gas_flow_model="isothermal",
+        sections=[section],
+    )
+    summary = make_summary(density=4.0)
+    section_result = make_results(summary)
+    network_result = NetworkResult(sections=[section_result], aggregate=CalculationOutput(), summary=summary)
+
+    out_path = tmp_path / "result.json"
+    results_io.write_output(out_path, network, network_result)
+
+    with out_path.open("r", encoding="utf-8") as handle:
+        data = json.load(handle)
+    assert "network" in data
+    assert data["network"]["name"] == "demo"

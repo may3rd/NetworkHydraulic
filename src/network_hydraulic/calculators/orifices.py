@@ -71,7 +71,7 @@ class OrificeCalculator(LossCalculator):
         density = self._fluid_density()
         viscosity = self._fluid_viscosity()
         isentropic_exponent = self._isentropic_exponent()
-        meter_type = orifice.meter_type or ISO_5167_ORIFICE
+        meter_type = orifice.meter_type or 'orifice' # ISO_5167_ORIFICE
 
         try:
             outlet_pressure = differential_pressure_meter_solver(

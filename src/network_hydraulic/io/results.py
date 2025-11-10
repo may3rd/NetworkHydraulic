@@ -1,6 +1,7 @@
 """Helpers for presenting and serializing solver results."""
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
@@ -165,9 +166,12 @@ def write_output(
             fluid_cfg["standard_flow_rate"] = flow_summary["volumetric_standard"]
 
     data = {"network": network_cfg}
-
+    suffix = path.suffix.lower()
     with path.open("w", encoding="utf-8") as handle:
-        yaml.safe_dump(data, handle, sort_keys=False)
+        if suffix == ".json":
+            json.dump(data, handle, indent=2)
+        else:
+            yaml.safe_dump(data, handle, sort_keys=False)
 
 
 def _pressure_drop_dict(details, length: float | None, converter: _OutputUnitConverter) -> Dict[str, Any]:
