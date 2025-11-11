@@ -72,7 +72,7 @@ def solve_isothermal(
     length: float,
     roughness: float,
     friction_factor: float,
-    k_total: float,
+    k_additional: float,
     molar_mass: float,
     z_factor: float,
     gamma: float,
@@ -81,8 +81,8 @@ def solve_isothermal(
     """Use fluids.compressible.isothermal_gas to compute outlet pressure."""
     if length is None or length <= 0:
         return inlet_pressure, _gas_state(inlet_pressure, temperature, mass_flow, diameter, molar_mass, z_factor, gamma)
-    equiv_length = max(length + k_total * diameter / max(friction_factor, 1e-12), 0.0)
-    fd = 4 * friction_factor # Convert Fanning friction factor to Darcy friction factor
+    equiv_length = max(length + max(k_additional, 0.0) * diameter / max(friction_factor, MIN_DARCY_F), 0.0)
+    fd = max(friction_factor, MIN_DARCY_F)
 
     # Estimate average density using inlet conditions for the initial call
     # The fluids library's isothermal_gas function expects an average density.
@@ -125,7 +125,7 @@ def solve_adiabatic(
     length: float,
     roughness: float,
     friction_factor: float,
-    k_total: float,
+    k_additional: float,
     molar_mass: float,
     z_factor: float,
     gamma: float,
@@ -141,9 +141,9 @@ def solve_adiabatic(
 
     pipe_length = max(length or 0.0, 0.0)
     additional_length = 0.0
-    fd = max(4.0 * friction_factor, MIN_DARCY_F)
-    if k_total and k_total > 0:
-        additional_length = (k_total * diameter) / fd
+    fd = max(friction_factor, MIN_DARCY_F)
+    if k_additional and k_additional > 0:
+        additional_length = (k_additional * diameter) / fd
     equiv_length = pipe_length + additional_length
 
     if equiv_length <= MIN_LENGTH:

@@ -42,5 +42,5 @@ network:
       fitting_type: LR
       orifice:
         tag: FE
-        d_over_D_ratio: 0.0500255
+        pressure_drop: 0.20
         

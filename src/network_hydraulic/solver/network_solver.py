@@ -22,9 +22,11 @@ from network_hydraulic.models.results import (
     PressureDropDetails,
     ResultSummary,
     SectionResult,
+    StatePoint,
 )
 from network_hydraulic.utils.gas_flow import (
     UNIVERSAL_GAS_CONSTANT,
+    GasState,
     solve_adiabatic,
     solve_isothermal,
 )
@@ -217,6 +219,8 @@ class NetworkSolver:
                 length = section.length
                 friction_factor = section.calculation_output.pressure_drop.frictional_factor
                 k_total = section.total_K
+                pipe_k = section.pipe_length_K or 0.0
+                k_additional = max((k_total or 0.0) - pipe_k, 0.0)
                 diameter = section.pipe_diameter or self.default_pipe_diameter
                 roughness = section.roughness
 
@@ -261,7 +265,17 @@ class NetworkSolver:
                 if gas_flow_model == "isothermal":
                     if forward:
                         summary.inlet.pressure = section_start_pressure
-                        outlet_pressure, _ = solve_isothermal(
+                        inlet_state = self._gas_state_from_conditions(
+                            pressure=section_start_pressure,
+                            temperature=temperature,
+                            mass_flow=section_mass_flow,
+                            diameter=diameter,
+                            molar_mass=molar_mass,
+                            z_factor=z_factor,
+                            gamma=gamma,
+                        )
+                        self._apply_gas_state(summary.inlet, inlet_state)
+                        outlet_pressure, outlet_state = solve_isothermal(
                             inlet_pressure=section_start_pressure,
                             temperature=temperature,
                             mass_flow=section_mass_flow,
@@ -269,17 +283,28 @@ class NetworkSolver:
                             length=length,
                             roughness=roughness,
                             friction_factor=friction_factor,
-                            k_total=k_total,
+                            k_additional=k_additional,
                             molar_mass=molar_mass,
                             z_factor=z_factor,
                             gamma=gamma,
                             is_forward=True,
                         )
                         summary.outlet.pressure = outlet_pressure
+                        self._apply_gas_state(summary.outlet, outlet_state)
                         current = outlet_pressure
                     else:
                         summary.outlet.pressure = section_start_pressure
-                        inlet_pressure, _ = solve_isothermal(
+                        outlet_state = self._gas_state_from_conditions(
+                            pressure=section_start_pressure,
+                            temperature=temperature,
+                            mass_flow=section_mass_flow,
+                            diameter=diameter,
+                            molar_mass=molar_mass,
+                            z_factor=z_factor,
+                            gamma=gamma,
+                        )
+                        self._apply_gas_state(summary.outlet, outlet_state)
+                        inlet_pressure, inlet_state = solve_isothermal(
                             inlet_pressure=section_start_pressure, # Pass current as inlet_pressure for backward calculation
                             temperature=temperature,
                             mass_flow=section_mass_flow,
@@ -287,13 +312,14 @@ class NetworkSolver:
                             length=length,
                             roughness=roughness,
                             friction_factor=friction_factor,
-                            k_total=k_total,
+                            k_additional=k_additional,
                             molar_mass=molar_mass,
                             z_factor=z_factor,
                             gamma=gamma,
                             is_forward=False,
                         )
                         summary.inlet.pressure = inlet_pressure
+                        self._apply_gas_state(summary.inlet, inlet_state)
                         current = inlet_pressure
                     
                     # Update pipe_and_fittings and total_segment_loss for gas flow
@@ -316,7 +342,17 @@ class NetworkSolver:
                 elif gas_flow_model == "adiabatic":
                     if forward:
                         summary.inlet.pressure = section_start_pressure
-                        outlet_pressure, _ = solve_adiabatic(
+                        inlet_state = self._gas_state_from_conditions(
+                            pressure=section_start_pressure,
+                            temperature=temperature,
+                            mass_flow=section_mass_flow,
+                            diameter=diameter,
+                            molar_mass=molar_mass,
+                            z_factor=z_factor,
+                            gamma=gamma,
+                        )
+                        self._apply_gas_state(summary.inlet, inlet_state)
+                        outlet_pressure, outlet_state = solve_adiabatic(
                             boundary_pressure=section_start_pressure, # Use boundary_pressure
                             temperature=temperature,
                             mass_flow=section_mass_flow,
@@ -324,7 +360,7 @@ class NetworkSolver:
                             length=length,
                             roughness=roughness,
                             friction_factor=friction_factor,
-                            k_total=k_total,
+                            k_additional=k_additional,
                             molar_mass=molar_mass,
                             z_factor=z_factor,
                             gamma=gamma,
@@ -332,10 +368,21 @@ class NetworkSolver:
                             label=section.id,
                         )
                         summary.outlet.pressure = outlet_pressure
+                        self._apply_gas_state(summary.outlet, outlet_state)
                         current = outlet_pressure
                     else:
                         summary.outlet.pressure = section_start_pressure
-                        inlet_pressure, _ = solve_adiabatic(
+                        outlet_state = self._gas_state_from_conditions(
+                            pressure=section_start_pressure,
+                            temperature=temperature,
+                            mass_flow=section_mass_flow,
+                            diameter=diameter,
+                            molar_mass=molar_mass,
+                            z_factor=z_factor,
+                            gamma=gamma,
+                        )
+                        self._apply_gas_state(summary.outlet, outlet_state)
+                        inlet_pressure, inlet_state = solve_adiabatic(
                             boundary_pressure=section_start_pressure, # Use boundary_pressure
                             temperature=temperature,
                             mass_flow=section_mass_flow,
@@ -343,7 +390,7 @@ class NetworkSolver:
                             length=length,
                             roughness=roughness,
                             friction_factor=friction_factor,
-                            k_total=k_total,
+                            k_additional=k_additional,
                             molar_mass=molar_mass,
                             z_factor=z_factor,
                             gamma=gamma,
@@ -351,6 +398,7 @@ class NetworkSolver:
                             label=section.id,
                         )
                         summary.inlet.pressure = inlet_pressure
+                        self._apply_gas_state(summary.inlet, inlet_state)
                         current = inlet_pressure
 
                     # Update pipe_and_fittings and total_segment_loss for gas flow
@@ -619,12 +667,18 @@ class NetworkSolver:
         mach: Optional[float],
         remarks: str,
     ) -> None:
-        state.temperature = fluid.temperature
-        state.density = density
-        state.velocity = velocity
-        state.erosional_velocity = erosional_velocity
-        state.flow_momentum = flow_momentum
-        state.mach_number = mach
+        if state.temperature is None:
+            state.temperature = fluid.temperature
+        if state.density is None and density is not None:
+            state.density = density
+        if state.velocity is None and velocity is not None:
+            state.velocity = velocity
+        if state.erosional_velocity is None and erosional_velocity is not None:
+            state.erosional_velocity = erosional_velocity
+        if state.flow_momentum is None and flow_momentum is not None:
+            state.flow_momentum = flow_momentum
+        if state.mach_number is None and mach is not None:
+            state.mach_number = mach
         state.remarks = remarks
 
     def _build_remarks(
@@ -647,6 +701,56 @@ class NetworkSolver:
         elif mach and mach > 0.7:
             warnings.append(f"Mach {mach:.2f} exceeds 0.7 threshold")
         return "; ".join(warnings) if warnings else "OK"
+
+    @staticmethod
+    def _gas_state_from_conditions(
+        *,
+        pressure: Optional[float],
+        temperature: Optional[float],
+        mass_flow: Optional[float],
+        diameter: Optional[float],
+        molar_mass: Optional[float],
+        z_factor: Optional[float],
+        gamma: Optional[float],
+    ) -> Optional[GasState]:
+        if (
+            pressure is None
+            or pressure <= 0
+            or temperature is None
+            or temperature <= 0
+            or diameter is None
+            or diameter <= 0
+            or molar_mass is None
+            or molar_mass <= 0
+            or z_factor is None
+            or z_factor <= 0
+        ):
+            return None
+        area = pi * diameter * diameter * 0.25
+        density = pressure * molar_mass / (z_factor * UNIVERSAL_GAS_CONSTANT * temperature)
+        velocity = None
+        if mass_flow and mass_flow > 0 and density > 0 and area > 0:
+            velocity = mass_flow / (density * area)
+        sonic = None
+        if gamma and gamma > 0:
+            sonic = sqrt(max(gamma, 1e-9) * z_factor * UNIVERSAL_GAS_CONSTANT * temperature / molar_mass)
+        mach = velocity / sonic if velocity is not None and sonic not in (None, 0) else None
+        return GasState(
+            pressure=pressure,
+            temperature=temperature,
+            density=density,
+            velocity=velocity,
+            mach=mach,
+        )
+
+    @staticmethod
+    def _apply_gas_state(target: StatePoint, gas_state: Optional[GasState]) -> None:
+        if target is None or gas_state is None:
+            return
+        target.temperature = gas_state.temperature
+        target.density = gas_state.density
+        target.velocity = gas_state.velocity
+        target.mach_number = gas_state.mach
 
     def _set_network_summary(self, network: Network, sections: Iterable[PipeSection]) -> None:
         sections = list(sections)

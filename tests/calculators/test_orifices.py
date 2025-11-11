@@ -71,6 +71,7 @@ def test_orifice_drop_computed_from_fluids():
     drop = section.calculation_output.pressure_drop
     assert drop.orifice_pressure_drop == orifice.pressure_drop
     assert drop.total_segment_loss == orifice.pressure_drop
+    assert orifice.calculation_note.startswith("Calculated pressure_drop")
 
 
 def test_orifice_uses_specified_drop():
@@ -82,6 +83,7 @@ def test_orifice_uses_specified_drop():
     drop = section.calculation_output.pressure_drop
     assert drop.orifice_pressure_drop == 1500.0
     assert drop.total_segment_loss == 1500.0
+    assert orifice.calculation_note.startswith("Used specified pressure_drop")
 
 
 def test_missing_diameter_raises():

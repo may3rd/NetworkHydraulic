@@ -36,6 +36,7 @@ class OrificeCalculator(LossCalculator):
         orifice = section.orifice
         if orifice is None:
             return
+        orifice.calculation_note = None
 
         pressure_drop = section.calculation_output.pressure_drop
         has_ratio = bool(orifice.d_over_D_ratio and orifice.d_over_D_ratio > 0)
@@ -51,6 +52,9 @@ class OrificeCalculator(LossCalculator):
             pipe_diameter = self._maybe_pipe_diameter(section)
             drop = max(orifice.pressure_drop or 0.0, 0.0)
             self._backfill_geometry_from_drop(orifice, pipe_diameter)
+            orifice.calculation_note = (
+                f"Used specified pressure_drop ({self._format_drop(drop)})."
+            )
         else:
             drop = self._compute_drop(section, orifice, inlet_pressure_override)
             orifice.pressure_drop = drop
@@ -128,13 +132,20 @@ class OrificeCalculator(LossCalculator):
             discharge_coefficient = 0.0
             orifice.discharge_coefficient = discharge_coefficient
             orifice.expansibility = None
-        return dP_orifice(
+            orifice.calculation_note = f"Failed to solve orifice drop: {exc}"
+        drop = dP_orifice(
             pipe_diameter,
             orifice_diameter,
             inlet_pressure,
             outlet_pressure,
             discharge_coefficient,
         )
+        if orifice.calculation_note is None:
+            meter_label = str(meter_type or ISO_5167_ORIFICE)
+            orifice.calculation_note = (
+                f"Calculated pressure_drop via {meter_label} solver ({self._format_drop(drop)})."
+            )
+        return drop
 
     def _maybe_pipe_diameter(self, section: PipeSection) -> Optional[float]:
         try:
@@ -213,3 +224,7 @@ class OrificeCalculator(LossCalculator):
         if self.mass_flow_rate and self.mass_flow_rate > 0:
             return self.mass_flow_rate
         return self.fluid.current_mass_flow_rate()
+
+    @staticmethod
+    def _format_drop(drop: float) -> str:
+        return f"{drop:.6g} Pa"

@@ -30,6 +30,29 @@ def section_cfg(**overrides):
     return base
 
 
+def liquid_network_cfg(fluid_overrides=None, **network_overrides):
+    fluid = {
+        "name": "water",
+        "phase": "liquid",
+        "temperature": 300.0,
+        "pressure": 101325.0,
+        "density": 1000.0,
+        "viscosity": 1e-3,
+    }
+    if fluid_overrides:
+        fluid.update(fluid_overrides)
+
+    network = {
+        "name": "net",
+        "direction": "forward",
+        "fluid": fluid,
+        "sections": [section_cfg()],
+    }
+    if network_overrides:
+        network.update(network_overrides)
+    return {"network": network}
+
+
 def test_loader_builds_structured_fittings():
     loader = ConfigurationLoader(raw={})
     cfg = section_cfg(
@@ -108,6 +131,49 @@ def test_loader_converts_units_when_specified():
     assert section.roughness == pytest.approx(convert(1.5, "mm", "m"))
     assert section.control_valve is not None
     assert section.control_valve.pressure_drop == pytest.approx(convert(5, "psig", "Pa"))
+
+
+def test_loader_accepts_negative_celsius_temperature():
+    raw = liquid_network_cfg(
+        fluid_overrides={
+            "temperature": {
+                "value": -100.0,
+                "unit": "degC",
+            }
+        }
+    )
+    loader = ConfigurationLoader(raw=raw)
+    network = loader.build_network()
+    expected = convert(-100.0, "degC", "K")
+    assert network.fluid.temperature == pytest.approx(expected, rel=1e-9)
+
+
+def test_loader_accepts_negative_gauge_pressure():
+    raw = liquid_network_cfg(
+        fluid_overrides={
+            "pressure": {
+                "value": -0.5,
+                "unit": "kPag",
+            }
+        }
+    )
+    loader = ConfigurationLoader(raw=raw)
+    network = loader.build_network()
+    expected = convert(-0.5, "kPag", "Pa")
+    assert expected > 0
+    assert network.fluid.pressure == pytest.approx(expected, rel=1e-9)
+
+
+def test_loader_defaults_pressure_to_boundary_when_missing():
+    raw = liquid_network_cfg(
+        fluid_overrides={"pressure": None},
+        boundary_pressure={"value": 50.0, "unit": "psig"},
+    )
+    loader = ConfigurationLoader(raw=raw)
+    network = loader.build_network()
+    expected = convert(50.0, "psig", "Pa")
+    assert network.boundary_pressure == pytest.approx(expected, rel=1e-9)
+    assert network.fluid.pressure == pytest.approx(expected, rel=1e-9)
 
 
 def test_loader_aligns_adjacent_pipe_diameters():

@@ -108,6 +108,7 @@ def test_liquid_cv_from_pressure_drop():
     assert pytest.approx(valve.cv, rel=1e-4) == cv_expected
     assert valve.cg is None
     assert section.calculation_output.pressure_drop.control_valve_pressure_drop == drop
+    assert valve.calculation_note.startswith("Used specified pressure_drop")
 
 
 def test_liquid_drop_sets_cg_when_c1_present():
@@ -186,6 +187,7 @@ def test_liquid_pressure_drop_from_cv():
     calc = ControlValveCalculator(fluid=fluid)
     calc.calculate(section)
     assert pytest.approx(valve.pressure_drop, rel=1e-4) == 460e3
+    assert valve.calculation_note.startswith("Calculated pressure_drop from Cv")
 
 
 def test_gas_valve_drop_from_cv():
@@ -206,6 +208,16 @@ def test_gas_valve_drop_from_cv():
     calc = ControlValveCalculator(fluid=fluid)
     calc.calculate(section)
     assert pytest.approx(valve.pressure_drop, rel=1e-4) == 120e3
+    assert valve.calculation_note.startswith("Calculated pressure_drop from Cv")
+
+
+def test_control_valve_note_when_insufficient_data():
+    fluid = liquid_fluid()
+    valve = ControlValve(tag="CV-missing", cv=None, cg=None, pressure_drop=None, C1=None)
+    section = make_section(valve)
+    calc = ControlValveCalculator(fluid=fluid)
+    calc.calculate(section)
+    assert valve.calculation_note.startswith("Skipped control valve calculation")
 
 
 def test_missing_flow_rate_raises():

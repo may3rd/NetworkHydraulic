@@ -44,15 +44,16 @@ network:
     mach_number: null
     orifice:
       tag: FE
-      d_over_D_ratio: 0.0500255
-      pressure_drop: 0.0
+      d_over_D_ratio: null
+      pressure_drop: 0.2
       pipe_diameter: 0.05248
-      orifice_diameter: 0.00262533824
+      orifice_diameter: null
       meter_type: null
       taps: null
       tap_position: null
-      discharge_coefficient: 0.0
+      discharge_coefficient: null
       expansibility: null
+      calculation_note: Used specified pressure_drop (0.2 Pa).
     calculation_result:
       pressure_drop:
         fitting_K: 0.0
@@ -67,9 +68,9 @@ network:
         pipe_and_fittings: 0.0
         elevation_change: 0.0
         control_valve: null
-        orifice: 0.0
+        orifice: 0.0002
         user_fixed: null
-        total: 0.0
+        total: 0.0002
         per_100m: null
       summary:
         inlet:
@@ -82,7 +83,7 @@ network:
           flow_momentum: 28.43229632125
           remarks: OK
         outlet:
-          pressure: 32.2
+          pressure: 32.1998
           temperature: 42.0
           density: 580.0
           mach_number: null
@@ -114,7 +115,7 @@ network:
         flow_momentum: 28.43229632125
         remarks: OK
       outlet:
-        pressure: 32.2
+        pressure: 32.1998
         temperature: 42.0
         density: 580.0
         mach_number: null
@@ -135,9 +136,9 @@ network:
       pipe_and_fittings: 0.0
       elevation_change: 0.0
       control_valve: 0.0
-      orifice: 0.0
+      orifice: 0.0002
       user_fixed: 0.0
-      total: 0.0
+      total: 0.0002
       per_100m: 0.0
     flow:
       volumetric_actual: 1.7241379310344829

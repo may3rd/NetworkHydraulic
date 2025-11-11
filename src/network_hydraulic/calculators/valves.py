@@ -27,11 +27,15 @@ class ControlValveCalculator(LossCalculator):
         valve = section.control_valve
         if valve is None:
             return
+        valve.calculation_note = None
         self._apply_section_defaults(section, valve)
 
         if valve.cv is None and valve.cg:
             valve.cv = self._cv_from_cg(valve.cg, valve)
         if valve.pressure_drop is None and valve.cv is None:
+            valve.calculation_note = (
+                "Skipped control valve calculation: provide pressure_drop or Cv/Cg."
+            )
             return
 
         flow = self._determine_flow_rate(section)
@@ -47,9 +51,15 @@ class ControlValveCalculator(LossCalculator):
 
         if valve.pressure_drop is not None:
             drop = self._apply_drop_from_spec(valve, inlet_pressure, flow, phase)
+            valve.calculation_note = (
+                f"Used specified pressure_drop ({self._format_drop(drop)})."
+            )
         else:
             drop = self._solve_drop_from_cv(valve, inlet_pressure, flow, phase)
             valve.pressure_drop = drop
+            valve.calculation_note = (
+                f"Calculated pressure_drop from Cv ({self._format_drop(drop)})."
+            )
 
         pressure_drop = section.calculation_output.pressure_drop
         pressure_drop.control_valve_pressure_drop = drop
@@ -162,6 +172,10 @@ class ControlValveCalculator(LossCalculator):
             else:
                 upper = mid
         return 0.5 * (lower + upper)
+
+    @staticmethod
+    def _format_drop(drop: float) -> str:
+        return f"{drop:.6g} Pa"
 
     @staticmethod
     def _apply_section_defaults(section: PipeSection, valve) -> None:

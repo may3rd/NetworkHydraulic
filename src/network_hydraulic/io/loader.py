@@ -69,10 +69,9 @@ class ConfigurationLoader:
             "fluid.temperature",
             target_unit="K",
         )
-        pressure = self._require_positive_quantity(
-            fluid_cfg.get("pressure"),
-            "fluid.pressure",
-            target_unit="Pa",
+        pressure = self._resolve_fluid_pressure(
+            raw_pressure=fluid_cfg.get("pressure"),
+            boundary_pressure=boundary_pressure,
         )
         density_value = self._quantity(
             fluid_cfg.get("density"),
@@ -254,6 +253,7 @@ class ConfigurationLoader:
                 cfg.get("outlet_diameter"), "control_valve.outlet_diameter", target_unit="m"
             ),
             valve_diameter=self._quantity(cfg.get("valve_diameter"), "control_valve.valve_diameter", target_unit="m"),
+            calculation_note=cfg.get("calculation_note"),
         )
 
     def _build_orifice(self, cfg: Optional[Dict[str, Any]]) -> Optional[Orifice]:
@@ -270,6 +270,7 @@ class ConfigurationLoader:
             tap_position=cfg.get("tap_position"),
             discharge_coefficient=cfg.get("discharge_coefficient"),
             expansibility=cfg.get("expansibility"),
+            calculation_note=cfg.get("calculation_note"),
         )
 
     def _build_fittings(
@@ -391,6 +392,25 @@ class ConfigurationLoader:
         unit = match.group(2).strip()
         return convert_units(magnitude, unit, target_unit)
 
+    def _resolve_fluid_pressure(
+        self,
+        *,
+        raw_pressure: Optional[Any],
+        boundary_pressure: Optional[float],
+    ) -> float:
+        pressure = self._quantity(raw_pressure, "fluid.pressure", target_unit="Pa")
+        source = "fluid.pressure"
+        if pressure is None:
+            if boundary_pressure is None:
+                raise ValueError(
+                    "fluid.pressure must be provided unless network.boundary_pressure is specified"
+                )
+            pressure = boundary_pressure
+            source = "network.boundary_pressure"
+        if pressure is None or pressure <= 0:
+            raise ValueError(f"{source} must be positive in absolute units")
+        return pressure
+
     def _require_positive_quantity(
         self,
         raw: Optional[Any],
@@ -438,14 +458,15 @@ class ConfigurationLoader:
         if normalized_phase == "liquid":
             if density is None or density <= 0:
                 errors.append("fluid.density must be provided and positive for liquids")
-        else:
-            # Gas / vapor requirements
+        elif normalized_phase in {"gas", "vapor"}:
             if molecular_weight is None or molecular_weight <= 0:
                 errors.append("fluid.molecular_weight must be provided and positive for gases")
             if z_factor is None or z_factor <= 0:
                 errors.append("fluid.z_factor must be provided and positive for gases")
             if specific_heat_ratio is None or specific_heat_ratio <= 0:
                 errors.append("fluid.specific_heat_ratio must be provided and positive for gases")
+        else:
+            errors.append("fluid.phase must be 'liquid', 'gas', or 'vapor'")
 
         if errors:
             raise ValueError("; ".join(errors))

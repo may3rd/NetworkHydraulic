@@ -15,7 +15,9 @@ def parse(quantity: str) -> Quantity:
 
 
 class QuantityParser(object):
-    quantity_re = re.compile(r"(?P<value>\d+[.,]?\d*)? *(?P<unit>.*)")
+    quantity_re = re.compile(
+        r"\s*(?P<value>[-+]?(?:\d+(?:[.,]\d*)?|\.\d+)(?:[eE][-+]?\d+)?)?\s*(?P<unit>.*)"
+    )
 
     def parse(self, quantity: str) -> Quantity:
         r = self.quantity_re.match(quantity)

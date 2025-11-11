@@ -18,6 +18,7 @@ class ControlValve:
     inlet_diameter: Optional[float] = None
     outlet_diameter: Optional[float] = None
     valve_diameter: Optional[float] = None
+    calculation_note: Optional[str] = None
 
 
 @dataclass(slots=True)
@@ -32,3 +33,4 @@ class Orifice:
     tap_position: Optional[str] = None
     discharge_coefficient: Optional[float] = None
     expansibility: Optional[float] = None
+    calculation_note: Optional[str] = None

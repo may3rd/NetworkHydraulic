@@ -374,6 +374,7 @@ def _control_valve_dict(valve) -> Dict[str, Any]:
         "inlet_diameter": getattr(valve, "inlet_diameter", None),
         "outlet_diameter": getattr(valve, "outlet_diameter", None),
         "valve_diameter": getattr(valve, "valve_diameter", None),
+        "calculation_note": getattr(valve, "calculation_note", None),
     }
 
 
@@ -389,6 +390,7 @@ def _orifice_dict(orifice) -> Dict[str, Any]:
         "tap_position": getattr(orifice, "tap_position", None),
         "discharge_coefficient": getattr(orifice, "discharge_coefficient", None),
         "expansibility": getattr(orifice, "expansibility", None),
+        "calculation_note": getattr(orifice, "calculation_note", None),
     }
 
 
@@ -590,6 +592,7 @@ def _print_control_elements(section: Optional["PipeSection"]) -> None:
             ("  Inlet Diameter", getattr(valve, "inlet_diameter", None)),
             ("  Outlet Diameter", getattr(valve, "outlet_diameter", None)),
             ("  Valve Diameter", getattr(valve, "valve_diameter", None)),
+            ("  Calculation Note", getattr(valve, "calculation_note", None)),
         ]
         for label, value in kv_pairs:
             text = f"{value:.3f}" if isinstance(value, float) else (value if value is not None else "—")
@@ -608,6 +611,7 @@ def _print_control_elements(section: Optional["PipeSection"]) -> None:
             ("  Tap Position", getattr(orifice, "tap_position", None)),
             ("  Discharge Coefficient", getattr(orifice, "discharge_coefficient", None)),
             ("  Expansibility", getattr(orifice, "expansibility", None)),
+            ("  Calculation Note", getattr(orifice, "calculation_note", None)),
         ]
         for label, value in kv_pairs:
             text = f"{value:.3f}" if isinstance(value, float) else (value if value is not None else "—")

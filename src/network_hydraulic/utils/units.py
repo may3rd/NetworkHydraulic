@@ -24,10 +24,8 @@ UNIT_ALIASES: Final[dict[str, str]] = {
 def convert(value: float, from_unit: str, to_unit: str) -> float:
     normalized_from = _normalize_unit(from_unit)
     normalized_to = _normalize_unit(to_unit)
-    magnitude = abs(value)
-    convert_value = converts(f"{magnitude} {normalized_from}", normalized_to)
-    result = float(convert_value)
-    return result if value >= 0 else -result
+
+    return _run_converter(value, normalized_from, normalized_to)
 
 
 def _normalize_unit(unit: str) -> str:
@@ -87,3 +85,8 @@ def _invert_term(term: str) -> str:
             power_str = str(inverted)
         return f"{base}^{power_str}"
     return f"{term}^-1"
+
+
+def _run_converter(value: float, normalized_from: str, normalized_to: str) -> float:
+    convert_value = converts(f"{value} {normalized_from}", normalized_to)
+    return float(convert_value)
