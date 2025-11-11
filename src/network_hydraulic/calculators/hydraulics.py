@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from math import pi
 from typing import Optional
 
-from fluids.friction import friction_factor
+from fluids.friction import friction_factor as colebrook_friction_factor
 
 from network_hydraulic.calculators.base import LossCalculator
 from network_hydraulic.models.fluid import Fluid
@@ -20,6 +20,7 @@ class FrictionCalculator(LossCalculator):
     default_pipe_diameter: Optional[float] = None
     volumetric_flow_rate: Optional[float] = None
     friction_factor_override: Optional[float] = None
+    friction_factor_type: str = "darcy"
 
     def calculate(self, section: PipeSection) -> None:
         diameter = self._pipe_diameter(section)
@@ -52,7 +53,7 @@ class FrictionCalculator(LossCalculator):
         total = pressure_drop.total_segment_loss or 0.0
         pressure_drop.total_segment_loss = total + delta_p
         pressure_drop.reynolds_number = reynolds
-        pressure_drop.frictional_factor = friction
+        pressure_drop.frictional_factor = self._convert_for_output(friction)
         pressure_drop.flow_scheme = self._determine_flow_scheme(reynolds)
 
     def _determine_flow_scheme(self, reynolds: float) -> str:
@@ -85,9 +86,25 @@ class FrictionCalculator(LossCalculator):
 
     def _friction_factor(self, reynolds: float, roughness: float, diameter: float) -> float:
         if self.friction_factor_override and self.friction_factor_override > 0:
-            return self.friction_factor_override
+            return self._to_darcy(self.friction_factor_override)
         rel_roughness = roughness / diameter if diameter > 0 and roughness > 0 else 0.0
-        return friction_factor(Re=reynolds, eD=rel_roughness)
+        return colebrook_friction_factor(Re=reynolds, eD=rel_roughness)
+
+    def _to_darcy(self, value: float) -> float:
+        kind = (self.friction_factor_type or "darcy").strip().lower()
+        if kind in {"darcy", "d"}:
+            return value
+        if kind in {"fanning", "f"}:
+            return value * 4.0
+        raise ValueError(f"Unknown friction_factor_type '{self.friction_factor_type}'. Expected 'darcy' or 'fanning'.")
+
+    def _convert_for_output(self, darcy_value: float) -> float:
+        kind = (self.friction_factor_type or "darcy").strip().lower()
+        if kind in {"darcy", "d"}:
+            return darcy_value
+        if kind in {"fanning", "f"}:
+            return darcy_value / 4.0
+        raise ValueError(f"Unknown friction_factor_type '{self.friction_factor_type}'. Expected 'darcy' or 'fanning'.")
 
     @staticmethod
     def _require_positive(value: Optional[float], name: str) -> float:  # pragma: no cover - defensive

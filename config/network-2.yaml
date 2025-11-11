@@ -3,8 +3,17 @@ network:
   description: Phenol Test
   direction: forward
   boundary_pressure:
-    value: 2277.73
+    value: 2290.24
     unit: kPag
+  output_units:
+    pressure: kPag
+    pressure_drop: kPa
+    temperature: degC
+    density: kg/m^3
+    velocity: m/s
+    volumetric_flow_rate: m^3/h
+    mass_flow_rate: kg/h
+    flow_momentum: Pa
   fluid:
     name: liquid
     phase: liquid
@@ -15,9 +24,6 @@ network:
     temperature:
       value: 105.19
       unit: degC
-    pressure:
-      value: 2277.73
-      unit: kPag
     density:
       value: 784.3
       unit: kg/m^3
@@ -56,6 +62,9 @@ network:
         - {type: tee_through, count: 2}
         - {type: block_valve_full_line_size, count: 1}
         - {type: check_valve_swing, count: 1}
+      user_specified_fixed_loss:
+        value: 15.30
+        unit: kPa
     - id: "4"
       schedule: "40"
       pipe_NPD: 6.0

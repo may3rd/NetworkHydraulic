@@ -58,6 +58,9 @@ class _OutputUnitConverter:
     def flow_momentum(self, value: Optional[float]) -> Optional[float]:
         return _convert_value(value, "Pa", self.units.flow_momentum)
 
+    def viscosity(self, value: Optional[float]) -> Optional[float]:
+        return _convert_value(value, "Pa*s", "cP")
+
 
 def print_summary(network: "Network", result: "NetworkResult", *, debug: bool = False) -> None:
     """Pretty-print a human readable summary to stdout."""
@@ -106,6 +109,13 @@ def print_summary(network: "Network", result: "NetworkResult", *, debug: bool = 
         print(f"  Reynolds Number: {pd.reynolds_number or 0:.3f}")
         print(f"  Flow Regime: {pd.flow_scheme or 'N/A'}")
         print(f"  Friction Factor: {pd.frictional_factor or 0:.3f}")
+        velocity_head = _velocity_head(section_result.summary.inlet)
+        print(
+            f"  Velocity Head (Inlet): {format_measure(velocity_head, converter.flow_momentum, network.output_units.flow_momentum)}"
+        )
+        print(
+            f"  Critical Pressure: {format_measure(pd.critical_pressure, converter.pressure, network.output_units.pressure)} (abs)"
+        )
         print(f"PRESSURE LOSS SUMMARY")
         print(
             f"  Pipe+Fittings Loss: {fmt(converter.pressure_drop(pd.pipe_and_fittings))} {pressure_unit}"
@@ -189,6 +199,7 @@ def _pressure_drop_dict(details, length: float | None, converter: _OutputUnitCon
         "reynolds_number": details.reynolds_number,
         "flow_scheme": details.flow_scheme,
         "frictional_factor": details.frictional_factor,
+        "critical_pressure": converter.pressure(details.critical_pressure),
         "pipe_and_fittings": converter.pressure_drop(details.pipe_and_fittings),
         "elevation_change": converter.pressure_drop(details.elevation_change),
         "control_valve": converter.pressure_drop(details.control_valve_pressure_drop),
@@ -221,6 +232,16 @@ def _state_dict(state: "StatePoint", converter: _OutputUnitConverter) -> Dict[st
         "flow_momentum": converter.flow_momentum(state.flow_momentum),
         "remarks": state.remarks,
     }
+
+
+def _velocity_head(state: Optional["StatePoint"]) -> Optional[float]:
+    if state is None:
+        return None
+    density = state.density
+    velocity = state.velocity
+    if density is None or velocity is None:
+        return None
+    return 0.5 * density * velocity * velocity
 
 
 def _print_state_table(
@@ -317,6 +338,7 @@ def _fluid_dict(fluid: "Fluid", converter: _OutputUnitConverter) -> Dict[str, An
         "temperature": converter.temperature(fluid.temperature),
         "pressure": converter.pressure(fluid.pressure),
         "density": converter.density(fluid.density),
+        "viscosity": converter.viscosity(fluid.viscosity),
         "molecular_weight": fluid.molecular_weight,
         "z_factor": fluid.z_factor,
         "specific_heat_ratio": fluid.specific_heat_ratio,
@@ -552,6 +574,7 @@ def _print_section_overview(
     print("  Standard Flow Rate (@15 degC, 1 ATM):", standard_flow_text)
     print(f"  Temperature: {format_measure(temperature, converter.temperature, network.output_units.temperature)}")
     print(f"  Density: {format_measure(density, converter.density, network.output_units.density)}")
+    print(f"  Viscosity: {format_measure(fluid.viscosity, converter.viscosity, 'cP')}")
     if fluid.is_gas():
         print(f"  Molecular Weight (gas): {fmt(fluid.molecular_weight)}")
         print(f"  Compressibility Z (gas): {fmt(fluid.z_factor)}")

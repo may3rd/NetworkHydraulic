@@ -31,6 +31,7 @@ class PressureDropDetails:
     user_specified_fixed_loss: Optional[float] = None
     total_segment_loss: Optional[float] = None
     normalized_friction_loss: Optional[float] = None
+    critical_pressure: Optional[float] = None
 
 
 @dataclass(slots=True)

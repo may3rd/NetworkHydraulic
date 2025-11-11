@@ -1,7 +1,7 @@
 network:
-  name: gas_flow
-  description: Gas Flow Test
-  gas_flow_model: adiabatic
+  name: gas_flow_isothermal
+  description: Isothermal Gas Flow Test
+  gas_flow_model: isothermal
   direction: forward
   boundary_pressure:
     value: 700
