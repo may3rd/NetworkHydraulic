@@ -26,5 +26,24 @@ class Network:
     output_units: OutputUnits = field(default_factory=OutputUnits)
     design_margin: Optional[float] = None
 
+    def __post_init__(self) -> None:
+        errors: list[str] = []
+
+        normalized_direction = (self.direction or "").strip().lower()
+        if normalized_direction not in {"auto", "forward", "backward"}:
+            errors.append(f"Network direction '{self.direction}' must be 'auto', 'forward', or 'backward'")
+        self.direction = normalized_direction
+
+        normalized_gas_flow_model = (self.gas_flow_model or "").strip().lower()
+        if normalized_gas_flow_model not in {"isothermal", "adiabatic"}:
+            errors.append(f"Gas flow model '{self.gas_flow_model}' must be 'isothermal' or 'adiabatic'")
+        self.gas_flow_model = normalized_gas_flow_model
+
+        if self.design_margin is not None and self.design_margin < 0:
+            errors.append("Network design_margin must be non-negative")
+
+        if errors:
+            raise ValueError("; ".join(errors))
+
     def add_section(self, section: PipeSection) -> None:
         self.sections.append(section)

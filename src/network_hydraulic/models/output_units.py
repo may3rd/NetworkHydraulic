@@ -4,6 +4,8 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from typing import Dict
 
+from network_hydraulic.utils.units import convert
+
 
 @dataclass(slots=True)
 class OutputUnits:
@@ -25,6 +27,18 @@ class OutputUnits:
         self.volumetric_flow_rate = self._normalize(self.volumetric_flow_rate, "m^3/s")
         self.mass_flow_rate = self._normalize(self.mass_flow_rate, "kg/s")
         self.flow_momentum = self._normalize(self.flow_momentum, self.pressure_drop)
+
+        errors: list[str] = []
+        for field_name in self.__dataclass_fields__:
+            unit_string = getattr(self, field_name)
+            try:
+                # Attempt a dummy conversion to validate the unit string
+                convert(1.0, unit_string, unit_string)
+            except ValueError:
+                errors.append(f"Output unit '{unit_string}' for '{field_name}' is not a recognized unit")
+        
+        if errors:
+            raise ValueError("; ".join(errors))
 
     def as_dict(self) -> Dict[str, str]:
         """Return a serializable snapshot of the configured units."""

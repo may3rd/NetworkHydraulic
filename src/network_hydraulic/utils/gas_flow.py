@@ -270,6 +270,9 @@ def find_ma(mach1: float, gamma: float, k_total: float, factor: int) -> float:
 def _gas_state(pressure: float, temperature: float, mass_flow: float, diameter: float, molar_mass: float, z_factor: float, gamma: float) -> GasState:
     density = (pressure * molar_mass) / (z_factor * UNIVERSAL_GAS_CONSTANT * temperature)
     area = pi * diameter * diameter / 4.0
-    velocity = mass_flow / (density * area)
+    try:
+        velocity = mass_flow / (density * area)
+    except ZeroDivisionError:
+        raise ValueError("Diameter and mass flow must be positive for gas state calculation.")
     sonic = sqrt(gamma * z_factor * UNIVERSAL_GAS_CONSTANT * temperature / molar_mass) # Corrected sonic speed calculation
     return GasState(pressure=pressure, temperature=temperature, density=density, velocity=velocity, mach=velocity / sonic)

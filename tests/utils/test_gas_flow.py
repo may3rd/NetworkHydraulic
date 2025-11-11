@@ -132,3 +132,58 @@ def test_solve_isothermal_accepts_fanning_factor():
         friction_factor_type="fanning",
     )
     assert fanning_pressure == pytest.approx(darcy_pressure, rel=1e-9)
+
+
+def test_solve_adiabatic_choking_condition(caplog):
+    with caplog.at_level("WARNING", logger="network_hydraulic.utils.gas_flow"):
+        boundary = 350000.0
+        outlet_pressure, state = gas_flow.solve_adiabatic(
+            boundary_pressure=boundary,
+            temperature=330.0,
+            mass_flow=50.0,  # High mass flow to induce choking
+            diameter=0.05,
+            length=60.0,
+            friction_factor=0.02,
+            k_additional=3.0,
+            molar_mass=20.0,
+            z_factor=0.95,
+            gamma=1.33,
+            is_forward=True,
+            label="choked-sec",
+        )
+        assert any("Section choked-sec reached sonic conditions" in record.message for record in caplog.records)
+        assert state.mach == pytest.approx(1.0, rel=1e-3) # Mach should be close to 1.0
+        assert outlet_pressure == pytest.approx(state.critical_pressure, rel=1e-3)
+
+
+def test_solve_adiabatic_raises_for_invalid_inputs():
+    with pytest.raises(ValueError, match="Diameter and mass flow must be positive for gas state calculation."):
+        gas_flow.solve_adiabatic(
+            boundary_pressure=100000.0,
+            temperature=300.0,
+            mass_flow=1.0,
+            diameter=0.0,  # Non-positive diameter
+            length=10.0,
+            friction_factor=0.02,
+            k_additional=0.0,
+            molar_mass=18.0,
+            z_factor=1.0,
+            gamma=1.2,
+        )
+
+
+def test_solve_isothermal_raises_for_invalid_inputs():
+    with pytest.raises(ValueError, match="The desired mass flow rate cannot be achieved with the specified upstream pressure.*"):
+        gas_flow.solve_isothermal(
+            inlet_pressure=100000.0,
+            temperature=300.0,
+            mass_flow=100.0,  # Very high mass flow
+            diameter=0.1,
+            length=10.0,
+            friction_factor=0.02,
+            k_additional=0.0,
+            molar_mass=18.0,
+            z_factor=1.0,
+            gamma=1.2,
+            is_forward=True,
+        )

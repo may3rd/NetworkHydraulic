@@ -415,4 +415,33 @@ def test_component_only_section_uses_dual_boundaries():
     assert section.result_summary.outlet.pressure == pytest.approx(200000.0)
 
 
+def test_solver_handles_no_initial_pressure_gracefully():
+    fluid = make_fluid()
+    fluid.pressure = None # Set fluid pressure to None for this test
+    section = make_section()
+    network = Network(
+        name="no-initial-pressure",
+        description=None,
+        fluid=fluid,
+        direction="auto",
+        boundary_pressure=None,
+        upstream_pressure=None,
+        downstream_pressure=None,
+        sections=[section],
+    )
+    # Remove the lines that made the fluid invalid
+    # fluid.pressure = None
+    # fluid.mass_flow_rate = None
+    # fluid.volumetric_flow_rate = 0.0 # To satisfy Fluid.__post_init__
+
+    solver = NetworkSolver()
+    result = solver.run(network)
+
+    # Expect initial pressure to be None, leading to None pressures in results
+    assert result.sections[0].summary.inlet.pressure is None
+    assert result.sections[0].summary.outlet.pressure is None
+    assert result.summary.inlet.pressure is None
+    assert result.summary.outlet.pressure is None
+
+
 

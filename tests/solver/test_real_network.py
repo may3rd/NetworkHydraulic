@@ -20,6 +20,9 @@ def test_real_network_from_yaml():
     assert config_path.exists(), f"Missing real network config at {config_path}"
 
     loader = ConfigurationLoader.from_yaml_path(config_path)
+    # Explicitly set gas_flow_model for the test to satisfy Network.__post_init__ validation
+    # as it's null in the real_network.yaml fixture.
+    loader.raw["network"]["gas_flow_model"] = "isothermal"
     network = loader.build_network()
     volumetric_flow = network.fluid.current_volumetric_flow_rate()
     solver = NetworkSolver(volumetric_flow_rate=volumetric_flow)

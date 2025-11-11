@@ -104,3 +104,47 @@ def test_friction_includes_fitting_k():
     calc.calculate(section)
     drop = section.calculation_output.pressure_drop.pipe_and_fittings
     assert drop == pytest.approx(expected_drop(fluid, section))
+
+
+def test_friction_raises_for_non_positive_reynolds_number():
+    fluid = make_fluid()
+    fluid.volumetric_flow_rate = 0.0 # Set flow rate to zero after Fluid is valid
+    fluid.mass_flow_rate = 0.0
+    section = make_section()
+    calc = FrictionCalculator(fluid=fluid)
+    with pytest.raises(ValueError, match="Unable to compute Reynolds number for friction calculation"):
+        calc.calculate(section)
+
+
+def test_friction_handles_zero_length():
+    fluid = make_fluid()
+    section = make_section(length=0.0)
+    calc = FrictionCalculator(fluid=fluid)
+    calc.calculate(section)
+    assert section.pipe_length_K == 0.0
+    assert section.calculation_output.pressure_drop.pipe_and_fittings == 0.0
+
+
+def test_friction_handles_zero_roughness():
+    fluid = make_fluid()
+    section = make_section(roughness=0.0)
+    calc = FrictionCalculator(fluid=fluid)
+    calc.calculate(section)
+    assert section.calculation_output.pressure_drop.pipe_and_fittings > 0.0 # Should still calculate friction
+
+
+def test_friction_raises_for_non_positive_viscosity():
+    fluid = make_fluid()
+    fluid.viscosity = 0.0 # Set viscosity to zero after Fluid is valid
+    section = make_section()
+    calc = FrictionCalculator(fluid=fluid)
+    with pytest.raises(ValueError, match="viscosity must be positive for friction calculations"):
+        calc.calculate(section)
+
+
+def test_friction_raises_for_unknown_friction_factor_type():
+    fluid = make_fluid()
+    section = make_section()
+    calc = FrictionCalculator(fluid=fluid, friction_factor_type="unknown")
+    with pytest.raises(ValueError, match="Unknown friction_factor_type 'unknown'. Expected 'darcy' or 'fanning'."):
+        calc.calculate(section)

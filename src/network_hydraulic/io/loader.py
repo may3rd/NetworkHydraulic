@@ -95,22 +95,19 @@ class ConfigurationLoader:
             fluid_cfg.get("specific_heat_ratio", 1.0),
             "fluid.specific_heat_ratio",
         )
-        self._validate_fluid_inputs(
-            phase=phase,
-            temperature=temperature,
-            pressure=pressure,
-            density=density_value,
-            viscosity=viscosity,
-            molecular_weight=molecular_weight,
-            z_factor=z_factor,
-            specific_heat_ratio=specific_heat_ratio,
+
+        mass_flow_rate_val = self._quantity(fluid_cfg.get("mass_flow_rate"), "fluid.mass_flow_rate", target_unit="kg/s")
+        volumetric_flow_rate_val = self._quantity(
+            fluid_cfg.get("volumetric_flow_rate"), "fluid.volumetric_flow_rate", target_unit="m^3/s"
         )
+
+        if mass_flow_rate_val is None and volumetric_flow_rate_val is None:
+            raise ValueError("Either fluid.mass_flow_rate or fluid.volumetric_flow_rate must be provided")
+
         fluid = Fluid(
             name=fluid_cfg.get("name"),
-            mass_flow_rate=self._quantity(fluid_cfg.get("mass_flow_rate"), "fluid.mass_flow_rate", target_unit="kg/s"),
-            volumetric_flow_rate=self._quantity(
-                fluid_cfg.get("volumetric_flow_rate"), "fluid.volumetric_flow_rate", target_unit="m^3/s"
-            ),
+            mass_flow_rate=mass_flow_rate_val,
+            volumetric_flow_rate=volumetric_flow_rate_val,
             phase=phase,
             temperature=temperature,
             pressure=pressure,
@@ -434,39 +431,4 @@ class ConfigurationLoader:
         except (TypeError, ValueError) as exc:
             raise ValueError(f"{name} must be numeric") from exc
 
-    @staticmethod
-    def _validate_fluid_inputs(
-        *,
-        phase: str,
-        temperature: float,
-        pressure: float,
-        density: Optional[float],
-        viscosity: float,
-        molecular_weight: Optional[float],
-        z_factor: Optional[float],
-        specific_heat_ratio: Optional[float],
-    ) -> None:
-        errors: list[str] = []
-        if temperature <= 0:
-            errors.append("fluid.temperature must be positive")
-        if pressure <= 0:
-            errors.append("fluid.pressure must be positive")
-        if viscosity <= 0:
-            errors.append("fluid.viscosity must be positive")
 
-        normalized_phase = (phase or "").strip().lower()
-        if normalized_phase == "liquid":
-            if density is None or density <= 0:
-                errors.append("fluid.density must be provided and positive for liquids")
-        elif normalized_phase in {"gas", "vapor"}:
-            if molecular_weight is None or molecular_weight <= 0:
-                errors.append("fluid.molecular_weight must be provided and positive for gases")
-            if z_factor is None or z_factor <= 0:
-                errors.append("fluid.z_factor must be provided and positive for gases")
-            if specific_heat_ratio is None or specific_heat_ratio <= 0:
-                errors.append("fluid.specific_heat_ratio must be provided and positive for gases")
-        else:
-            errors.append("fluid.phase must be 'liquid', 'gas', or 'vapor'")
-
-        if errors:
-            raise ValueError("; ".join(errors))

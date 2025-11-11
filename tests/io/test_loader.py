@@ -38,6 +38,7 @@ def liquid_network_cfg(fluid_overrides=None, **network_overrides):
         "pressure": 101325.0,
         "density": 1000.0,
         "viscosity": 1e-3,
+        "mass_flow_rate": 1.0, # Added default mass_flow_rate
     }
     if fluid_overrides:
         fluid.update(fluid_overrides)
@@ -54,7 +55,20 @@ def liquid_network_cfg(fluid_overrides=None, **network_overrides):
 
 
 def test_loader_builds_structured_fittings():
-    loader = ConfigurationLoader(raw={})
+    raw_config = {
+        "network": {
+            "fluid": {
+                "name": "water",
+                "phase": "liquid",
+                "temperature": 300.0,
+                "pressure": 101325.0,
+                "density": 1000.0,
+                "viscosity": 1e-3,
+                "mass_flow_rate": 1.0,
+            }
+        }
+    }
+    loader = ConfigurationLoader(raw=raw_config)
     cfg = section_cfg(
         fittings=[
             {"type": "elbow_90", "count": 2},
@@ -70,7 +84,20 @@ def test_loader_builds_structured_fittings():
 
 
 def test_loader_auto_adds_swage_fittings():
-    loader = ConfigurationLoader(raw={})
+    raw_config = {
+        "network": {
+            "fluid": {
+                "name": "water",
+                "phase": "liquid",
+                "temperature": 300.0,
+                "pressure": 101325.0,
+                "density": 1000.0,
+                "viscosity": 1e-3,
+                "mass_flow_rate": 1.0,
+            }
+        }
+    }
+    loader = ConfigurationLoader(raw=raw_config)
     cfg = section_cfg(
         main_ID=0.2,
         input_ID=0.25,
@@ -87,7 +114,20 @@ def test_loader_auto_adds_swage_fittings():
 
 
 def test_loader_derives_diameter_from_npd():
-    loader = ConfigurationLoader(raw={})
+    raw_config = {
+        "network": {
+            "fluid": {
+                "name": "water",
+                "phase": "liquid",
+                "temperature": 300.0,
+                "pressure": 101325.0,
+                "density": 1000.0,
+                "viscosity": 1e-3,
+                "mass_flow_rate": 1.0,
+            }
+        }
+    }
+    loader = ConfigurationLoader(raw=raw_config)
     cfg = section_cfg(main_ID=None, pipe_NPD=6.0, schedule="40", pipe_diameter=None, inlet_diameter=None, outlet_diameter=None)
     section = loader._build_section(cfg)
     # 6" schedule 40 has an ID of 0.15408 m
@@ -200,6 +240,7 @@ def test_loader_aligns_adjacent_pipe_diameters():
                 "pressure": 101325.0,
                 "density": 1000.0,
                 "viscosity": 1e-3,
+                "mass_flow_rate": 1.0,
             },
             "sections": [
                 upstream,
@@ -230,6 +271,7 @@ def test_loader_respects_user_defined_diameters_between_sections():
                 "pressure": 101325.0,
                 "density": 1000.0,
                 "viscosity": 1e-3,
+                "mass_flow_rate": 1.0,
             },
             "sections": [
                 section_cfg(
@@ -256,7 +298,20 @@ def test_loader_respects_user_defined_diameters_between_sections():
 
 
 def test_loader_defaults_elevation_change_to_zero_when_missing():
-    loader = ConfigurationLoader(raw={})
+    raw_config = {
+        "network": {
+            "fluid": {
+                "name": "water",
+                "phase": "liquid",
+                "temperature": 300.0,
+                "pressure": 101325.0,
+                "density": 1000.0,
+                "viscosity": 1e-3,
+                "mass_flow_rate": 1.0,
+            }
+        }
+    }
+    loader = ConfigurationLoader(raw=raw_config)
     cfg = section_cfg()
     cfg.pop("elevation_change")
     section = loader._build_section(cfg)
@@ -280,6 +335,7 @@ def test_loader_parses_output_units_block():
                 "pressure": 101325.0,
                 "density": 1000.0,
                 "viscosity": 1e-3,
+                "mass_flow_rate": 1.0,
             },
             "sections": [
                 section_cfg(),
@@ -307,6 +363,7 @@ def test_loader_design_margin_honors_section_override():
                 "pressure": 101325.0,
                 "density": 1000.0,
                 "viscosity": 1e-3,
+                "mass_flow_rate": 1.0,
             },
             "sections": [
                 section_cfg(id="s1", design_margin=12.0),
@@ -335,6 +392,7 @@ def test_loader_from_json_path(tmp_path: Path):
                 "pressure": 250000.0,
                 "density": 997.0,
                 "viscosity": 1.0e-3,
+                "mass_flow_rate": 1.0, # Added default mass_flow_rate
             },
             "sections": [
                 section_cfg(
@@ -356,3 +414,67 @@ def test_loader_from_json_path(tmp_path: Path):
     section = network.sections[0]
     assert section.length == 50.0
     assert section.fittings[0].type == "elbow_90"
+
+
+def test_loader_raises_for_invalid_unit_string():
+    raw = liquid_network_cfg(
+        fluid_overrides={
+            "temperature": {
+                "value": 100.0,
+                "unit": "invalid_unit",
+            }
+        }
+    )
+    loader = ConfigurationLoader(raw=raw)
+    with pytest.raises(ValueError, match="Unit \\('invalid',\\) doesn't exist !"):
+        loader.build_network()
+
+
+def test_loader_raises_for_non_numeric_quantity_string():
+    raw = liquid_network_cfg(
+        fluid_overrides={
+            "temperature": "not_a_number K",
+        }
+    )
+    loader = ConfigurationLoader(raw=raw)
+    with pytest.raises(ValueError, match="fluid.temperature must be numeric"):
+        loader.build_network()
+
+
+def test_loader_raises_for_non_numeric_quantity_value_in_map():
+    raw = liquid_network_cfg(
+        fluid_overrides={
+            "temperature": {
+                "value": "not_a_number",
+                "unit": "K",
+            }
+        }
+    )
+    loader = ConfigurationLoader(raw=raw)
+    with pytest.raises(ValueError, match="fluid.temperature value must be numeric"):
+        loader.build_network()
+
+
+def test_loader_raises_for_missing_unit_in_map():
+    raw = liquid_network_cfg(
+        fluid_overrides={
+            "temperature": {
+                "value": 100.0,
+                "unit": None,
+            }
+        }
+    )
+    loader = ConfigurationLoader(raw=raw)
+    with pytest.raises(ValueError, match="Unit \\('None',\\) doesn't exist !"):
+        loader.build_network()
+
+
+def test_loader_raises_for_missing_required_positive_quantity():
+    raw = liquid_network_cfg(
+        fluid_overrides={
+            "temperature": None,
+        }
+    )
+    loader = ConfigurationLoader(raw=raw)
+    with pytest.raises(ValueError, match="fluid.temperature must be provided"):
+        loader.build_network()

@@ -46,7 +46,7 @@ class NetworkSolver:
     friction_factor_type: str = "darcy"
 
     def run(self, network: Network) -> NetworkResult:
-        network.fluid.ensure_valid()
+
         calculators = self._build_calculators(network)
         result = NetworkResult()
 

@@ -79,3 +79,36 @@ class PipeSection:
     design_flow_multiplier: float = 1.0
     design_mass_flow_rate: Optional[float] = None
     design_volumetric_flow_rate: Optional[float] = None
+
+    def __post_init__(self) -> None:
+        errors: list[str] = []
+
+        if not self.id:
+            errors.append("PipeSection id must be a non-empty string")
+        
+        if self.roughness < 0:
+            errors.append("PipeSection roughness must be non-negative")
+        
+        if self.length < 0:
+            errors.append("PipeSection length must be non-negative")
+        
+        if self.pipe_diameter is not None and self.pipe_diameter <= 0:
+            errors.append("PipeSection pipe_diameter must be positive if provided")
+        
+        if self.inlet_diameter is not None and self.inlet_diameter <= 0:
+            errors.append("PipeSection inlet_diameter must be positive if provided")
+        
+        if self.outlet_diameter is not None and self.outlet_diameter <= 0:
+            errors.append("PipeSection outlet_diameter must be positive if provided")
+        
+        if self.piping_and_fitting_safety_factor is not None and self.piping_and_fitting_safety_factor <= 0:
+            errors.append("PipeSection piping_and_fitting_safety_factor must be positive if provided")
+        
+        if self.erosional_constant is not None and self.erosional_constant <= 0:
+            errors.append("PipeSection erosional_constant must be positive if provided")
+        
+        if not self.fitting_type:
+            errors.append("PipeSection fitting_type must be a non-empty string")
+
+        if errors:
+            raise ValueError("; ".join(errors))

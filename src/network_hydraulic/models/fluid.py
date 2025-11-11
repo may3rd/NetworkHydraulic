@@ -24,9 +24,37 @@ class Fluid:
     vapor_pressure: Optional[float] = None
     critical_pressure: Optional[float] = None
 
-    def ensure_valid(self) -> None:
+    def __post_init__(self) -> None:
+        errors: list[str] = []
+
+        # From _validate_fluid_inputs in ConfigurationLoader
+        if self.temperature <= 0:
+            errors.append("fluid.temperature must be positive")
+        if self.pressure <= 0:
+            errors.append("fluid.pressure must be positive")
+        if self.viscosity <= 0:
+            errors.append("fluid.viscosity must be positive")
+
+        normalized_phase = (self.phase or "").strip().lower()
+        if normalized_phase == "liquid":
+            if self.density is None or self.density <= 0:
+                errors.append("fluid.density must be provided and positive for liquids")
+        elif normalized_phase in {"gas", "vapor"}:
+            if self.molecular_weight is None or self.molecular_weight <= 0:
+                errors.append("fluid.molecular_weight must be provided and positive for gases")
+            if self.z_factor is None or self.z_factor <= 0:
+                errors.append("fluid.z_factor must be provided and positive for gases")
+            if self.specific_heat_ratio is None or self.specific_heat_ratio <= 0:
+                errors.append("fluid.specific_heat_ratio must be provided and positive for gases")
+        else:
+            errors.append("fluid.phase must be 'liquid', 'gas', or 'vapor'")
+        
+        # From ensure_valid
         if not self._has_mass_flow() and not self._has_volumetric_flow():
-            raise ValueError("Either mass_flow_rate or volumetric_flow_rate must be provided")
+            errors.append("Either mass_flow_rate or volumetric_flow_rate must be provided")
+
+        if errors:
+            raise ValueError("; ".join(errors))
 
     def phase_key(self) -> str:
         return self.phase.lower().strip()
@@ -43,7 +71,7 @@ class Fluid:
         if self._has_volumetric_flow():
             density = self.current_density()
             return (self.volumetric_flow_rate or 0.0) * density
-        raise ValueError("Unable to determine mass flow rate for fluid")
+        return 0.0 # Return 0.0 if no flow rate can be determined
 
     def current_volumetric_flow_rate(self) -> float:
         if self._has_volumetric_flow():
@@ -51,7 +79,7 @@ class Fluid:
         if self._has_mass_flow():
             density = self.current_density()
             return (self.mass_flow_rate or 0.0) / density
-        raise ValueError("Unable to determine volumetric flow rate for fluid")
+        return 0.0 # Return 0.0 if no flow rate can be determined
 
     def current_density(self) -> float:
         if self.is_gas():

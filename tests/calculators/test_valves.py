@@ -221,24 +221,26 @@ def test_control_valve_note_when_insufficient_data():
 
 
 def test_missing_flow_rate_raises():
-    fluid = Fluid(
-        name="bad",
-        mass_flow_rate=None,
-        volumetric_flow_rate=None,
-        phase="liquid",
-        temperature=300.0,
-        pressure=100e3,
-        density=1000.0,
-        molecular_weight=18.0,
-        z_factor=1.0,
-        specific_heat_ratio=1.0,
-        viscosity=1e-3,
-        standard_flow_rate=None,
-        vapor_pressure=10e3,
-        critical_pressure=22e6,
-    )
-    valve = ControlValve(tag="CV-4", cv=10.0, cg=None, pressure_drop=None, C1=None)
-    section = make_section(valve)
-    calc = ControlValveCalculator(fluid=fluid)
-    with pytest.raises(ValueError):
-        calc.calculate(section)
+    with pytest.raises(ValueError, match="Either mass_flow_rate or volumetric_flow_rate must be provided"):
+        fluid = Fluid(
+            name="bad",
+            mass_flow_rate=None,
+            volumetric_flow_rate=None,
+            phase="liquid",
+            temperature=300.0,
+            pressure=100e3,
+            density=1000.0,
+            molecular_weight=18.0,
+            z_factor=1.0,
+            specific_heat_ratio=1.0,
+            viscosity=1e-3,
+            standard_flow_rate=None,
+            vapor_pressure=10e3,
+            critical_pressure=22e6,
+        )
+    # The rest of the test is now unreachable, but keeping it for context if needed later.
+    # valve = ControlValve(tag="CV-4", cv=10.0, cg=None, pressure_drop=None, C1=None)
+    # section = make_section(valve)
+    # calc = ControlValveCalculator(fluid=fluid)
+    # with pytest.raises(ValueError):
+    #     calc.calculate(section)
