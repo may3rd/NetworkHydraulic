@@ -187,3 +187,25 @@ def test_solve_isothermal_raises_for_invalid_inputs():
             gamma=1.2,
             is_forward=True,
         )
+
+
+import unittest.mock
+
+def test_solve_adiabatic_brentq_failure(caplog):
+    with caplog.at_level("WARNING", logger="network_hydraulic.utils.gas_flow"):
+        with unittest.mock.patch("network_hydraulic.utils.gas_flow._fanno_mach_from_fL_D", side_effect=ValueError("Mocked _fanno_mach_from_fL_D failure")):
+            _, state = gas_flow.solve_adiabatic(
+                boundary_pressure=100000.0,
+                temperature=300.0,
+                mass_flow=1.0,
+                diameter=0.1,
+                length=10.0,
+                friction_factor=0.02,
+                k_additional=0.0,
+                molar_mass=18.0,
+                z_factor=1.0,
+                gamma=1.2,
+                label="brentq-fail-sec",
+            )
+            assert any("Section brentq-fail-sec reached sonic conditions" in record.message for record in caplog.records)
+            assert state.mach == pytest.approx(1.0, rel=1e-3)

@@ -478,3 +478,14 @@ def test_loader_raises_for_missing_required_positive_quantity():
     loader = ConfigurationLoader(raw=raw)
     with pytest.raises(ValueError, match="fluid.temperature must be provided"):
         loader.build_network()
+
+
+def test_loader_raises_for_invalid_fluid_phase():
+    raw = liquid_network_cfg(
+        fluid_overrides={
+            "phase": "solid",
+        }
+    )
+    loader = ConfigurationLoader(raw=raw)
+    with pytest.raises(ValueError, match="fluid.phase must be 'liquid', 'gas', or 'vapor'"):
+        loader.build_network()
