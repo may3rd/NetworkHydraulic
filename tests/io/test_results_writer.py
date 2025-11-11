@@ -205,6 +205,31 @@ def test_write_output_writes_json_when_requested(tmp_path: Path):
     assert data["network"]["name"] == "demo"
 
 
+def test_section_description_included_in_output(tmp_path: Path):
+    section = build_section()
+    section.description = "Feed gas from knockout drum"
+    fluid = build_fluid()
+    network = Network(
+        name="demo",
+        description="Overall feed network",
+        fluid=fluid,
+        direction="forward",
+        boundary_pressure=150000.0,
+        gas_flow_model="isothermal",
+        sections=[section],
+    )
+    summary = make_summary(density=4.0)
+    section_result = make_results(summary)
+    network_result = NetworkResult(sections=[section_result], aggregate=CalculationOutput(), summary=summary)
+
+    out_path = tmp_path / "section_description.yaml"
+    results_io.write_output(out_path, network, network_result)
+
+    with out_path.open("r", encoding="utf-8") as handle:
+        data = yaml.safe_load(handle)
+    assert data["network"]["sections"][0]["description"] == "Feed gas from knockout drum"
+
+
 def test_print_summary_output(capfd):
     section = build_section()
     fluid = build_fluid()

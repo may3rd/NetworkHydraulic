@@ -14,15 +14,16 @@ network:
     temperature: 42.0
     pressure: 32.2
     density: 580.0
+    viscosity: 0.00013
     molecular_weight: 0.0
     z_factor: 1.0
     specific_heat_ratio: 1.0
-    viscosity: 0.00013
     standard_flow_rate: null
     vapor_pressure: null
     critical_pressure: null
   sections:
   - id: '1'
+    description: null
     schedule: '40'
     roughness: 4.57e-05
     length: 0.0
@@ -65,6 +66,7 @@ network:
         reynolds_number: 51840.650110712224
         flow_scheme: turbulent
         frictional_factor: 0.0
+        critical_pressure: null
         pipe_and_fittings: 0.0
         elevation_change: 0.0
         control_valve: null
@@ -133,6 +135,7 @@ network:
       reynolds_number: null
       flow_scheme: null
       frictional_factor: null
+      critical_pressure: null
       pipe_and_fittings: 0.0
       elevation_change: 0.0
       control_valve: 0.0

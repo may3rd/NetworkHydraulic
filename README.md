@@ -20,17 +20,20 @@ Skeleton Python project for computing pressure losses across complex pipe networ
 ## Getting Started
 ```bash
 python -m venv .venv
-source .venv/bin/activate
+source .venv/bin/activate    # .venv\Scripts\Activate.ps1 on Windows
 pip install -e .[dev]
-network-hydraulic --config config/sample_network.yaml
+network-hydraulic run config/sample_network.yaml --output build/result.yaml
 ```
 
 ## Usage
 
 ### CLI entry point
 ```bash
-network-hydraulic --config config/sample_network.yaml \
-                  --output results/sample.json
+network-hydraulic run config/sample_network.yaml \
+                      --output results/sample.json \
+                      --default-diameter 0.15 \
+                      --flow-rate 0.025 \
+                      --debug-fittings
 ```
 - Result files include each section’s `calculation_result.flow` plus matching network-level `fluid.volumetric_flow_rate` and `fluid.standard_flow_rate` derived from solver outputs (0 °C & 1 atm for gas).
 
@@ -67,10 +70,13 @@ print(result.summary())
   - Prefer setting `upstream_pressure` / `downstream_pressure` on the network block and leave `direction: auto`; the solver infers flow direction from whichever boundary is provided.
 - If both boundaries and a component-only section (valve/orifice) are defined, the solver automatically assigns the component’s pressure drop from those constraints.
 
-## Helpful References
+## Documentation & References
+- [User Manual](docs/user_manual.md): step-by-step instructions for installing, running, logging, and troubleshooting.
+- [Configuration Reference](docs/configuration_reference.md): exhaustive list of network/section keys, fittings, and component fields.
 - Sample network definition: `config/sample_network.yaml`.
 - Expected results skeleton: `config/sample_results.yaml`.
 - Example fittings metadata: `config/fittings_skeleton.yaml`.
+- Architecture overview: `docs/architecture.md`.
 - Fanno flow overview (basis for the adiabatic solver): [Flows with friction (Fanno flows)](https://kyleniemeyer.github.io/gas-dynamics-notes/compressible-flows/friction.html).
 
 ## Development

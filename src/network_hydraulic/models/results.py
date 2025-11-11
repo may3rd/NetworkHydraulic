@@ -1,4 +1,11 @@
-"""Result containers for calculations."""
+"""Result containers for per-section and network summaries.
+
+Example:
+
+    from network_hydraulic.models.results import NetworkResult
+
+    result = NetworkResult()
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass, field

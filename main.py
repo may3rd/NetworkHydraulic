@@ -56,8 +56,11 @@ def main() -> None:
     )
     try:
         result = solver.run(network)
+    except ValueError as exc:
+        print(f"Configuration Error: {exc}")
+        return
     except Exception as exc:  # pragma: no cover - manual testing helper
-        print(f"Calculation failed: {exc}")
+        print(f"An unexpected error occurred during calculation: {exc}")
         return
 
     result_io.print_summary(network, result, debug=args.debug_fittings)

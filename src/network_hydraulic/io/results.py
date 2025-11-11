@@ -1,7 +1,14 @@
-"""Helpers for presenting and serializing solver results."""
+"""Helpers for presenting and serializing solver results.
+
+Example:
+
+    from network_hydraulic.io import results as results_io
+    results_io.write_output(Path("out.yaml"), network, result)
+"""
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
@@ -352,6 +359,7 @@ def _fluid_dict(fluid: "Fluid", converter: _OutputUnitConverter) -> Dict[str, An
 def _section_config(section: "PipeSection") -> Dict[str, Any]:
     base = {
         "id": section.id,
+        "description": section.description,
         "schedule": section.schedule,
         "roughness": section.roughness,
         "length": section.length,
@@ -477,9 +485,18 @@ def _standard_gas_density(fluid: "Fluid") -> Optional[float]:
 
 
 def _convert_value(value: Optional[float], from_unit: str, to_unit: str) -> Optional[float]:
-    if value is None or not to_unit or to_unit == from_unit:
+    if value is None:
+        return None
+    if isinstance(value, (int, float)) and not math.isfinite(value):
+        raise ValueError(f"Non-finite value '{value}' encountered while converting from {from_unit} to {to_unit}")
+    if not to_unit or to_unit == from_unit:
         return value
-    return convert_units(value, from_unit, to_unit)
+    converted = convert_units(value, from_unit, to_unit)
+    if isinstance(converted, float) and not math.isfinite(converted):
+        raise ValueError(
+            f"Unit conversion produced non-finite value '{converted}' from {from_unit} to {to_unit}"
+        )
+    return converted
 
 
 def _print_section_overview(

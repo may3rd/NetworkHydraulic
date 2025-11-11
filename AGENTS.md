@@ -16,7 +16,7 @@ Cheat sheet for coding agents who need quick context about the hydraulic solver 
 | `src/network_hydraulic/solver/` | `NetworkSolver` orchestrates calculator execution, pressure profile propagation, and summaries. |
 | `src/network_hydraulic/io/loader.py` | Parses YAML configs, performs unit normalization, builds model graph. |
 | `src/network_hydraulic/utils/` | Unit conversion helpers, pipe dimension tables, gas-flow constants. |
-| `src/network_hydraulic/cli/app.py` | Typer-based CLI (`network-hydraulic run --config …`). |
+| `src/network_hydraulic/cli/app.py` | Typer-based CLI (`network-hydraulic run CONFIG …`). |
 | `config/` | Sample configs and expected outputs (`sample_network.yaml`, fittings reference). |
 | `examples/`, `docs/` | Usage demos and architecture notes. |
 | `tests/` | Pytest suites for calculators, IO, models, solver integration. |
@@ -43,7 +43,7 @@ Cheat sheet for coding agents who need quick context about the hydraulic solver 
    ```
 2. **Run the CLI**
    ```bash
-   network-hydraulic run --config config/sample_network.yaml
+   network-hydraulic run config/sample_network.yaml
    ```
    The CLI stops on `NotImplementedError` placeholders; use this to validate plumbing while calculators are incomplete.
 3. **Testing & Quality**

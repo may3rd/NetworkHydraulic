@@ -302,12 +302,10 @@ def test_component_drops_match_total_loss_when_no_pipe_losses():
     assert section.result_summary.outlet.pressure == pytest.approx(250000.0 - 6200.0)
 
 
-def test_solver_logs_missing_gas_parameters(caplog: LogCaptureFixture):
+def test_solver_errors_for_missing_gas_parameters():
     fluid = make_gas_fluid()
     section = make_component_section("missing")
-    section.length = None
-    section.roughness = None
-    section.total_K = None
+    section.length = 1.0
     network = Network(
         name="gas-missing",
         description=None,
@@ -318,15 +316,10 @@ def test_solver_logs_missing_gas_parameters(caplog: LogCaptureFixture):
         sections=[section],
     )
 
-    caplog.clear()
-    with caplog.at_level("WARNING", logger="network_hydraulic.solver.network_solver"):
-        solver = NetworkSolver(default_pipe_diameter=0.1)
-        result = solver.run(network)
-
-    assert any("Skipping gas section" in message for message in caplog.messages)
-    section_result = result.sections[0].summary
-    assert section_result.inlet.pressure is None
-    assert section_result.outlet.pressure is None
+    solver = NetworkSolver(default_pipe_diameter=0.1)
+    with patch.object(NetworkSolver, "_build_calculators", return_value=[]):
+        with pytest.raises(ValueError, match="missing.*gas-flow inputs"):
+            solver.run(network)
 
 
 def test_solver_sets_direction_from_upstream_pressure():
@@ -442,6 +435,3 @@ def test_solver_handles_no_initial_pressure_gracefully():
     assert result.sections[0].summary.outlet.pressure is None
     assert result.summary.inlet.pressure is None
     assert result.summary.outlet.pressure is None
-
-
-

@@ -1,4 +1,17 @@
-"""Orchestrates per-section hydraulic calculations."""
+"""Orchestrates per-section hydraulic calculations and state propagation.
+
+Example:
+
+    from network_hydraulic.models.fluid import Fluid
+    from network_hydraulic.models.network import Network
+    from network_hydraulic.models.pipe_section import PipeSection, Fitting
+    from network_hydraulic.solver.network_solver import NetworkSolver
+
+    fluid = Fluid(...)
+    network = Network(name="test", description=None, fluid=fluid, sections=[...])
+    solver = NetworkSolver()
+    result = solver.run(network)
+"""
 from __future__ import annotations
 
 import logging
@@ -51,6 +64,11 @@ class NetworkSolver:
         result = NetworkResult()
 
         sections = list(network.sections)
+        logger.info(
+            "Starting solver run for network '%s' (%d section(s))",
+            network.name,
+            len(sections),
+        )
         for section in sections:
             self._reset_section(section)
 
@@ -58,6 +76,7 @@ class NetworkSolver:
         base_mass_flow = self._determine_mass_flow(network, base_vol_flow)
         self._assign_design_flows(sections, network, base_vol_flow, base_mass_flow)
         for section in sections:
+            self._validate_section_prerequisites(section)
             for calculator in calculators:
                 calculator.calculate(section)
             # Calculate total_K
@@ -97,6 +116,7 @@ class NetworkSolver:
             self._accumulate(result.aggregate.pressure_drop, section.calculation_output.pressure_drop)
 
         result.summary = network.result_summary
+        logger.info("Completed solver run for network '%s'", network.name)
         return result
 
     def _build_calculators(self, network: Network) -> Iterable:
@@ -129,6 +149,18 @@ class NetworkSolver:
         section.design_flow_multiplier = 1.0
         section.design_mass_flow_rate = None
         section.design_volumetric_flow_rate = None
+
+    def _validate_section_prerequisites(self, section: PipeSection) -> None:
+        errors: list[str] = []
+        diameter = section.pipe_diameter or self.default_pipe_diameter
+        if diameter is None or diameter <= 0:
+            errors.append("pipe diameter is required")
+        if section.length is None:
+            errors.append("length must be provided")
+        if errors:
+            raise ValueError(
+                f"Section '{section.id}' is invalid: {', '.join(errors)}"
+            )
 
     def _assign_design_flows(
         self,
@@ -255,15 +287,9 @@ class NetworkSolver:
                     missing_params.append("section_start_pressure")
 
                 if missing_params:
-                    logger.warning(
-                        "Skipping gas section %s due to missing parameters: %s",
-                        section.id,
-                        ", ".join(missing_params),
+                    raise ValueError(
+                        f"Section '{section.id}' is missing required gas-flow inputs: {', '.join(missing_params)}"
                     )
-                    summary.inlet.pressure = None
-                    summary.outlet.pressure = None
-                    current = None
-                    continue
 
                 if gas_flow_model == "isothermal":
                     if forward:
@@ -493,6 +519,10 @@ class NetworkSolver:
         orifice_calculator: OrificeCalculator,
     ) -> None:
         if inlet_pressure is None or inlet_pressure <= 0:
+            if section.control_valve or section.orifice:
+                raise ValueError(
+                    f"Section '{section.id}' requires a valid inlet pressure for component calculations"
+                )
             return
 
         if section.control_valve:

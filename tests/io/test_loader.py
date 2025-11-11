@@ -11,6 +11,7 @@ from network_hydraulic.utils.units import convert
 def section_cfg(**overrides):
     base = {
         "id": "sec-1",
+        "description": None,
         "main_ID": 0.2,
         "input_ID": 0.2,
         "output_ID": 0.2,
@@ -216,6 +217,38 @@ def test_loader_defaults_pressure_to_boundary_when_missing():
     assert network.fluid.pressure == pytest.approx(expected, rel=1e-9)
 
 
+def test_loader_rejects_unknown_network_key():
+    raw = liquid_network_cfg()
+    raw["network"]["unknown_key"] = 10
+    loader = ConfigurationLoader(raw=raw)
+    with pytest.raises(ValueError, match="Unknown keys in network"):
+        loader.build_network()
+
+
+def test_loader_rejects_unknown_section_key():
+    raw = liquid_network_cfg()
+    raw["network"]["sections"][0]["unexpected"] = 42
+    loader = ConfigurationLoader(raw=raw)
+    with pytest.raises(ValueError, match=r"Unknown keys in section 'sec-1'"):
+        loader.build_network()
+
+
+def test_loader_captures_section_description():
+    raw = liquid_network_cfg()
+    raw["network"]["sections"][0]["description"] = "Feed line to compressor"
+    loader = ConfigurationLoader(raw=raw)
+    network = loader.build_network()
+    assert network.sections[0].description == "Feed line to compressor"
+
+
+def test_loader_requires_section_length():
+    raw = liquid_network_cfg()
+    raw["network"]["sections"][0].pop("length")
+    loader = ConfigurationLoader(raw=raw)
+    with pytest.raises(ValueError, match=r"section\.length .*sec-1"):
+        loader.build_network()
+
+
 def test_loader_aligns_adjacent_pipe_diameters():
     upstream = section_cfg(id="s1", pipe_diameter=0.1, fittings=[])
     upstream["output_ID"] = None
@@ -257,6 +290,52 @@ def test_loader_aligns_adjacent_pipe_diameters():
     assert second.inlet_diameter == pytest.approx(first.pipe_diameter)
     summary = {f.type: f.count for f in second.fittings}
     assert summary.get("inlet_swage") == 1
+
+
+def test_loader_does_not_add_swage_for_near_equal_diameters():
+    upstream = section_cfg(
+        id="s1",
+        main_ID=0.15408,
+        input_ID=0.15408,
+        output_ID=0.15408,
+        pipe_diameter=0.15408,
+        inlet_diameter=0.15408,
+        outlet_diameter=0.15408,
+        fittings=[],
+    )
+    downstream = section_cfg(
+        id="s2",
+        main_ID=0.1540805,
+        input_ID=None,
+        output_ID=None,
+        pipe_diameter=0.1540805,
+        inlet_diameter=None,
+        outlet_diameter=0.1540805,
+        fittings=[],
+    )
+    raw = {
+        "network": {
+            "name": "tolerance",
+            "direction": "forward",
+            "fluid": {
+                "name": "water",
+                "phase": "liquid",
+                "temperature": 300.0,
+                "pressure": 101325.0,
+                "density": 1000.0,
+                "viscosity": 1e-3,
+                "mass_flow_rate": 1.0,
+            },
+            "sections": [
+                upstream,
+                downstream,
+            ],
+        }
+    }
+    loader = ConfigurationLoader(raw=raw)
+    network = loader.build_network()
+    _, second = network.sections
+    assert not any(f.type == "inlet_swage" for f in second.fittings)
 
 
 def test_loader_respects_user_defined_diameters_between_sections():
@@ -348,6 +427,18 @@ def test_loader_parses_output_units_block():
     assert units.pressure == "kPag"
     assert units.pressure_drop == "kPa"
     assert units.temperature == "degC"
+
+
+def test_loader_normalizes_fitting_aliases():
+    raw = liquid_network_cfg()
+    raw["network"]["sections"][0]["fittings"] = [
+        {"type": "check_valve_tilting", "count": 2},
+    ]
+    loader = ConfigurationLoader(raw=raw)
+    network = loader.build_network()
+    fitting = network.sections[0].fittings[0]
+    assert fitting.type == "tilting_check_valve"
+    assert fitting.count == 2
 
 
 def test_loader_design_margin_honors_section_override():

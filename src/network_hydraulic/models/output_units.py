@@ -1,4 +1,11 @@
-"""Configuration for report/output units."""
+"""Configuration for report/output units.
+
+Example:
+
+    from network_hydraulic.models.output_units import OutputUnits
+
+    units = OutputUnits(pressure="kPag", temperature="degC")
+"""
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass

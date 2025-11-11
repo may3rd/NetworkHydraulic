@@ -1,7 +1,16 @@
-"""Configuration loader utilities."""
+"""Configuration loader utilities that parse YAML/JSON configs.
+
+Example:
+
+    from network_hydraulic.io.loader import ConfigurationLoader
+
+    loader = ConfigurationLoader.from_yaml_path(Path("config/sample.yaml"))
+    network = loader.build_network()
+"""
 from __future__ import annotations
 
 import json
+import logging
 import re
 import warnings
 from dataclasses import dataclass
@@ -18,8 +27,57 @@ from network_hydraulic.models.output_units import OutputUnits
 from network_hydraulic.utils.pipe_dimensions import inner_diameter_from_nps
 from network_hydraulic.utils.units import convert as convert_units
 
-SWAGE_TOLERANCE = 1e-9
+SWAGE_ABSOLUTE_TOLERANCE = 1e-6
+SWAGE_RELATIVE_TOLERANCE = 1e-3
 QUANTITY_PATTERN = re.compile(r"^\s*([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)\s*(\S.+)$")
+
+logger = logging.getLogger(__name__)
+NETWORK_ALLOWED_KEYS = {
+    "name",
+    "description",
+    "direction",
+    "boundary_pressure",
+    "upstream_pressure",
+    "downstream_pressure",
+    "gas_flow_model",
+    "gas_flow_type",
+    "fluid",
+    "sections",
+    "output_units",
+    "design_margin",
+}
+
+SECTION_ALLOWED_KEYS = {
+    "id",
+    "description",
+    "main_ID",
+    "input_ID",
+    "output_ID",
+    "schedule",
+    "roughness",
+    "length",
+    "elevation_change",
+    "fitting_type",
+    "fittings",
+    "pipe_diameter",
+    "inlet_diameter",
+    "outlet_diameter",
+    "control_valve",
+    "orifice",
+    "pipe_NPD",
+    "design_margin",
+    "fitting_K",
+    "pipe_length_K",
+    "user_K",
+    "piping_and_fitting_safety_factor",
+    "total_K",
+    "user_specified_fixed_loss",
+    "erosional_constant",
+    "boundary_pressure",
+    "direction",
+    "inlet_diameter_specified",
+    "outlet_diameter_specified",
+}
 
 def _yaml_loader() -> YAML:
     yaml = YAML(typ="safe")
@@ -55,6 +113,8 @@ class ConfigurationLoader:
 
     def build_network(self) -> Network:
         network_cfg = self.raw.get("network", {})
+        logger.info("Building network configuration from loader data")
+        self._validate_keys(network_cfg, NETWORK_ALLOWED_KEYS, context="network")
         fluid_cfg = network_cfg.get("fluid", {})
         boundary_pressure = self._quantity(network_cfg.get("boundary_pressure"), "network.boundary_pressure", target_unit="Pa")
         upstream_pressure = self._quantity(
@@ -128,9 +188,17 @@ class ConfigurationLoader:
         sections = [self._build_section(cfg) for cfg in sections_cfg]
         self._align_adjacent_diameters(sections)
         direction = network_cfg.get("direction", "auto")
-        gas_flow_model = network_cfg.get("gas_flow_model", network_cfg.get("gas_flow_type", "isothermal"))
+        raw_gas_flow_model = network_cfg.get("gas_flow_model", network_cfg.get("gas_flow_type"))
+        if raw_gas_flow_model is None:
+            gas_flow_model = "isothermal" if fluid.is_gas() else None
+        else:
+            text_value = str(raw_gas_flow_model).strip().lower()
+            if not text_value:
+                gas_flow_model = "isothermal" if fluid.is_gas() else None
+            else:
+                gas_flow_model = text_value
         output_units = self._build_output_units(network_cfg.get("output_units"))
-        return Network(
+        network = Network(
             name=network_cfg.get("name", "network"),
             description=network_cfg.get("description"),
             fluid=fluid,
@@ -143,8 +211,16 @@ class ConfigurationLoader:
             output_units=output_units,
             design_margin=self._coerce_optional_float(network_cfg.get("design_margin"), "network.design_margin"),
         )
+        logger.info(
+            "Built network '%s' with %d section(s) and fluid '%s'",
+            network.name,
+            len(sections),
+            network.fluid.name or network.fluid.phase,
+        )
+        return network
 
     def _build_section(self, cfg: Dict[str, Any]) -> PipeSection:
+        self._validate_keys(cfg, SECTION_ALLOWED_KEYS, context=f"section '{cfg.get('id', '<unknown>')}'")
         control_valve = self._build_control_valve(cfg.get("control_valve"))
         orifice = self._build_orifice(cfg.get("orifice"))
         schedule = str(cfg.get("schedule", "40"))
@@ -160,6 +236,9 @@ class ConfigurationLoader:
         fittings = self._build_fittings(cfg.get("fittings"), inlet_diameter, outlet_diameter, pipe_diameter)
         roughness = self._quantity(cfg.get("roughness"), "roughness", target_unit="m", default=0.0)
         length = self._quantity(cfg.get("length"), "length", target_unit="m")
+        if length is None:
+            section_id = cfg.get("id", "<unknown>")
+            raise ValueError(f"section.length must be provided for section '{section_id}'")
         elevation_change = self._quantity(
             cfg.get("elevation_change"), "elevation_change", target_unit="m", default=0.0
         )
@@ -221,12 +300,17 @@ class ConfigurationLoader:
             )
             if upstream_exit is None or downstream_entry is None:
                 continue
-            if abs(upstream_exit - downstream_entry) <= SWAGE_TOLERANCE:
+            if self._diameters_within_tolerance(upstream_exit, downstream_entry):
                 continue
             if upstream.outlet_diameter_specified or downstream.inlet_diameter_specified:
                 continue
             downstream.inlet_diameter = upstream_exit
             self._ensure_swage_fitting(downstream, "inlet_swage")
+            logger.debug(
+                "Aligned downstream inlet diameter for section '%s' to match upstream '%s'",
+                downstream.id,
+                upstream.id,
+            )
 
     def _ensure_swage_fitting(self, section: PipeSection, fit_type: str) -> None:
         if self._has_fitting(section.fittings, fit_type):
@@ -305,11 +389,29 @@ class ConfigurationLoader:
 
     @staticmethod
     def _needs_swage(upstream: float, downstream: float) -> bool:
-        return abs((upstream or 0.0) - (downstream or 0.0)) > SWAGE_TOLERANCE
+        if upstream is None or downstream is None:
+            return False
+        return not ConfigurationLoader._diameters_within_tolerance(upstream, downstream)
 
     @staticmethod
     def _has_fitting(fittings: List[Fitting], fit_type: str) -> bool:
         return any(fitting.type == fit_type for fitting in fittings)
+
+    @staticmethod
+    def _validate_keys(cfg: Dict[str, Any], allowed: set[str], *, context: str) -> None:
+        unknown = set(cfg or {}) - allowed
+        if unknown:
+            keys = ", ".join(sorted(unknown))
+            raise ValueError(f"Unknown keys in {context}: {keys}")
+
+    @staticmethod
+    def _diameters_within_tolerance(a: Optional[float], b: Optional[float]) -> bool:
+        if a is None or b is None:
+            return False
+        diff = abs(a - b)
+        scale = max(abs(a), abs(b), 1.0)
+        tolerance = max(SWAGE_ABSOLUTE_TOLERANCE, SWAGE_RELATIVE_TOLERANCE * scale)
+        return diff <= tolerance
 
     def _resolve_main_diameter(self, explicit: Optional[Any], pipe_npd: Optional[float], schedule: str) -> float:
         if explicit is not None:
@@ -430,5 +532,3 @@ class ConfigurationLoader:
             return float(value)
         except (TypeError, ValueError) as exc:
             raise ValueError(f"{name} must be numeric") from exc
-
-

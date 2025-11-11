@@ -1,4 +1,24 @@
-"""Fluid properties."""
+"""Fluid properties used across sections.
+
+Example:
+
+    from network_hydraulic.models.fluid import Fluid
+
+    fluid = Fluid(
+        name="nitrogen",
+        mass_flow_rate=1.0,
+        volumetric_flow_rate=None,
+        phase="gas",
+        temperature=300.0,
+        pressure=101325.0,
+        density=1.25,
+        molecular_weight=28.0,
+        z_factor=0.95,
+        specific_heat_ratio=1.33,
+        viscosity=1e-5,
+        standard_flow_rate=None,
+    )
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass

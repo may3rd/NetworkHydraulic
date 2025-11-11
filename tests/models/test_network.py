@@ -35,7 +35,7 @@ def make_network(**overrides) -> Network:
         boundary_pressure=None,
         upstream_pressure=None,
         downstream_pressure=None,
-        gas_flow_model="isothermal",
+        gas_flow_model=None,
         sections=[],
         design_margin=None,
     )
@@ -46,7 +46,7 @@ def make_network(**overrides) -> Network:
 def test_network_post_init_valid_inputs():
     network = make_network()
     assert network.direction == "auto"
-    assert network.gas_flow_model == "isothermal"
+    assert network.gas_flow_model is None
     assert network.design_margin is None
 
 
@@ -68,6 +68,12 @@ def test_network_post_init_raises_for_invalid_direction():
 def test_network_post_init_raises_for_invalid_gas_flow_model():
     with pytest.raises(ValueError, match="Gas flow model 'unknown' must be 'isothermal' or 'adiabatic'"):
         make_network(gas_flow_model="unknown")
+
+
+def test_network_defaults_gas_flow_model_for_gas_fluid():
+    gas_fluid = make_fluid(phase="gas", volumetric_flow_rate=None)
+    network = make_network(fluid=gas_fluid, gas_flow_model=None)
+    assert network.gas_flow_model == "isothermal"
 
 
 def test_network_post_init_raises_for_negative_design_margin():

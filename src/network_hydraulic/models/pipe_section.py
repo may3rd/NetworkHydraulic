@@ -1,4 +1,21 @@
-"""Pipe section definition."""
+"""Pipe section definition with fittings and result containers.
+
+Example:
+
+    from network_hydraulic.models.pipe_section import PipeSection, Fitting
+    section = PipeSection(
+        id="sec-1",
+        schedule="40",
+        roughness=1e-4,
+        length=10.0,
+        elevation_change=0.0,
+        fitting_type="LR",
+        fittings=[Fitting(type="elbow_90", count=2)],
+        pipe_diameter=0.1,
+        inlet_diameter=0.1,
+        outlet_diameter=0.1,
+    )
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -21,14 +38,19 @@ ALLOWED_FITTING_TYPES = [
     "diaphragm_valve",
     "butterfly_valve",
     "check_valve_swing",
-    "check_valve_lift",
-    "check_valve_tilting",
+    "lift_check_valve",
+    "tilting_check_valve",
     "pipe_entrance_normal",
     "pipe_entrance_raise",
     "pipe_exit",
     "inlet_swage",
     "outlet_swage",
 ]
+
+FITTING_NAME_ALIASES = {
+    "check_valve_lift": "lift_check_valve",
+    "check_valve_tilting": "tilting_check_valve",
+}
 
 
 @dataclass(slots=True)
@@ -37,12 +59,14 @@ class Fitting:
     count: int = 1
 
     def __post_init__(self) -> None:
-        normalized_type = self.type.strip().lower()
-        if normalized_type not in ALLOWED_FITTING_TYPES:
-            raise ValueError(f"Unsupported fitting type '{self.type}'")
+        original_type = self.type
+        normalized_type = original_type.strip().lower()
+        canonical_type = FITTING_NAME_ALIASES.get(normalized_type, normalized_type)
+        if canonical_type not in ALLOWED_FITTING_TYPES:
+            raise ValueError(f"Unsupported fitting type '{original_type}'")
         if self.count <= 0:
             raise ValueError("Fitting count must be positive")
-        self.type = normalized_type
+        self.type = canonical_type
 
 
 @dataclass(slots=True)

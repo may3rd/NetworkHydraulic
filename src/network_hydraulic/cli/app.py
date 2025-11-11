@@ -1,4 +1,13 @@
-"""Command-line entry point."""
+"""Command-line entry point with run helpers and backward compatibility.
+
+Example:
+
+    # new preferred form
+    network-hydraulic run config/sample_network.yaml --output results/out.yaml
+
+    # legacy compatible form
+    network-hydraulic config/sample_network.yaml -o results/out.yaml
+"""
 from __future__ import annotations
 
 import logging

@@ -1,6 +1,16 @@
-"""Network grouping of pipe sections."""
+"""Network grouping of pipe sections and result summaries.
+
+Example:
+
+    from network_hydraulic.models import fluid, network
+
+    fluid_model = fluid.Fluid(...)
+    net = network.Network(name="demo", description="Sample", fluid=fluid_model)
+    net.add_section(...)
+"""
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from typing import List, Optional
 
@@ -8,6 +18,8 @@ from network_hydraulic.models.fluid import Fluid
 from network_hydraulic.models.pipe_section import PipeSection
 from network_hydraulic.models.results import CalculationOutput, ResultSummary
 from network_hydraulic.models.output_units import OutputUnits
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -19,7 +31,7 @@ class Network:
     boundary_pressure: Optional[float] = None
     upstream_pressure: Optional[float] = None
     downstream_pressure: Optional[float] = None
-    gas_flow_model: str = "isothermal"
+    gas_flow_model: Optional[str] = None
     sections: List[PipeSection] = field(default_factory=list)
     calculation_output: CalculationOutput = field(default_factory=CalculationOutput)
     result_summary: ResultSummary = field(default_factory=ResultSummary)
@@ -35,9 +47,34 @@ class Network:
         self.direction = normalized_direction
 
         normalized_gas_flow_model = (self.gas_flow_model or "").strip().lower()
-        if normalized_gas_flow_model not in {"isothermal", "adiabatic"}:
-            errors.append(f"Gas flow model '{self.gas_flow_model}' must be 'isothermal' or 'adiabatic'")
-        self.gas_flow_model = normalized_gas_flow_model
+        fluid_is_gas = False
+        try:
+            fluid_is_gas = self.fluid.is_gas()
+        except AttributeError:
+            fluid_is_gas = False
+
+        if fluid_is_gas:
+            if not normalized_gas_flow_model:
+                normalized_gas_flow_model = "isothermal"
+            if normalized_gas_flow_model not in {"isothermal", "adiabatic"}:
+                errors.append(
+                    f"Gas flow model '{self.gas_flow_model}' must be 'isothermal' or 'adiabatic'"
+                )
+            else:
+                self.gas_flow_model = normalized_gas_flow_model
+        else:
+            if normalized_gas_flow_model and normalized_gas_flow_model not in {"isothermal", "adiabatic"}:
+                errors.append(
+                    f"Gas flow model '{self.gas_flow_model}' must be 'isothermal' or 'adiabatic'"
+                )
+            else:
+                if normalized_gas_flow_model:
+                    logger.warning(
+                        "Liquid/vapor network '%s' specified gas_flow_model='%s'; this setting is ignored for liquid runs.",
+                        self.name,
+                        normalized_gas_flow_model,
+                    )
+                self.gas_flow_model = normalized_gas_flow_model or None
 
         if self.design_margin is not None and self.design_margin < 0:
             errors.append("Network design_margin must be non-negative")
