@@ -1,189 +1,302 @@
 network:
   name: sample_network
-  description: Demo two-section pipeline with optional control valve.
+  description: Test
   direction: forward
-  boundary_pressure: 8601325.0
-  gas_flow_model: isothermal
+  boundary_pressure: 101.008
+  upstream_pressure: null
+  downstream_pressure: null
+  gas_flow_model: null
   fluid:
-    name: natural_gas
-    mass_flow_rate: 5.0
-    volumetric_flow_rate: 0.0773681731347409
-    phase: gas
-    temperature: 320.15
-    pressure: 8601325.0
-    density: 35.0
-    molecular_weight: 18.0
-    z_factor: 0.9
-    specific_heat_ratio: 1.3
-    viscosity: 1.1e-05
-    standard_flow_rate: 5.6034923861502595
-    vapor_pressure: 500000.0
-    critical_pressure: 45000000.0
+    name: liquid
+    mass_flow_rate: 90513.6
+    volumetric_flow_rate: 115.53944345162114
+    phase: liquid
+    temperature: 103.42
+    pressure: 101.008
+    density: 783.4
+    viscosity: 0.000247
+    molecular_weight: 0.0
+    z_factor: 1.0
+    specific_heat_ratio: 1.0
+    standard_flow_rate: null
+    vapor_pressure: null
+    critical_pressure: null
   sections:
-  - id: inlet_to_valve
+  - id: '1'
+    description: Line 1
     schedule: '40'
-    roughness: 4.6e-05
-    length: 121.92
-    elevation_change: 15.24
+    roughness: 4.57e-05
+    length: 37.599
+    elevation_change: -23.59
     fitting_type: LR
     fittings:
     - type: elbow_90
-      count: 2
-    - type: tee_through
+      count: 9
+    - type: tee_elbow
       count: 1
-    pipe_diameter: 0.15408000000000002
-    inlet_diameter: 0.15408000000000002
-    outlet_diameter: 0.15408000000000002
-    fitting_K: 0.5246481474642867
-    pipe_length_K: 11.972109920930512
-    user_K: 2.0
-    piping_and_fitting_safety_factor: 1.0
-    total_K: null
-    user_specified_fixed_loss: null
-    pipe_NPD: 6.0
-    erosional_constant: 100
-    mach_number: 0.017473917053906593
-    control_valve:
-      tag: CV-101
-      cv: 3.8433390473570426
-      cg: null
-      pressure_drop: 7000.0
-      C1: null
-      FL: null
-      Fd: null
-      xT: null
-      inlet_diameter: null
-      outlet_diameter: null
-      valve_diameter: null
-    calculation_result:
-      pressure_drop:
-        pipe_and_fittings: 6952.401924667261
-        elevation_change: 0.0
-        control_valve: 7000.0
-        orifice: null
-        user_fixed: null
-        total: 13952.401924667261
-        per_100m: 5702.429400153593
-        reynolds_number: 3756134.784572249
-        frictional_factor: 0.015130107419758641
-        flow_scheme: turbulent
-      summary:
-        inlet:
-          pressure: 8601325.0
-          temperature: 320.15
-          density: 64.62605742664012
-          mach_number: 0.017473917053906593
-          velocity: 7.661601140464087
-          erosional_velocity: 15.17475027478478
-          flow_momentum: 3793.558103881496
-          remarks: OK
-        outlet:
-          pressure: 8587372.598075332
-          temperature: 320.15
-          density: 64.52122605147139
-          mach_number: 0.017473917053906593
-          velocity: 7.661601140464087
-          erosional_velocity: 15.187072919584832
-          flow_momentum: 3787.404488317622
-          remarks: OK
-      flow:
-        volumetric_actual: 0.0773681731347409
-        volumetric_standard: 5.6034923861502595
-  - id: valve_to_export
-    schedule: '80'
-    roughness: 4.6e-05
-    length: null
-    elevation_change: 0.0
-    fitting_type: SCRD
-    fittings: []
-    pipe_diameter: 0.19369999999999998
-    inlet_diameter: 0.19369999999999998
-    outlet_diameter: 0.19369999999999998
-    fitting_K: 0.0
-    pipe_length_K: 0.0
+    - type: pipe_entrance_normal
+      count: 1
+    direction: null
+    pipe_diameter: 0.20274
+    inlet_diameter: 0.20274
+    outlet_diameter: 0.20274
+    fitting_K: 2.9883884897798954
+    pipe_length_K: 2.8499146769271704
     user_K: null
     piping_and_fitting_safety_factor: null
-    total_K: null
+    total_K: 5.838303166707066
     user_specified_fixed_loss: null
     pipe_NPD: 8.0
-    erosional_constant: null
-    mach_number: 0.011056650148221542
-    orifice:
-      tag: FE-201
-      d_over_D_ratio: 0.35
-      pressure_drop: 65053.80679341659
-      pipe_diameter: null
-      orifice_diameter: null
-      meter_type: null
-      taps: null
-      tap_position: null
-      discharge_coefficient: null
-      expansibility: null
+    erosional_constant: 100
+    mach_number: null
     calculation_result:
       pressure_drop:
-        pipe_and_fittings: 0.0
-        elevation_change: 0.0
-        control_valve: null
-        orifice: 65053.80679341659
-        user_fixed: null
-        total: 65053.80679341659
-        per_100m: null
-        reynolds_number: 2987843.3020490045
-        frictional_factor: 0.0
+        fitting_K: 2.9883884897798954
+        pipe_length_K: 2.8499146769271704
+        user_K: null
+        piping_and_fitting_safety_factor: null
+        total_K: 5.838303166707066
+        fitting_breakdown:
+        - type: elbow_90
+          count: 9
+          k_each: 0.22630814818263342
+          k_total: 2.036773333643701
+        - type: tee_elbow
+          count: 1
+          k_each: 0.45136487107892675
+          k_total: 0.45136487107892675
+        - type: pipe_entrance_normal
+          count: 1
+          k_each: 0.500250285057268
+          k_total: 0.500250285057268
+        reynolds_number: 639271.0845244966
         flow_scheme: turbulent
+        frictional_factor: 0.015367209276848178
+        critical_pressure: null
+        pipe_and_fittings: 2.2602590876058466
+        elevation_change: -181.2308734999
+        control_valve: null
+        orifice: null
+        user_fixed: null
+        total: -178.97061441229414
+        per_100m: 6.011487240633652
       summary:
         inlet:
-          pressure: 8587372.598075332
-          temperature: 320.15
-          density: 64.52122605147139
-          mach_number: 0.011056650148221542
-          velocity: 4.847890894983266
-          erosional_velocity: 15.187072919584832
-          flow_momentum: 1516.3808310040074
+          pressure: 101.008
+          temperature: 103.42
+          density: 783.4
+          mach_number: null
+          velocity: 0.9941662252262125
+          erosional_velocity: 4.358465376064942
+          flow_momentum: 774.286303080312
           remarks: OK
         outlet:
-          pressure: 8522318.791281916
-          temperature: 320.15
-          density: 64.03244425870658
-          mach_number: 0.011056650148221542
-          velocity: 4.847890894983266
-          erosional_velocity: 15.244926814812127
-          flow_momentum: 1504.8934587631104
+          pressure: 279.9786144122941
+          temperature: 103.42
+          density: 783.4
+          mach_number: null
+          velocity: 0.9941662252262125
+          erosional_velocity: 4.358465376064942
+          flow_momentum: 774.286303080312
           remarks: OK
       flow:
-        volumetric_actual: 0.07749387768935578
-        volumetric_standard: 5.6034923861502595
+        volumetric_actual: 115.53944345162114
+        volumetric_standard: null
+  - id: '2'
+    description: null
+    schedule: '40'
+    roughness: 4.57e-05
+    length: 8.639
+    elevation_change: -3.208
+    fitting_type: LR
+    fittings:
+    - type: elbow_90
+      count: 3
+    - type: tee_elbow
+      count: 1
+    - type: block_valve_full_line_size
+      count: 1
+    - type: outlet_swage
+      count: 1
+    direction: null
+    pipe_diameter: 0.20274
+    inlet_diameter: 0.20274
+    outlet_diameter: 0.10226
+    fitting_K: 6.49080902446724
+    pipe_length_K: 0.6548156305745851
+    user_K: null
+    piping_and_fitting_safety_factor: null
+    total_K: 7.145624655041825
+    user_specified_fixed_loss: 5080.0
+    pipe_NPD: 8.0
+    erosional_constant: 100
+    mach_number: null
+    calculation_result:
+      pressure_drop:
+        fitting_K: 6.49080902446724
+        pipe_length_K: 0.6548156305745851
+        user_K: null
+        piping_and_fitting_safety_factor: null
+        total_K: 7.145624655041825
+        fitting_breakdown:
+        - type: elbow_90
+          count: 3
+          k_each: 0.22630814818263342
+          k_total: 0.6789244445479002
+        - type: tee_elbow
+          count: 1
+          k_each: 0.45136487107892675
+          k_total: 0.45136487107892675
+        - type: block_valve_full_line_size
+          count: 1
+          k_each: 0.1129976459305242
+          k_total: 0.1129976459305242
+        - type: outlet_swage
+          count: 1
+          k_each: 5.247522062909889
+          k_total: 5.247522062909889
+        reynolds_number: 639271.0845244966
+        flow_scheme: turbulent
+        frictional_factor: 0.015367209276848178
+        critical_pressure: null
+        pipe_and_fittings: 2.7663796486759327
+        elevation_change: -24.64555498888
+        control_valve: null
+        orifice: null
+        user_fixed: 5.08
+        total: -16.79917534020407
+        per_100m: 32.02198921953852
+      summary:
+        inlet:
+          pressure: 279.9786144122941
+          temperature: 103.42
+          density: 783.4
+          mach_number: null
+          velocity: 0.9941662252262125
+          erosional_velocity: 4.358465376064942
+          flow_momentum: 774.286303080312
+          remarks: OK
+        outlet:
+          pressure: 296.7777897524982
+          temperature: 103.42
+          density: 783.4
+          mach_number: null
+          velocity: 0.9941662252262125
+          erosional_velocity: 4.358465376064942
+          flow_momentum: 774.286303080312
+          remarks: OK
+      flow:
+        volumetric_actual: 115.53944345162114
+        volumetric_standard: null
+  - id: '41'
+    description: null
+    schedule: '40'
+    roughness: 4.57e-05
+    length: 0.708
+    elevation_change: -0.712
+    fitting_type: LR
+    fittings: []
+    direction: null
+    pipe_diameter: 0.10226
+    inlet_diameter: 0.10226
+    outlet_diameter: 0.10226
+    fitting_K: 0.0
+    pipe_length_K: 0.11580030425401981
+    user_K: null
+    piping_and_fitting_safety_factor: null
+    total_K: 0.11580030425401981
+    user_specified_fixed_loss: null
+    pipe_NPD: 4.0
+    erosional_constant: 100
+    mach_number: null
+    calculation_result:
+      pressure_drop:
+        fitting_K: 0.0
+        pipe_length_K: 0.11580030425401981
+        user_K: null
+        piping_and_fitting_safety_factor: null
+        total_K: 0.11580030425401981
+        fitting_breakdown: null
+        reynolds_number: 1267414.6262125606
+        flow_scheme: turbulent
+        frictional_factor: 0.01672562021612439
+        critical_pressure: null
+        pipe_and_fittings: 0.6926532824224396
+        elevation_change: -5.469961082319999
+        control_valve: null
+        orifice: null
+        user_fixed: null
+        total: -4.77730779989756
+        per_100m: 97.83238452294346
+      summary:
+        inlet:
+          pressure: 296.7777897524982
+          temperature: 103.42
+          density: 783.4
+          mach_number: null
+          velocity: 3.907745866003037
+          erosional_velocity: 4.358465376064942
+          flow_momentum: 11962.892271906881
+          remarks: OK
+        outlet:
+          pressure: 301.5550975523958
+          temperature: 103.42
+          density: 783.4
+          mach_number: null
+          velocity: 3.907745866003037
+          erosional_velocity: 4.358465376064942
+          flow_momentum: 11962.892271906881
+          remarks: OK
+      flow:
+        volumetric_actual: 115.53944345162114
+        volumetric_standard: null
+  output_units:
+    pressure: kPag
+    pressure_drop: kPa
+    temperature: degC
+    density: kg/m^3
+    velocity: m/s
+    volumetric_flow_rate: m^3/h
+    mass_flow_rate: kg/h
+    flow_momentum: Pa
   summary:
     state:
       inlet:
-        pressure: 8601325.0
-        temperature: 320.15
-        density: 64.62605742664012
-        mach_number: 0.017473917053906593
-        velocity: 7.661601140464087
-        erosional_velocity: 15.17475027478478
-        flow_momentum: 3793.558103881496
+        pressure: 101.008
+        temperature: 103.42
+        density: 783.4
+        mach_number: null
+        velocity: 0.9941662252262125
+        erosional_velocity: 4.358465376064942
+        flow_momentum: 774.286303080312
         remarks: OK
       outlet:
-        pressure: 8522318.791281916
-        temperature: 320.15
-        density: 64.03244425870658
-        mach_number: 0.011056650148221542
-        velocity: 4.847890894983266
-        erosional_velocity: 15.244926814812127
-        flow_momentum: 1504.8934587631104
+        pressure: 301.5550975523958
+        temperature: 103.42
+        density: 783.4
+        mach_number: null
+        velocity: 3.907745866003037
+        erosional_velocity: 4.358465376064942
+        flow_momentum: 11962.892271906881
         remarks: OK
     pressure_drop:
-      pipe_and_fittings: 6952.401924667261
-      elevation_change: 0.0
-      control_valve: 7000.0
-      orifice: 65053.80679341659
-      user_fixed: 0.0
-      total: 79006.20871808386
-      per_100m: 5702.429400153593
+      fitting_K: null
+      pipe_length_K: null
+      user_K: null
+      piping_and_fitting_safety_factor: null
+      total_K: null
+      fitting_breakdown: null
       reynolds_number: null
-      frictional_factor: null
       flow_scheme: null
+      frictional_factor: null
+      critical_pressure: null
+      pipe_and_fittings: 5.719292018704218
+      elevation_change: -211.3463895711
+      control_valve: 0.0
+      orifice: 0.0
+      user_fixed: 5.08
+      total: -200.54709755239577
+      per_100m: 103.70129034302445
     flow:
-      volumetric_actual: 0.0773681731347409
-      volumetric_standard: 5.6034923861502595
+      volumetric_actual: 115.53944345162114
+      volumetric_standard: null

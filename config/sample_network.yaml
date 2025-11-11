@@ -1,6 +1,6 @@
 network:
   name: sample_network
-  description: Phenol Test
+  description: Test
   direction: forward
   boundary_pressure:
     value: 101.008
@@ -35,6 +35,7 @@ network:
     viscosity: 2.47e-4
   sections:
     - id: "1"
+      description: Line 1
       schedule: "40"
       pipe_NPD: 8.0
       roughness: 4.57e-5

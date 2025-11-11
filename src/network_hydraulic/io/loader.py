@@ -260,7 +260,7 @@ class ConfigurationLoader:
                 cfg.get("user_specified_fixed_loss"), "user_specified_fixed_loss", target_unit="Pa"
             ),
             pipe_NPD=pipe_npd,
-            description=cfg.get("description"),
+            description=cfg.get("description") or f"Line {cfg['id']}",
             design_margin=self._coerce_optional_float(cfg.get("design_margin"), "section.design_margin"),
             pipe_diameter=pipe_diameter,
             inlet_diameter=inlet_diameter,
