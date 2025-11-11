@@ -25,3 +25,5 @@ htmlcov/
 .idea/
 .DS_Store
 .python-version
+
+hydraulic-webapp/node_modules/
