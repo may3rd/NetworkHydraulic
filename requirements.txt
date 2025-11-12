@@ -3,3 +3,5 @@ pyyaml
 ruamel.yaml
 pydantic
 typer
+fastapi
+uvicorn[standard]

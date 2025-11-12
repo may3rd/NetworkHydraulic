@@ -97,6 +97,12 @@ class ConfigurationLoader:
         return cls(raw=data)
 
     @classmethod
+    def from_string(cls, payload: str) -> "ConfigurationLoader":
+        yaml = _yaml_loader()
+        data = yaml.load(payload) or {}
+        return cls(raw=data)
+
+    @classmethod
     def from_path(cls, path: Path) -> "ConfigurationLoader":
         warnings.warn(
             "ConfigurationLoader.from_path is deprecated; use from_yaml_path instead.",

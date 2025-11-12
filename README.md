@@ -94,6 +94,34 @@ Common caches and virtual environments are ignored via `.gitignore`. If you adde
 git ls-files -ci --exclude-from=.gitignore -z | xargs -0 git rm --cached
 ```
 
+## Frontend Portal
+
+The `frontend/` directory hosts the React + Vite web application described in `docs/react_app_design.md`. From the root:
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Use `npm run build` for production bundles and `npm run preview` to inspect a built version locally. The portal mirrors the CLI flow, letting you upload configs, track execution history, and inspect pressure profiles in a Material-UI dashboard.
+
+## Backend API
+
+The Python package now exposes a FastAPI endpoint that the portal can call. Install the requirements and run the server locally:
+
+```bash
+pip install -e .[dev]
+uvicorn network_hydraulic.api.app:app --reload --port 8000
+```
+
+Launch the frontend with `VITE_API_BASE_URL` pointing at the running API (the default is `http://localhost:8000`):
+
+```bash
+VITE_API_BASE_URL=http://localhost:8000 npm run dev
+```
+
+The backend accepts POSTs to `/api/calculate` with the uploaded YAML/JSON text, runs the solver, and returns summaries the UI already consumes.
+
 ## Next Steps
 1. Validate and extend hydraulic calculators with additional loss models.
 2. Flesh out config schema validation (Pydantic/dataclasses JSON).
