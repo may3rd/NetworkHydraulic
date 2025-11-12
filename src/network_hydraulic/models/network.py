@@ -37,6 +37,9 @@ class Network:
     result_summary: ResultSummary = field(default_factory=ResultSummary)
     output_units: OutputUnits = field(default_factory=OutputUnits)
     design_margin: Optional[float] = None
+    mass_flow_rate: Optional[float] = None
+    volumetric_flow_rate: Optional[float] = None
+    standard_flow_rate: Optional[float] = None
 
     def __post_init__(self) -> None:
         errors: list[str] = []
@@ -78,6 +81,11 @@ class Network:
 
         if self.design_margin is not None and self.design_margin < 0:
             errors.append("Network design_margin must be non-negative")
+
+        for attr_name in ("mass_flow_rate", "volumetric_flow_rate", "standard_flow_rate"):
+            value = getattr(self, attr_name)
+            if value is not None and value <= 0:
+                errors.append(f"Network {attr_name} must be positive if provided")
 
         if errors:
             raise ValueError("; ".join(errors))

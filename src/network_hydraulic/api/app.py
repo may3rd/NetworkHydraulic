@@ -91,7 +91,7 @@ def _section_summary(section: PipeSection, network) -> SectionSummaryModel:
     diameter_m = section.pipe_diameter or section.inlet_diameter or section.outlet_diameter or 0.0
     flow_rate = (
         section.design_volumetric_flow_rate
-        or network.fluid.volumetric_flow_rate
+        or network.volumetric_flow_rate
         or 0.0
     )
     pressure_drop = section.calculation_output.pressure_drop.total_segment_loss or 0.0
@@ -135,7 +135,7 @@ def _determine_peak_flow(sections: list[PipeSection], network) -> float:
     for section in sections:
         candidate = (
             section.design_volumetric_flow_rate
-            or network.fluid.volumetric_flow_rate
+            or network.volumetric_flow_rate
             or 0.0
         )
         flows.append(candidate)

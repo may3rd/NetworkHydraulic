@@ -5,18 +5,15 @@ Example:
     from network_hydraulic.models.fluid import Fluid
 
     fluid = Fluid(
-        name="nitrogen",
-        mass_flow_rate=1.0,
-        volumetric_flow_rate=None,
         phase="gas",
         temperature=300.0,
         pressure=101325.0,
+        viscosity=1e-5,
         density=1.25,
+        name="nitrogen",
         molecular_weight=28.0,
         z_factor=0.95,
         specific_heat_ratio=1.33,
-        viscosity=1e-5,
-        standard_flow_rate=None,
     )
 """
 from __future__ import annotations
@@ -29,18 +26,15 @@ GAS_CONSTANT = 8.314462618  # J/(mol*K)
 
 @dataclass(slots=True)
 class Fluid:
-    name: Optional[str]
-    mass_flow_rate: Optional[float]
-    volumetric_flow_rate: Optional[float]
     phase: str
     temperature: float
     pressure: float
-    density: float
-    molecular_weight: float
-    z_factor: float
-    specific_heat_ratio: float
     viscosity: float
-    standard_flow_rate: Optional[float]
+    density: Optional[float] = None
+    name: Optional[str] = None
+    molecular_weight: Optional[float] = None
+    z_factor: Optional[float] = None
+    specific_heat_ratio: Optional[float] = None
     vapor_pressure: Optional[float] = None
     critical_pressure: Optional[float] = None
 
@@ -68,10 +62,6 @@ class Fluid:
                 errors.append("fluid.specific_heat_ratio must be provided and positive for gases")
         else:
             errors.append("fluid.phase must be 'liquid', 'gas', or 'vapor'")
-        
-        # From ensure_valid
-        if not self._has_mass_flow() and not self._has_volumetric_flow():
-            errors.append("Either mass_flow_rate or volumetric_flow_rate must be provided")
 
         if errors:
             raise ValueError("; ".join(errors))
@@ -85,22 +75,6 @@ class Fluid:
     def is_gas(self) -> bool:
         return self.phase_key() in {"gas", "vapor"}
 
-    def current_mass_flow_rate(self) -> float:
-        if self._has_mass_flow():
-            return self.mass_flow_rate or 0.0
-        if self._has_volumetric_flow():
-            density = self.current_density()
-            return (self.volumetric_flow_rate or 0.0) * density
-        return 0.0 # Return 0.0 if no flow rate can be determined
-
-    def current_volumetric_flow_rate(self) -> float:
-        if self._has_volumetric_flow():
-            return self.volumetric_flow_rate or 0.0
-        if self._has_mass_flow():
-            density = self.current_density()
-            return (self.mass_flow_rate or 0.0) / density
-        return 0.0 # Return 0.0 if no flow rate can be determined
-
     def current_density(self) -> float:
         if self.is_gas():
             return self._gas_density()
@@ -113,12 +87,6 @@ class Fluid:
         z_factor = self._require_positive(self.z_factor or 1.0, "z_factor")
         mw_kg_per_mol = molecular_weight if molecular_weight <= 0.5 else molecular_weight / 1000.0
         return pressure * mw_kg_per_mol / (GAS_CONSTANT * temperature * z_factor)
-
-    def _has_mass_flow(self) -> bool:
-        return self.mass_flow_rate is not None and self.mass_flow_rate > 0
-
-    def _has_volumetric_flow(self) -> bool:
-        return self.volumetric_flow_rate is not None and self.volumetric_flow_rate > 0
 
     @staticmethod
     def _require_positive(value: Optional[float], name: str) -> float:

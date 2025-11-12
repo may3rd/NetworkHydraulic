@@ -20,7 +20,7 @@ def test_gas_network_adiabatic():
     
     loader = ConfigurationLoader.from_yaml_path(config_path)
     network = loader.build_network()
-    volumetric_flow = network.fluid.current_volumetric_flow_rate()
+    volumetric_flow = network.volumetric_flow_rate
     solver = NetworkSolver(volumetric_flow_rate=volumetric_flow)
     result = solver.run(network)
     assert len(result.sections) == 1
@@ -80,7 +80,7 @@ def test_gas_network_isothermal():
 
     loader = ConfigurationLoader.from_yaml_path(config_path)
     network = loader.build_network()
-    volumetric_flow = network.fluid.current_volumetric_flow_rate()
+    volumetric_flow = network.volumetric_flow_rate
     solver = NetworkSolver(volumetric_flow_rate=volumetric_flow)
     result = solver.run(network)
     assert len(result.sections) == 1

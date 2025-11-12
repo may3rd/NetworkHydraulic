@@ -4,11 +4,12 @@ network:  # Top-level network metadata
   direction: forward  # Flow direction flag, forward/backward
   boundary_pressure: null  # Known boundary pressure, Pa (set per direction mode)
   gas_flow_model: isothermal  # Gas calculation mode, isothermal or adiabatic
+  mass_flow_rate: 1.0  # Mass flow rate, kg/s
+  volumetric_flow_rate: null  # Volumetric flow rate, m^3/s at flowing conditions
+  standard_flow_rate: null  # Standard volumetric flow rate, Sm^3/s
   fluid:  # Fluid properties block
     name: placeholder  # Fluid identifier, unitless text
     phase: gas  # Liquid or gas (two-phase not yet supported)
-    mass_flow_rate: 1.0  # Mass flow rate, kg/s
-    volumetric_flow_rate: null  # Volumetric flow rate, m^3/s at flowing conditions
     temperature: 300.0  # Flowing temperature, K
     pressure: 1.0e6  # Flowing pressure at reference node, Pa
     density: 10.0  # Flowing density, kg/m^3

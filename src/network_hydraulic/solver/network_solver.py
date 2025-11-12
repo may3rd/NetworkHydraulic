@@ -27,6 +27,7 @@ from network_hydraulic.calculators.normalization import NormalizedLossCalculator
 from network_hydraulic.calculators.orifices import OrificeCalculator
 from network_hydraulic.calculators.user_fixed_loss import UserFixedLossCalculator
 from network_hydraulic.calculators.valves import ControlValveCalculator
+from network_hydraulic.models.fluid import Fluid
 from network_hydraulic.models.network import Network
 from network_hydraulic.models.pipe_section import PipeSection
 from network_hydraulic.models.results import (
@@ -74,7 +75,7 @@ class NetworkSolver:
 
         base_vol_flow = self._determine_volumetric_flow(network)
         base_mass_flow = self._determine_mass_flow(network, base_vol_flow)
-        self._assign_design_flows(sections, network, base_vol_flow, base_mass_flow)
+        self._assign_design_flows(sections, network, base_vol_flow, base_mass_flow, network.fluid)
         for section in sections:
             self._validate_section_prerequisites(section)
             for calculator in calculators:
@@ -168,15 +169,33 @@ class NetworkSolver:
         network: Network,
         base_vol_flow: Optional[float],
         base_mass_flow: Optional[float],
+        fluid: Fluid,
     ) -> None:
+        reference_density = self._reference_density(fluid)
         for section in sections:
             multiplier = self._design_multiplier(section, network)
             section.design_flow_multiplier = multiplier
+            section_vol_flow = (
+                section.base_volumetric_flow_rate
+                if section.base_volumetric_flow_rate and section.base_volumetric_flow_rate > 0
+                else base_vol_flow
+            )
+            section_mass_flow = (
+                section.base_mass_flow_rate
+                if section.base_mass_flow_rate and section.base_mass_flow_rate > 0
+                else base_mass_flow
+            )
+            if (section_vol_flow is None or section_vol_flow <= 0) and section_mass_flow and section_mass_flow > 0:
+                if reference_density and reference_density > 0:
+                    section_vol_flow = section_mass_flow / reference_density
+            if (section_mass_flow is None or section_mass_flow <= 0) and section_vol_flow and section_vol_flow > 0:
+                if reference_density and reference_density > 0:
+                    section_mass_flow = section_vol_flow * reference_density
             section.design_volumetric_flow_rate = (
-                base_vol_flow * multiplier if base_vol_flow is not None else None
+                section_vol_flow * multiplier if section_vol_flow is not None else None
             )
             section.design_mass_flow_rate = (
-                base_mass_flow * multiplier if base_mass_flow is not None else None
+                section_mass_flow * multiplier if section_mass_flow is not None else None
             )
 
     @staticmethod
@@ -215,7 +234,7 @@ class NetworkSolver:
 
         control_valve_calculator = ControlValveCalculator(
             fluid=network.fluid,
-            volumetric_flow_rate=self.volumetric_flow_rate,
+            volumetric_flow_rate=vol_flow,
         )
         orifice_calculator = OrificeCalculator(
             fluid=network.fluid,
@@ -605,31 +624,32 @@ class NetworkSolver:
                 section.design_mass_flow_rate,
             )
 
+    def _reference_density(self, fluid: Fluid) -> Optional[float]:
+        try:
+            density = fluid.current_density()
+            if density and density > 0:
+                return density
+        except ValueError:
+            pass
+        if fluid.density and fluid.density > 0:
+            return fluid.density
+        return None
+
     def _determine_volumetric_flow(self, network: Network) -> Optional[float]:
         if self.volumetric_flow_rate and self.volumetric_flow_rate > 0:
             return self.volumetric_flow_rate
-        fluid = network.fluid
-        if fluid.volumetric_flow_rate and fluid.volumetric_flow_rate > 0:
-            return fluid.volumetric_flow_rate
-        if fluid.mass_flow_rate and fluid.mass_flow_rate > 0:
-            try:
-                density = fluid.current_density()
-            except ValueError:
-                density = fluid.density if fluid.density and fluid.density > 0 else None
+        if network.volumetric_flow_rate and network.volumetric_flow_rate > 0:
+            return network.volumetric_flow_rate
+        if network.mass_flow_rate and network.mass_flow_rate > 0:
+            density = self._reference_density(network.fluid)
             if density and density > 0:
-                return fluid.mass_flow_rate / density
+                return network.mass_flow_rate / density
         return None
 
     def _determine_mass_flow(self, network: Network, vol_flow: Optional[float]) -> Optional[float]:
-        fluid = network.fluid
-        if fluid.mass_flow_rate and fluid.mass_flow_rate > 0:
-            return fluid.mass_flow_rate
-        density: Optional[float] = None
-        try:
-            density = fluid.current_density()
-        except ValueError:
-            if fluid.density and fluid.density > 0:
-                density = fluid.density
+        if network.mass_flow_rate and network.mass_flow_rate > 0:
+            return network.mass_flow_rate
+        density = self._reference_density(network.fluid)
         if vol_flow and vol_flow > 0 and density and density > 0:
             return vol_flow * density
         return None

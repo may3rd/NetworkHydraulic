@@ -70,7 +70,9 @@ class FrictionCalculator(LossCalculator):
             return flow_rate
         if self.volumetric_flow_rate and self.volumetric_flow_rate > 0:
             return self.volumetric_flow_rate
-        return self.fluid.current_volumetric_flow_rate()
+        raise ValueError(
+            f"Section '{section.id}' is missing a design volumetric flow rate for friction calculations"
+        )
 
     def _pipe_diameter(self, section: PipeSection) -> float:
         for candidate in (section.pipe_diameter, self.default_pipe_diameter):

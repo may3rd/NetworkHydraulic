@@ -35,7 +35,7 @@ network-hydraulic run config/sample_network.yaml \
                       --flow-rate 0.025 \
                       --debug-fittings
 ```
-- Result files include each section’s `calculation_result.flow` plus matching network-level `fluid.volumetric_flow_rate` and `fluid.standard_flow_rate` derived from solver outputs (0 °C & 1 atm for gas).
+- Result files include each section’s `calculation_result.flow` plus matching network-level `mass_flow_rate`, `volumetric_flow_rate`, and (for gases) `standard_flow_rate` derived from solver outputs (0 °C & 1 atm for gas).
 
 ### Library
 ```python

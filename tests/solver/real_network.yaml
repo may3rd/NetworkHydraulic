@@ -2,6 +2,9 @@ network:
   name: sample_network
   description: Phenol Test
   direction: forward
+  mass_flow_rate:
+    value: 90513.6
+    unit: kg/h
   boundary_pressure:
     value: 101.008
     unit: kPag
@@ -9,10 +12,6 @@ network:
   fluid:
     name: liquid
     phase: liquid
-    mass_flow_rate:
-      value: 90513.6
-      unit: kg/h
-    volumetric_flow_rate: null
     temperature:
       value: 103.42
       unit: degC

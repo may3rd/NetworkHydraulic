@@ -109,7 +109,9 @@ class FittingLossCalculator(LossCalculator):
     def _velocity(self, section: PipeSection, diameter: float) -> float:
         flow_rate = section.design_volumetric_flow_rate
         if flow_rate is None or flow_rate <= 0:
-            flow_rate = self.fluid.current_volumetric_flow_rate()
+            raise ValueError(
+                f"Section '{section.id}' is missing a design volumetric flow rate for fittings calculation"
+            )
         area = 0.25 * pi * diameter * diameter
         if area <= 0:
             raise ValueError("Pipe diameter must be positive to determine velocity")

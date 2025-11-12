@@ -15,8 +15,6 @@ from network_hydraulic.solver.network_solver import NetworkSolver
 def make_fluid() -> Fluid:
     return Fluid(
         name="water",
-        mass_flow_rate=None,
-        volumetric_flow_rate=0.05,
         phase="liquid",
         temperature=298.15,
         pressure=250000.0,
@@ -25,7 +23,6 @@ def make_fluid() -> Fluid:
         z_factor=1.0,
         specific_heat_ratio=1.0,
         viscosity=9.5e-4,
-        standard_flow_rate=None,
         vapor_pressure=2000.0,
         critical_pressure=2.2e7,
     )
@@ -80,7 +77,7 @@ def make_section() -> PipeSection:
 def test_network_solver_runs_all_calculations():
     fluid = make_fluid()
     section = make_section()
-    network = Network(name="test", description=None, fluid=fluid, sections=[section])
+    network = Network(name="test", description=None, fluid=fluid, sections=[section], mass_flow_rate=1.0)
     solver = NetworkSolver()
     result = solver.run(network)
 
@@ -101,8 +98,6 @@ def test_network_solver_runs_all_calculations():
 def make_gas_fluid() -> Fluid:
     return Fluid(
         name="nitrogen",
-        mass_flow_rate=2.5,
-        volumetric_flow_rate=None,
         phase="gas",
         temperature=320.0,
         pressure=250000.0,
@@ -111,7 +106,6 @@ def make_gas_fluid() -> Fluid:
         z_factor=0.95,
         specific_heat_ratio=1.32,
         viscosity=1.8e-5,
-        standard_flow_rate=None,
         vapor_pressure=None,
         critical_pressure=None,
     )
@@ -197,6 +191,7 @@ def test_solver_uses_section_pressures_for_components_forward():
         boundary_pressure=260000.0,
         gas_flow_model="isothermal",
         sections=sections,
+        mass_flow_rate=1.0,
     )
 
     valve_pressures, orifice_pressures, fake_valve, fake_orifice = _capture_component_pressures()
@@ -225,6 +220,7 @@ def test_solver_uses_section_pressures_for_components_backward():
         boundary_pressure=250000.0,
         gas_flow_model="adiabatic",
         sections=sections,
+        mass_flow_rate=1.0,
     )
 
     valve_pressures, orifice_pressures, fake_valve, fake_orifice = _capture_component_pressures()
@@ -291,6 +287,7 @@ def test_component_drops_match_total_loss_when_no_pipe_losses():
         direction="forward",
         boundary_pressure=250000.0,
         sections=[section],
+        mass_flow_rate=1.0,
     )
     solver = NetworkSolver()
     solver.run(network)
@@ -314,6 +311,7 @@ def test_solver_errors_for_missing_gas_parameters():
         boundary_pressure=260000.0,
         gas_flow_model="isothermal",
         sections=[section],
+        mass_flow_rate=2.5,
     )
 
     solver = NetworkSolver(default_pipe_diameter=0.1)
@@ -332,6 +330,7 @@ def test_solver_sets_direction_from_upstream_pressure():
         direction="auto",
         upstream_pressure=300000.0,
         sections=[section],
+        mass_flow_rate=1.0,
     )
     solver = NetworkSolver()
     solver.run(network)
@@ -349,6 +348,7 @@ def test_solver_sets_direction_from_downstream_pressure():
         direction="auto",
         downstream_pressure=150000.0,
         sections=[section],
+        mass_flow_rate=1.0,
     )
     solver = NetworkSolver()
     solver.run(network)
@@ -400,6 +400,7 @@ def test_component_only_section_uses_dual_boundaries():
         upstream_pressure=250000.0,
         downstream_pressure=200000.0,
         sections=[section],
+        mass_flow_rate=1.0,
     )
     solver = NetworkSolver()
     solver.run(network)
@@ -421,12 +422,8 @@ def test_solver_handles_no_initial_pressure_gracefully():
         upstream_pressure=None,
         downstream_pressure=None,
         sections=[section],
+        mass_flow_rate=1.0,
     )
-    # Remove the lines that made the fluid invalid
-    # fluid.pressure = None
-    # fluid.mass_flow_rate = None
-    # fluid.volumetric_flow_rate = 0.0 # To satisfy Fluid.__post_init__
-
     solver = NetworkSolver()
     result = solver.run(network)
 

@@ -26,12 +26,18 @@
      - …
  ```
 
- - All numeric fields accept bare SI numbers, `{value, unit}` objects, or strings with units (e.g., `"100 ft"`). Units are converted via `network_hydraulic.utils.units`.
- - Unknown keys anywhere in `network` or `sections[]` raise `ValueError`.
+- All numeric fields accept bare SI numbers, `{value, unit}` objects, or strings with units (e.g., `"100 ft"`). Units are converted via `network_hydraulic.utils.units`.
+- Unknown keys anywhere in `network` or `sections[]` raise `ValueError`.
 
- ---
+### Network Flow Rates
 
- ## 2. `fluid` Block
+- `mass_flow_rate`, `volumetric_flow_rate`: at least one is required at the network level and defines the base design flow (kg/s or m³/s). When only one is provided the solver derives the other using fluid density.
+- `standard_flow_rate`: optional standard volumetric flow (Sm³/s) used for reporting gas/vapor systems.
+- Section entries may override these via local `mass_flow_rate` / `volumetric_flow_rate`; unspecified sections inherit the network baseline scaled by `design_margin`.
+
+---
+
+## 2. `fluid` Block
 
  | Field | Required | Description |
  | --- | --- | --- |
@@ -44,8 +50,6 @@
  | `z_factor` | Required for gas/vapor | Compressibility factor (dimensionless). |
  | `specific_heat_ratio` | Required for gas/vapor | γ = Cp/Cv. |
  | `viscosity` | **Yes** | Dynamic viscosity (Pa·s). |
- | `mass_flow_rate` / `volumetric_flow_rate` | At least one required | Design flow. The solver derives the other from density. |
- | `standard_flow_rate` | Optional | Desired standard volumetric flow for output. |
  | `vapor_pressure`, `critical_pressure` | Optional; required for liquid valve calcs. |
 
  ---
@@ -75,6 +79,7 @@
  - `direction` – overrides network direction for that section.
  - `design_margin` – percent overriding network-level margin.
  - `erosional_constant` – used for erosional velocity checks.
+ - `mass_flow_rate`, `volumetric_flow_rate` – optional per-section overrides (kg/s or m³/s); inherit from the network when omitted.
 
  ### 3.1 Auto-Swage
 
@@ -105,7 +110,7 @@
  | `C1`, `FL`, `Fd`, `xT` | Vendor constants. |
  | `inlet_diameter`, `outlet_diameter`, `valve_diameter` | Defaults to section diameters. |
 
- The calculator requires either a specified pressure drop or a Cv/Cg. Liquid valves also need `fluid.vapor_pressure` and `fluid.critical_pressure`.
+ The calculator requires either a specified pressure drop or a Cv/Cg. Liquid valves use ISA/IEC flashing / cavitation limits (`F_F`, `F_L`) and benefit from `fluid.vapor_pressure`/`fluid.critical_pressure`, but those values are now optional. Compressible valves follow the ISA expansion-factor correlation (`x_T`, `Y`) and reuse the same geometry factors (`F_P`) as liquids.
 
  #### Orifice (`orifice`)
 

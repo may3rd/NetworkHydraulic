@@ -222,7 +222,9 @@ class OrificeCalculator(LossCalculator):
             return mass_flow
         if self.mass_flow_rate and self.mass_flow_rate > 0:
             return self.mass_flow_rate
-        return self.fluid.current_mass_flow_rate()
+        raise ValueError(
+            f"Section '{section.id}' is missing a design mass flow rate for orifice calculations"
+        )
 
     @staticmethod
     def _format_drop(drop: float) -> str:

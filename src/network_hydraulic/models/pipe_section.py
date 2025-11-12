@@ -101,6 +101,8 @@ class PipeSection:
     calculation_output: CalculationOutput = field(default_factory=CalculationOutput)
     result_summary: ResultSummary = field(default_factory=ResultSummary)
     design_flow_multiplier: float = 1.0
+    base_mass_flow_rate: Optional[float] = None
+    base_volumetric_flow_rate: Optional[float] = None
     design_mass_flow_rate: Optional[float] = None
     design_volumetric_flow_rate: Optional[float] = None
 
@@ -133,6 +135,11 @@ class PipeSection:
         
         if not self.fitting_type:
             errors.append("PipeSection fitting_type must be a non-empty string")
+
+        if self.base_mass_flow_rate is not None and self.base_mass_flow_rate <= 0:
+            errors.append("PipeSection mass_flow_rate must be positive if provided")
+        if self.base_volumetric_flow_rate is not None and self.base_volumetric_flow_rate <= 0:
+            errors.append("PipeSection volumetric_flow_rate must be positive if provided")
 
         if errors:
             raise ValueError("; ".join(errors))

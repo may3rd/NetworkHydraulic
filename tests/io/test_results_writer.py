@@ -50,8 +50,6 @@ def build_section(section_id: str = "sec-1") -> PipeSection:
 def build_fluid() -> Fluid:
     return Fluid(
         name="gas",
-        mass_flow_rate=2.0,
-        volumetric_flow_rate=None,
         phase="gas",
         temperature=300.0,
         pressure=150000.0,
@@ -60,7 +58,6 @@ def build_fluid() -> Fluid:
         z_factor=1.0,
         specific_heat_ratio=1.3,
         viscosity=1.0e-5,
-        standard_flow_rate=None,
         vapor_pressure=None,
         critical_pressure=None,
     )
@@ -88,6 +85,7 @@ def test_write_output_includes_flow_rates(tmp_path: Path):
         boundary_pressure=150000.0,
         gas_flow_model="isothermal",
         sections=[section],
+        mass_flow_rate=2.0,
     )
     summary = make_summary(density=4.0)
     section_result = make_results(summary)
@@ -99,16 +97,17 @@ def test_write_output_includes_flow_rates(tmp_path: Path):
     with out_path.open("r", encoding="utf-8") as handle:
         data = yaml.safe_load(handle)
 
-    flow_summary = data["network"]["summary"]["flow"]
-    actual_expected = fluid.mass_flow_rate / summary.inlet.density
+    network_block = data["network"]
+    flow_summary = network_block["summary"]["flow"]
+    actual_expected = network.mass_flow_rate / summary.inlet.density
     mw = fluid.molecular_weight / 1000.0
     std_density = results_io.STANDARD_PRESSURE * mw / (GAS_CONSTANT * results_io.STANDARD_TEMPERATURE)
-    standard_expected = fluid.mass_flow_rate / std_density
+    standard_expected = network.mass_flow_rate / std_density
     assert flow_summary["volumetric_actual"] == pytest.approx(actual_expected)
     assert flow_summary["volumetric_standard"] == pytest.approx(standard_expected)
-    fluid_block = data["network"]["fluid"]
-    assert fluid_block["volumetric_flow_rate"] == pytest.approx(actual_expected)
-    assert fluid_block["standard_flow_rate"] == pytest.approx(standard_expected)
+    assert network_block["mass_flow_rate"] == pytest.approx(network.mass_flow_rate)
+    assert network_block["volumetric_flow_rate"] == pytest.approx(actual_expected)
+    assert network_block["standard_flow_rate"] == pytest.approx(standard_expected)
 
     section_flow = data["network"]["sections"][0]["calculation_result"]["flow"]
     assert section_flow["volumetric_actual"] == pytest.approx(actual_expected)
@@ -138,6 +137,7 @@ def test_write_output_respects_custom_output_units(tmp_path: Path):
         boundary_pressure=150000.0,
         gas_flow_model="isothermal",
         sections=[section],
+        mass_flow_rate=2.0,
     )
     network.output_units = OutputUnits(
         pressure="kPag",
@@ -166,13 +166,14 @@ def test_write_output_respects_custom_output_units(tmp_path: Path):
     boundary_expected = convert(150000.0, "Pa", "kPag")
     assert data["network"]["boundary_pressure"] == pytest.approx(boundary_expected)
 
-    fluid_block = data["network"]["fluid"]
+    network_block = data["network"]
+    fluid_block = network_block["fluid"]
     assert fluid_block["pressure"] == pytest.approx(boundary_expected)
     assert fluid_block["temperature"] == pytest.approx(convert(300.0, "K", "degC"))
-    assert fluid_block["mass_flow_rate"] == pytest.approx(convert(2.0, "kg/s", "kg/h"))
+    assert network_block["mass_flow_rate"] == pytest.approx(convert(2.0, "kg/s", "kg/h"))
 
-    flow_summary = data["network"]["summary"]["flow"]
-    actual_expected = convert(2.0 / summary.inlet.density, "m^3/s", "m^3/h")
+    flow_summary = network_block["summary"]["flow"]
+    actual_expected = convert(network.mass_flow_rate / summary.inlet.density, "m^3/s", "m^3/h")
     assert flow_summary["volumetric_actual"] == pytest.approx(actual_expected)
 
     section_drop = data["network"]["sections"][0]["calculation_result"]["pressure_drop"]
@@ -191,6 +192,7 @@ def test_write_output_writes_json_when_requested(tmp_path: Path):
         boundary_pressure=150000.0,
         gas_flow_model="isothermal",
         sections=[section],
+        mass_flow_rate=2.0,
     )
     summary = make_summary(density=4.0)
     section_result = make_results(summary)
@@ -217,6 +219,7 @@ def test_section_description_included_in_output(tmp_path: Path):
         boundary_pressure=150000.0,
         gas_flow_model="isothermal",
         sections=[section],
+        mass_flow_rate=2.0,
     )
     summary = make_summary(density=4.0)
     section_result = make_results(summary)
@@ -241,6 +244,7 @@ def test_print_summary_output(capfd):
         boundary_pressure=150000.0,
         gas_flow_model="isothermal",
         sections=[section],
+        mass_flow_rate=2.0,
     )
     network.output_units = OutputUnits(
         pressure="kPag",
@@ -316,8 +320,6 @@ def test_print_summary_output(capfd):
 def test_write_results_with_none_values(tmp_path: Path):
     section = build_section()
     fluid = build_fluid()
-    fluid.mass_flow_rate = None # Set to None
-    fluid.volumetric_flow_rate = None # Set to None
     network = Network(
         name="none-values",
         description=None, # Set to None
@@ -326,6 +328,8 @@ def test_write_results_with_none_values(tmp_path: Path):
         boundary_pressure=None, # Set to None
         gas_flow_model="isothermal", # Corrected to a valid value
         sections=[section],
+        mass_flow_rate=None,
+        volumetric_flow_rate=None,
     )
     summary = make_summary(density=4.0)
     summary.inlet.mach_number = None
@@ -347,8 +351,8 @@ def test_write_results_with_none_values(tmp_path: Path):
     assert data["network"]["description"] is None
     assert data["network"]["boundary_pressure"] is None
     assert data["network"]["gas_flow_model"] == "isothermal" # Should not be None
-    assert data["network"]["fluid"]["mass_flow_rate"] is None
-    assert data["network"]["fluid"]["volumetric_flow_rate"] == 0.0 # Corrected assertion
+    assert data["network"]["mass_flow_rate"] is None
+    assert data["network"]["volumetric_flow_rate"] is None
     assert data["network"]["sections"][0]["calculation_result"]["summary"]["inlet"]["mach_number"] is None
     assert data["network"]["sections"][0]["calculation_result"]["summary"]["outlet"]["mach_number"] is None
     assert data["network"]["sections"][0]["calculation_result"]["pressure_drop"]["control_valve"] is None

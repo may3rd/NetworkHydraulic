@@ -7,6 +7,11 @@ network:
     unit: kPag
   gas_flow_model: null
   design_margin: 0.0
+  mass_flow_rate:
+    value: 1000.0
+    unit: kg/h
+  volumetric_flow_rate: null
+  standard_flow_rate: null
   output_units:
     pressure: kPag
     pressure_drop: kPa
@@ -16,10 +21,6 @@ network:
   fluid:
     name: Butene-1
     phase: liquid
-    mass_flow_rate:
-      value: 1000.0
-      unit: kg/h
-    volumetric_flow_rate: null
     temperature:
       value: 42.0
       unit: degC

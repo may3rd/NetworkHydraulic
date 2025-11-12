@@ -5,6 +5,11 @@ network:
   boundary_pressure:
     value: 2290.24
     unit: kPag
+  mass_flow_rate:
+    value: 90513.6
+    unit: kg/h
+  volumetric_flow_rate: null
+  standard_flow_rate: null
   output_units:
     pressure: kPag
     pressure_drop: kPa
@@ -17,10 +22,6 @@ network:
   fluid:
     name: liquid
     phase: liquid
-    mass_flow_rate:
-      value: 90513.6
-      unit: kg/h
-    volumetric_flow_rate: null
     temperature:
       value: 105.19
       unit: degC
@@ -91,4 +92,3 @@ network:
         - {type: tee_through, count: 1}
         - {type: check_valve_swing, count: 1}
       
-

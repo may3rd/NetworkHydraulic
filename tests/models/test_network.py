@@ -7,8 +7,6 @@ from network_hydraulic.models.fluid import Fluid
 def make_fluid(**overrides) -> Fluid:
     defaults = dict(
         name="test",
-        mass_flow_rate=10.0,
-        volumetric_flow_rate=None,
         phase="liquid",
         temperature=300.0,
         pressure=101325.0,
@@ -17,7 +15,6 @@ def make_fluid(**overrides) -> Fluid:
         z_factor=1.0,
         specific_heat_ratio=1.0,
         viscosity=1e-3,
-        standard_flow_rate=None,
         vapor_pressure=None,
         critical_pressure=None,
     )
@@ -38,6 +35,9 @@ def make_network(**overrides) -> Network:
         gas_flow_model=None,
         sections=[],
         design_margin=None,
+        mass_flow_rate=1.0,
+        volumetric_flow_rate=None,
+        standard_flow_rate=None,
     )
     defaults.update(overrides)
     return Network(**defaults)
@@ -71,7 +71,7 @@ def test_network_post_init_raises_for_invalid_gas_flow_model():
 
 
 def test_network_defaults_gas_flow_model_for_gas_fluid():
-    gas_fluid = make_fluid(phase="gas", volumetric_flow_rate=None)
+    gas_fluid = make_fluid(phase="gas")
     network = make_network(fluid=gas_fluid, gas_flow_model=None)
     assert network.gas_flow_model == "isothermal"
 

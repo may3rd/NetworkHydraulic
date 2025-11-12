@@ -6,10 +6,11 @@ network:
   upstream_pressure: null
   downstream_pressure: null
   gas_flow_model: null
+  mass_flow_rate: 90513.6
+  volumetric_flow_rate: 115.53944345162114
+  standard_flow_rate: null
   fluid:
     name: liquid
-    mass_flow_rate: 90513.6
-    volumetric_flow_rate: 115.53944345162114
     phase: liquid
     temperature: 103.42
     pressure: 101.008
@@ -18,7 +19,6 @@ network:
     z_factor: 1.0
     specific_heat_ratio: 1.0
     viscosity: 0.000247
-    standard_flow_rate: null
     vapor_pressure: null
     critical_pressure: null
   sections:

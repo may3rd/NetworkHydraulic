@@ -10,8 +10,6 @@ from network_hydraulic.models.pipe_section import Fitting, PipeSection
 def make_fluid(**overrides) -> Fluid:
     base = dict(
         name="water",
-        mass_flow_rate=None,
-        volumetric_flow_rate=0.08,
         phase="liquid",
         temperature=298.0,
         pressure=101325.0,
@@ -20,7 +18,6 @@ def make_fluid(**overrides) -> Fluid:
         z_factor=1.0,
         specific_heat_ratio=1.0,
         viscosity=8.9e-4,
-        standard_flow_rate=None,
         vapor_pressure=None,
         critical_pressure=None,
     )
@@ -52,13 +49,14 @@ def make_section(fittings, fitting_type="LR", **overrides) -> PipeSection:
         boundary_pressure=None,
         control_valve=None,
         orifice=None,
+        base_volumetric_flow_rate=0.08,
     )
     base.update(overrides)
     return PipeSection(**base)
 
 
-def reynolds(fluid: Fluid, diameter: float) -> float:
-    q = fluid.current_volumetric_flow_rate()
+def reynolds(fluid: Fluid, section: PipeSection, diameter: float) -> float:
+    q = section.design_volumetric_flow_rate or 0.0
     area = 0.25 * math.pi * diameter * diameter
     velocity = q / area
     return fluid.current_density() * velocity * diameter / fluid.viscosity
@@ -73,19 +71,21 @@ def test_standard_fitting_k_sum():
     fluid = make_fluid()
     fittings = [Fitting("elbow_90", 2), Fitting("tee_through", 1)]
     section = make_section(fittings)
+    section.design_volumetric_flow_rate = section.base_volumetric_flow_rate
     calculator = FittingLossCalculator(fluid=fluid)
     calculator.calculate(section)
 
-    re = reynolds(fluid, section.pipe_diameter)
+    re = reynolds(fluid, section, section.pipe_diameter)
     expected = 2 * two_k(800.0, 0.2, re, section.pipe_diameter)
     expected += two_k(150.0, 0.05, re, section.pipe_diameter)
     assert section.fitting_K == pytest.approx(expected, rel=1e-6)
 
 
 def test_swage_contributions_positive():
-    fluid = make_fluid(volumetric_flow_rate=0.05)
+    fluid = make_fluid()
     fittings = [Fitting("inlet_swage", 1), Fitting("outlet_swage", 1)]
-    section = make_section(fittings)
+    section = make_section(fittings, base_volumetric_flow_rate=0.05)
+    section.design_volumetric_flow_rate = section.base_volumetric_flow_rate
     calculator = FittingLossCalculator(fluid=fluid)
     calculator.calculate(section)
     assert section.fitting_K > 0.0
@@ -104,6 +104,7 @@ def test_fitting_breakdown_captures_each_component():
     fluid = make_fluid()
     fittings = [Fitting("elbow_90", 2), Fitting("tee_elbow", 1)]
     section = make_section(fittings)
+    section.design_volumetric_flow_rate = section.base_volumetric_flow_rate
     calculator = FittingLossCalculator(fluid=fluid)
     calculator.calculate(section)
 

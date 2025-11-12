@@ -45,6 +45,9 @@ NETWORK_ALLOWED_KEYS = {
     "sections",
     "output_units",
     "design_margin",
+    "mass_flow_rate",
+    "volumetric_flow_rate",
+    "standard_flow_rate",
 }
 
 SECTION_ALLOWED_KEYS = {
@@ -77,6 +80,8 @@ SECTION_ALLOWED_KEYS = {
     "direction",
     "inlet_diameter_specified",
     "outlet_diameter_specified",
+    "mass_flow_rate",
+    "volumetric_flow_rate",
 }
 
 def _yaml_loader() -> YAML:
@@ -126,6 +131,21 @@ class ConfigurationLoader:
         upstream_pressure = self._quantity(
             network_cfg.get("upstream_pressure"), "network.upstream_pressure", target_unit="Pa"
         )
+        mass_flow_rate_val = self._quantity(
+            network_cfg.get("mass_flow_rate"),
+            "network.mass_flow_rate",
+            target_unit="kg/s",
+        )
+        volumetric_flow_rate_val = self._quantity(
+            network_cfg.get("volumetric_flow_rate"),
+            "network.volumetric_flow_rate",
+            target_unit="m^3/s",
+        )
+        standard_flow_rate_val = self._quantity(
+            network_cfg.get("standard_flow_rate"),
+            "network.standard_flow_rate",
+            target_unit="m^3/s",
+        )
         downstream_pressure = self._quantity(
             network_cfg.get("downstream_pressure"), "network.downstream_pressure", target_unit="Pa"
         )
@@ -162,18 +182,8 @@ class ConfigurationLoader:
             "fluid.specific_heat_ratio",
         )
 
-        mass_flow_rate_val = self._quantity(fluid_cfg.get("mass_flow_rate"), "fluid.mass_flow_rate", target_unit="kg/s")
-        volumetric_flow_rate_val = self._quantity(
-            fluid_cfg.get("volumetric_flow_rate"), "fluid.volumetric_flow_rate", target_unit="m^3/s"
-        )
-
-        if mass_flow_rate_val is None and volumetric_flow_rate_val is None:
-            raise ValueError("Either fluid.mass_flow_rate or fluid.volumetric_flow_rate must be provided")
-
         fluid = Fluid(
             name=fluid_cfg.get("name"),
-            mass_flow_rate=mass_flow_rate_val,
-            volumetric_flow_rate=volumetric_flow_rate_val,
             phase=phase,
             temperature=temperature,
             pressure=pressure,
@@ -182,9 +192,6 @@ class ConfigurationLoader:
             z_factor=z_factor if z_factor is not None else 1.0,
             specific_heat_ratio=specific_heat_ratio if specific_heat_ratio is not None else 1.0,
             viscosity=viscosity,
-            standard_flow_rate=self._quantity(
-                fluid_cfg.get("standard_flow_rate"), "fluid.standard_flow_rate", target_unit="m^3/s"
-            ),
             vapor_pressure=self._quantity(fluid_cfg.get("vapor_pressure"), "fluid.vapor_pressure", target_unit="Pa"),
             critical_pressure=self._quantity(
                 fluid_cfg.get("critical_pressure"), "fluid.critical_pressure", target_unit="Pa"
@@ -193,6 +200,18 @@ class ConfigurationLoader:
         sections_cfg: List[Dict[str, Any]] = network_cfg.get("sections", [])
         sections = [self._build_section(cfg) for cfg in sections_cfg]
         self._align_adjacent_diameters(sections)
+        if (
+            mass_flow_rate_val is None
+            and volumetric_flow_rate_val is None
+            and not any(
+                (section.base_mass_flow_rate and section.base_mass_flow_rate > 0)
+                or (section.base_volumetric_flow_rate and section.base_volumetric_flow_rate > 0)
+                for section in sections
+            )
+        ):
+            raise ValueError(
+                "Network must define mass_flow_rate or volumetric_flow_rate either at the network level or per section."
+            )
         direction = network_cfg.get("direction", "auto")
         raw_gas_flow_model = network_cfg.get("gas_flow_model", network_cfg.get("gas_flow_type"))
         if raw_gas_flow_model is None:
@@ -216,6 +235,9 @@ class ConfigurationLoader:
             sections=sections,
             output_units=output_units,
             design_margin=self._coerce_optional_float(network_cfg.get("design_margin"), "network.design_margin"),
+            mass_flow_rate=mass_flow_rate_val,
+            volumetric_flow_rate=volumetric_flow_rate_val,
+            standard_flow_rate=standard_flow_rate_val,
         )
         logger.info(
             "Built network '%s' with %d section(s) and fluid '%s'",
@@ -249,6 +271,16 @@ class ConfigurationLoader:
             cfg.get("elevation_change"), "elevation_change", target_unit="m", default=0.0
         )
         boundary_pressure = self._quantity(cfg.get("boundary_pressure"), "section.boundary_pressure", target_unit="Pa")
+        section_mass_flow = self._quantity(
+            cfg.get("mass_flow_rate"),
+            f"section.{cfg.get('id', '<unknown>')}.mass_flow_rate",
+            target_unit="kg/s",
+        )
+        section_vol_flow = self._quantity(
+            cfg.get("volumetric_flow_rate"),
+            f"section.{cfg.get('id', '<unknown>')}.volumetric_flow_rate",
+            target_unit="m^3/s",
+        )
         pipe_section = PipeSection(
             id=cfg["id"],
             schedule=schedule,
@@ -278,6 +310,8 @@ class ConfigurationLoader:
             orifice=orifice,
             boundary_pressure=boundary_pressure,
             direction=cfg.get("direction"),
+            base_mass_flow_rate=section_mass_flow,
+            base_volumetric_flow_rate=section_vol_flow,
         )
         return pipe_section
 

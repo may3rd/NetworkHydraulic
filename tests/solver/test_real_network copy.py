@@ -24,7 +24,7 @@ def test_real_network_from_yaml():
     # as it's null in the real_network.yaml fixture.
     loader.raw["network"]["gas_flow_model"] = "isothermal"
     network = loader.build_network()
-    volumetric_flow = network.fluid.current_volumetric_flow_rate()
+    volumetric_flow = network.volumetric_flow_rate
     solver = NetworkSolver(volumetric_flow_rate=volumetric_flow)
     result = solver.run(network)
     assert len(result.sections) == 3
@@ -54,4 +54,3 @@ def test_real_network_from_yaml():
 
     assert result.sections, "Expected at least one section result"
     assert result.aggregate.pressure_drop.total_segment_loss is not None
-
