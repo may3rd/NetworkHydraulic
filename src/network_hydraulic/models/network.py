@@ -29,7 +29,7 @@ class Network:
     description: Optional[str]
     fluid: Fluid
     temperature: float
-    pressure: float
+    pressure: Optional[float] = None
     direction: str = "auto"
     boundary_pressure: Optional[float] = None
     upstream_pressure: Optional[float] = None
@@ -47,8 +47,6 @@ class Network:
 
         if self.temperature is None or self.temperature <= 0:
             errors.append("network.temperature must be positive")
-        if self.pressure is None or self.pressure <= 0:
-            errors.append("network.pressure must be positive")
 
         if self.mass_flow_rate is None:
             errors.append("mass_flow_rate must be provided for the network")

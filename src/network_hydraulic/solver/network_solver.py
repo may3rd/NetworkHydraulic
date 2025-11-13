@@ -170,7 +170,15 @@ class NetworkSolver:
             )
             section.mass_flow_rate = section.design_mass_flow_rate
             section.temperature = network.temperature
-            section.pressure = network.pressure
+            if network.pressure is None:
+                if network.boundary_pressure is not None and network.boundary_pressure > 0:
+                    section.pressure = network.boundary_pressure
+                else:
+                    raise ValueError(
+                        "Network pressure or boundary pressure must be provided for fluid property calculations."
+                    )
+            else:
+                section.pressure = network.pressure
 
     @staticmethod
     def _design_multiplier(section: PipeSection, network: Network) -> float:

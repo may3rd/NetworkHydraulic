@@ -128,7 +128,7 @@ class ConfigurationLoader:
             "network.temperature",
             target_unit="K",
         )
-        network_pressure = self._require_positive_quantity(
+        network_pressure = self._quantity(
             network_cfg.get("pressure"),
             "network.pressure",
             target_unit="Pa",
