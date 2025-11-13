@@ -153,7 +153,7 @@ def write_output(
     network_cfg = _network_config(network, converter)
     section_results = {section.section_id: section for section in result.sections}
     mass_flow_rate = network.mass_flow_rate
-    standard_density = _standard_gas_density(network.fluid, network.temperature, network.pressure)
+    standard_density = _standard_gas_density(network.fluid, STANDARD_TEMPERATURE, STANDARD_PRESSURE)
 
     for section in network.sections:
         section_cfg = _section_config(section)

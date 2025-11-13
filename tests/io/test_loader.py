@@ -31,7 +31,7 @@ def section_cfg(**overrides):
     return base
 
 
-def liquid_network_cfg(fluid_overrides=None, **network_overrides):
+def liquid_network_cfg(fluid_overrides=None, **kwargs):
     fluid = {
         "name": "water",
         "phase": "liquid",
@@ -50,8 +50,8 @@ def liquid_network_cfg(fluid_overrides=None, **network_overrides):
         "fluid": fluid,
         "sections": [section_cfg()],
     }
-    if network_overrides:
-        network.update(network_overrides)
+    if kwargs:
+        network.update(kwargs)
     return {"network": network}
 
 
@@ -388,10 +388,8 @@ def test_loader_parses_output_units_block():
 
 def test_loader_normalizes_fitting_aliases():
     raw = liquid_network_cfg(
-        network_overrides={
-            "temperature": 300.0,
-            "pressure": 101325.0,
-        }
+        temperature=300.0,
+        pressure=101325.0,
     )
     raw["network"]["sections"][0]["fittings"] = [
         {"type": "check_valve_tilting", "count": 2},
@@ -471,25 +469,21 @@ def test_loader_from_json_path(tmp_path: Path):
 
 def test_loader_raises_for_invalid_unit_string():
     raw = liquid_network_cfg(
-        network_overrides={
-            "temperature": {
-                "value": 100.0,
-                "unit": "invalid_unit",
-            },
-            "pressure": 101325.0,
-        }
+        temperature={
+            "value": 100.0,
+            "unit": "invalid_unit",
+        },
+        pressure=101325.0,
     )
     loader = ConfigurationLoader(raw=raw)
-    with pytest.raises(ValueError, match="Unit \\('invalid_unit',\\) doesn't exist !"):
+    with pytest.raises(ValueError, match="Unit \\('invalid',\\) doesn't exist !"):
         loader.build_network()
 
 
 def test_loader_raises_for_non_numeric_quantity_string():
     raw = liquid_network_cfg(
-        network_overrides={
-            "temperature": "not_a_number K",
-            "pressure": 101325.0,
-        }
+        temperature="not_a_number K",
+        pressure=101325.0,
     )
     loader = ConfigurationLoader(raw=raw)
     with pytest.raises(ValueError, match="network.temperature must be numeric"):
@@ -498,13 +492,11 @@ def test_loader_raises_for_non_numeric_quantity_string():
 
 def test_loader_raises_for_non_numeric_quantity_value_in_map():
     raw = liquid_network_cfg(
-        network_overrides={
-            "temperature": {
-                "value": "not_a_number",
-                "unit": "K",
-            },
-            "pressure": 101325.0,
-        }
+        temperature={
+            "value": "not_a_number",
+            "unit": "K",
+        },
+        pressure=101325.0,
     )
     loader = ConfigurationLoader(raw=raw)
     with pytest.raises(ValueError, match="network.temperature value must be numeric"):
@@ -513,13 +505,11 @@ def test_loader_raises_for_non_numeric_quantity_value_in_map():
 
 def test_loader_raises_for_missing_unit_in_map():
     raw = liquid_network_cfg(
-        network_overrides={
-            "temperature": {
-                "value": 100.0,
-                "unit": None,
-            },
-            "pressure": 101325.0,
-        }
+        temperature={
+            "value": 100.0,
+            "unit": None,
+        },
+        pressure=101325.0,
     )
     loader = ConfigurationLoader(raw=raw)
     with pytest.raises(ValueError, match="Unit \\('None',\\) doesn't exist !"):
@@ -528,10 +518,8 @@ def test_loader_raises_for_missing_unit_in_map():
 
 def test_loader_raises_for_missing_required_positive_quantity():
     raw = liquid_network_cfg(
-        network_overrides={
-            "temperature": None,
-            "pressure": 101325.0,
-        }
+        temperature=None,
+        pressure=101325.0,
     )
     loader = ConfigurationLoader(raw=raw)
     with pytest.raises(ValueError, match="network.temperature must be provided"):

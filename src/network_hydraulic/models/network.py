@@ -45,9 +45,9 @@ class Network:
     def __post_init__(self) -> None:
         errors: list[str] = []
 
-        if self.temperature <= 0:
+        if self.temperature is None or self.temperature <= 0:
             errors.append("network.temperature must be positive")
-        if self.pressure <= 0:
+        if self.pressure is None or self.pressure <= 0:
             errors.append("network.pressure must be positive")
 
         if self.mass_flow_rate is None:

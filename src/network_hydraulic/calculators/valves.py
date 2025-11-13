@@ -191,19 +191,25 @@ class ControlValveCalculator(LossCalculator):
             valve.valve_diameter = section.pipe_diameter
 
     def _determine_flow_rate(self, section: PipeSection) -> float:
-        try:
-            flow = section.current_volumetric_flow_rate(self.fluid)
-        except ValueError as e:
-            raise ValueError(f"Volumetric flow rate is required for control valve calculations: {e}")
-        return flow
+        if section.mass_flow_rate is None or section.mass_flow_rate <= 0:
+            raise ValueError("Section mass_flow_rate must be positive for control valve calculations")
+        if section.temperature is None or section.temperature <= 0:
+            raise ValueError("Section temperature must be positive for control valve calculations")
+        if section.pressure is None or section.pressure <= 0:
+            raise ValueError("Section pressure must be positive for control valve calculations")
+
+        density = self.fluid.current_density(section.temperature, section.pressure)
+        if density <= 0:
+            raise ValueError("Fluid density must be positive for control valve calculations")
+        return section.mass_flow_rate / density
 
     def _inlet_pressure(self, section: PipeSection) -> float:
         summary = section.result_summary.inlet
         if summary.pressure and summary.pressure > 0:
             return summary.pressure
-        if self.fluid.pressure <= 0:
-            raise ValueError("Fluid pressure must be positive for control valve calculations")
-        return self.fluid.pressure
+        if section.pressure is None or section.pressure <= 0:
+            raise ValueError("Section pressure must be positive for control valve calculations")
+        return section.pressure
 
     def _cg_from_cv(self, cv: float, valve) -> Optional[float]:
         c1 = self._conversion_c1(valve)

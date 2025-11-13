@@ -169,15 +169,23 @@ def test_pressure_drop_from_cg_only():
 
 def test_liquid_pressure_drop_from_cv():
     fluid = liquid_fluid()
-    section = make_section(ControlValve(tag="temp"), mass_flow_rate=1.0, temperature=300.0, pressure=680e3)
+    section = make_section(
+        ControlValve(tag="temp", cv=None, cg=None, pressure_drop=None, C1=None),
+        mass_flow_rate=1.0,
+        temperature=300.0,
+        pressure=680e3,
+    )
+    # Calculate volumetric flow rate for sizing
+    density = fluid.current_density(section.temperature, section.pressure)
+    volumetric_flow_rate = section.mass_flow_rate / density
     kv = size_control_valve_l(
-        rho=fluid.current_density(section.temperature, section.pressure),
+        rho=density,
         Psat=fluid.vapor_pressure,
         Pc=fluid.critical_pressure,
         mu=fluid.viscosity,
         P1=section.pressure,
         P2=section.pressure - 460e3,
-        Q=section.current_volumetric_flow_rate(fluid),
+        Q=volumetric_flow_rate,
     )
     cv = convert_flow_coefficient(kv, "Kv", "Cv")
     valve = ControlValve(tag="CV-2", cv=cv, cg=None, pressure_drop=None, C1=None)
@@ -190,7 +198,16 @@ def test_liquid_pressure_drop_from_cv():
 
 def test_gas_valve_drop_from_cv():
     fluid = gas_fluid()
-    section = make_section(ControlValve(tag="temp"), mass_flow_rate=1.0, temperature=310.0, pressure=600e3)
+    section = make_section(
+        ControlValve(tag="temp", cv=None, cg=None, pressure_drop=None, C1=None),
+        mass_flow_rate=1.0,
+        temperature=310.0,
+        pressure=600e3,
+    )
+    # Calculate volumetric flow rate for sizing
+    density = fluid.current_density(section.temperature, section.pressure)
+    volumetric_flow_rate = section.mass_flow_rate / density
+
     kv = size_control_valve_g(
         T=section.temperature,
         MW=fluid.molecular_weight,
@@ -199,7 +216,7 @@ def test_gas_valve_drop_from_cv():
         Z=fluid.z_factor,
         P1=section.pressure,
         P2=section.pressure - 120e3,
-        Q=section.current_volumetric_flow_rate(fluid),
+        Q=volumetric_flow_rate,
     )
     cv = convert_flow_coefficient(kv, "Kv", "Cv")
     valve = ControlValve(tag="CV-3", cv=cv, cg=None, pressure_drop=None, C1=None)
