@@ -18,7 +18,6 @@ class FrictionCalculator(LossCalculator):
 
     fluid: Fluid
     default_pipe_diameter: Optional[float] = None
-    volumetric_flow_rate: Optional[float] = None
     friction_factor_override: Optional[float] = None
     friction_factor_type: str = "darcy"
 
@@ -65,12 +64,11 @@ class FrictionCalculator(LossCalculator):
             return "transition"
 
     def _determine_flow_rate(self, section: PipeSection) -> float:
-        flow_rate = section.design_volumetric_flow_rate
-        if flow_rate and flow_rate > 0:
-            return flow_rate
-        if self.volumetric_flow_rate and self.volumetric_flow_rate > 0:
-            return self.volumetric_flow_rate
-        return self.fluid.current_volumetric_flow_rate()
+        try:
+            flow_rate = section.current_volumetric_flow_rate(self.fluid)
+        except ValueError as e:
+            raise ValueError(f"Volumetric flow rate is required for friction calculations: {e}")
+        return flow_rate
 
     def _pipe_diameter(self, section: PipeSection) -> float:
         for candidate in (section.pipe_diameter, self.default_pipe_diameter):

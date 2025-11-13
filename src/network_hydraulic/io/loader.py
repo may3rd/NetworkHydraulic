@@ -45,6 +45,7 @@ NETWORK_ALLOWED_KEYS = {
     "sections",
     "output_units",
     "design_margin",
+    "mass_flow_rate",
 }
 
 SECTION_ALLOWED_KEYS = {
@@ -156,18 +157,13 @@ class ConfigurationLoader:
             "fluid.specific_heat_ratio",
         )
 
-        mass_flow_rate_val = self._quantity(fluid_cfg.get("mass_flow_rate"), "fluid.mass_flow_rate", target_unit="kg/s")
-        volumetric_flow_rate_val = self._quantity(
-            fluid_cfg.get("volumetric_flow_rate"), "fluid.volumetric_flow_rate", target_unit="m^3/s"
-        )
+        mass_flow_rate_val = self._quantity(network_cfg.get("mass_flow_rate"), "network.mass_flow_rate", target_unit="kg/s")
 
-        if mass_flow_rate_val is None and volumetric_flow_rate_val is None:
-            raise ValueError("Either fluid.mass_flow_rate or fluid.volumetric_flow_rate must be provided")
+        if mass_flow_rate_val is None:
+            raise ValueError("network.mass_flow_rate must be provided")
 
         fluid = Fluid(
             name=fluid_cfg.get("name"),
-            mass_flow_rate=mass_flow_rate_val,
-            volumetric_flow_rate=volumetric_flow_rate_val,
             phase=phase,
             temperature=temperature,
             pressure=pressure,
@@ -206,6 +202,7 @@ class ConfigurationLoader:
             boundary_pressure=boundary_pressure,
             upstream_pressure=upstream_pressure,
             downstream_pressure=downstream_pressure,
+            mass_flow_rate=mass_flow_rate_val,
             gas_flow_model=gas_flow_model,
             sections=sections,
             output_units=output_units,

@@ -16,7 +16,6 @@ MIN_PRESSURE = 1.0  # Pa to avoid zero/negative outlet pressures
 @dataclass
 class ControlValveCalculator(LossCalculator):
     fluid: Fluid
-    volumetric_flow_rate: Optional[float] = None
 
     def calculate(
         self,
@@ -187,12 +186,11 @@ class ControlValveCalculator(LossCalculator):
             valve.valve_diameter = section.pipe_diameter
 
     def _determine_flow_rate(self, section: PipeSection) -> float:
-        flow = section.design_volumetric_flow_rate
-        if flow and flow > 0:
-            return flow
-        if self.volumetric_flow_rate and self.volumetric_flow_rate > 0:
-            return self.volumetric_flow_rate
-        return self.fluid.current_volumetric_flow_rate()
+        try:
+            flow = section.current_volumetric_flow_rate(self.fluid)
+        except ValueError as e:
+            raise ValueError(f"Volumetric flow rate is required for control valve calculations: {e}")
+        return flow
 
     def _inlet_pressure(self, section: PipeSection) -> float:
         summary = section.result_summary.inlet

@@ -107,9 +107,7 @@ class FittingLossCalculator(LossCalculator):
         raise ValueError("Pipe diameter is required to evaluate fittings with the 2-K method")
 
     def _velocity(self, section: PipeSection, diameter: float) -> float:
-        flow_rate = section.design_volumetric_flow_rate
-        if flow_rate is None or flow_rate <= 0:
-            flow_rate = self.fluid.current_volumetric_flow_rate()
+        flow_rate = section.current_volumetric_flow_rate(self.fluid)
         area = 0.25 * pi * diameter * diameter
         if area <= 0:
             raise ValueError("Pipe diameter must be positive to determine velocity")

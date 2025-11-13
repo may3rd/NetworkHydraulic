@@ -1,3 +1,4 @@
+
 """Network grouping of pipe sections and result summaries.
 
 Example:
@@ -31,6 +32,7 @@ class Network:
     boundary_pressure: Optional[float] = None
     upstream_pressure: Optional[float] = None
     downstream_pressure: Optional[float] = None
+    mass_flow_rate: Optional[float] = None
     gas_flow_model: Optional[str] = None
     sections: List[PipeSection] = field(default_factory=list)
     calculation_output: CalculationOutput = field(default_factory=CalculationOutput)
@@ -40,6 +42,11 @@ class Network:
 
     def __post_init__(self) -> None:
         errors: list[str] = []
+
+        if self.mass_flow_rate is None:
+            errors.append("mass_flow_rate must be provided for the network")
+        if self.mass_flow_rate is not None and self.mass_flow_rate < 0:
+            errors.append("Network mass_flow_rate cannot be negative")
 
         normalized_direction = (self.direction or "").strip().lower()
         if normalized_direction not in {"auto", "forward", "backward"}:
@@ -84,3 +91,11 @@ class Network:
 
     def add_section(self, section: PipeSection) -> None:
         self.sections.append(section)
+
+    def current_volumetric_flow_rate(self) -> float:
+        if self.mass_flow_rate is None:
+            raise ValueError("mass_flow_rate must be set to calculate volumetric flow rate")
+        density = self.fluid.current_density()
+        if density == 0:
+            raise ValueError("Cannot calculate volumetric flow rate with zero density")
+        return self.mass_flow_rate / density

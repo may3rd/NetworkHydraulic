@@ -23,6 +23,7 @@ from typing import List, Optional
 
 from network_hydraulic.models.components import ControlValve, Orifice
 from network_hydraulic.models.results import CalculationOutput, ResultSummary
+from network_hydraulic.models.fluid import Fluid
 
 ALLOWED_FITTING_TYPES = [
     "elbow_90",
@@ -102,7 +103,7 @@ class PipeSection:
     result_summary: ResultSummary = field(default_factory=ResultSummary)
     design_flow_multiplier: float = 1.0
     design_mass_flow_rate: Optional[float] = None
-    design_volumetric_flow_rate: Optional[float] = None
+    mass_flow_rate: Optional[float] = None
 
     def __post_init__(self) -> None:
         errors: list[str] = []
@@ -136,3 +137,11 @@ class PipeSection:
 
         if errors:
             raise ValueError("; ".join(errors))
+
+    def current_volumetric_flow_rate(self, fluid: Fluid) -> float:
+        if self.mass_flow_rate is None:
+            raise ValueError("mass_flow_rate must be set for the pipe section to calculate volumetric flow rate")
+        density = fluid.current_density()
+        if density == 0:
+            raise ValueError("Cannot calculate volumetric flow rate with zero density")
+        return self.mass_flow_rate / density

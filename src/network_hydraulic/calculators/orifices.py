@@ -217,12 +217,11 @@ class OrificeCalculator(LossCalculator):
         return 1.4
 
     def _mass_flow_rate(self, section: PipeSection) -> float:
-        mass_flow = section.design_mass_flow_rate
-        if mass_flow and mass_flow > 0:
-            return mass_flow
+        if section.mass_flow_rate and section.mass_flow_rate > 0:
+            return section.mass_flow_rate
         if self.mass_flow_rate and self.mass_flow_rate > 0:
             return self.mass_flow_rate
-        return self.fluid.current_mass_flow_rate()
+        raise ValueError("Mass flow rate is required for orifice calculations")
 
     @staticmethod
     def _format_drop(drop: float) -> str:

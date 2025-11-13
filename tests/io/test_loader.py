@@ -39,7 +39,6 @@ def liquid_network_cfg(fluid_overrides=None, **network_overrides):
         "pressure": 101325.0,
         "density": 1000.0,
         "viscosity": 1e-3,
-        "mass_flow_rate": 1.0, # Added default mass_flow_rate
     }
     if fluid_overrides:
         fluid.update(fluid_overrides)
@@ -47,6 +46,7 @@ def liquid_network_cfg(fluid_overrides=None, **network_overrides):
     network = {
         "name": "net",
         "direction": "forward",
+        "mass_flow_rate": 1.0, 
         "fluid": fluid,
         "sections": [section_cfg()],
     }
@@ -58,6 +58,7 @@ def liquid_network_cfg(fluid_overrides=None, **network_overrides):
 def test_loader_builds_structured_fittings():
     raw_config = {
         "network": {
+            "mass_flow_rate": 1.0,
             "fluid": {
                 "name": "water",
                 "phase": "liquid",
@@ -65,7 +66,6 @@ def test_loader_builds_structured_fittings():
                 "pressure": 101325.0,
                 "density": 1000.0,
                 "viscosity": 1e-3,
-                "mass_flow_rate": 1.0,
             }
         }
     }
@@ -87,6 +87,7 @@ def test_loader_builds_structured_fittings():
 def test_loader_auto_adds_swage_fittings():
     raw_config = {
         "network": {
+            "mass_flow_rate": 1.0,
             "fluid": {
                 "name": "water",
                 "phase": "liquid",
@@ -94,7 +95,6 @@ def test_loader_auto_adds_swage_fittings():
                 "pressure": 101325.0,
                 "density": 1000.0,
                 "viscosity": 1e-3,
-                "mass_flow_rate": 1.0,
             }
         }
     }
@@ -117,6 +117,7 @@ def test_loader_auto_adds_swage_fittings():
 def test_loader_derives_diameter_from_npd():
     raw_config = {
         "network": {
+            "mass_flow_rate": 1.0,
             "fluid": {
                 "name": "water",
                 "phase": "liquid",
@@ -124,7 +125,6 @@ def test_loader_derives_diameter_from_npd():
                 "pressure": 101325.0,
                 "density": 1000.0,
                 "viscosity": 1e-3,
-                "mass_flow_rate": 1.0,
             }
         }
     }
@@ -141,10 +141,10 @@ def test_loader_converts_units_when_specified():
             "network": {
                 "boundary_pressure": {"value": 50, "unit": "barg"},
                 "direction": "forward",
+                "mass_flow_rate": 2.0,
                 "fluid": {
                     "name": "gas",
                     "phase": "gas",
-                    "mass_flow_rate": 2.0,
                     "temperature": 300.0,
                     "pressure": 101325.0,
                     "density": 15.0,
@@ -266,6 +266,7 @@ def test_loader_aligns_adjacent_pipe_diameters():
         "network": {
             "name": "adjacent",
             "direction": "forward",
+            "mass_flow_rate": 1.0,
             "fluid": {
                 "name": "water",
                 "phase": "liquid",
@@ -273,7 +274,6 @@ def test_loader_aligns_adjacent_pipe_diameters():
                 "pressure": 101325.0,
                 "density": 1000.0,
                 "viscosity": 1e-3,
-                "mass_flow_rate": 1.0,
             },
             "sections": [
                 upstream,
@@ -317,6 +317,7 @@ def test_loader_does_not_add_swage_for_near_equal_diameters():
         "network": {
             "name": "tolerance",
             "direction": "forward",
+            "mass_flow_rate": 1.0,
             "fluid": {
                 "name": "water",
                 "phase": "liquid",
@@ -324,7 +325,6 @@ def test_loader_does_not_add_swage_for_near_equal_diameters():
                 "pressure": 101325.0,
                 "density": 1000.0,
                 "viscosity": 1e-3,
-                "mass_flow_rate": 1.0,
             },
             "sections": [
                 upstream,
@@ -343,6 +343,7 @@ def test_loader_respects_user_defined_diameters_between_sections():
         "network": {
             "name": "adjacent",
             "direction": "forward",
+            "mass_flow_rate": 1.0,
             "fluid": {
                 "name": "water",
                 "phase": "liquid",
@@ -350,7 +351,6 @@ def test_loader_respects_user_defined_diameters_between_sections():
                 "pressure": 101325.0,
                 "density": 1000.0,
                 "viscosity": 1e-3,
-                "mass_flow_rate": 1.0,
             },
             "sections": [
                 section_cfg(
@@ -379,6 +379,7 @@ def test_loader_respects_user_defined_diameters_between_sections():
 def test_loader_defaults_elevation_change_to_zero_when_missing():
     raw_config = {
         "network": {
+            "mass_flow_rate": 1.0,
             "fluid": {
                 "name": "water",
                 "phase": "liquid",
@@ -386,7 +387,6 @@ def test_loader_defaults_elevation_change_to_zero_when_missing():
                 "pressure": 101325.0,
                 "density": 1000.0,
                 "viscosity": 1e-3,
-                "mass_flow_rate": 1.0,
             }
         }
     }
@@ -402,6 +402,7 @@ def test_loader_parses_output_units_block():
         "network": {
             "name": "units",
             "direction": "forward",
+            "mass_flow_rate": 1.0,
             "output_units": {
                 "pressure": "kPag",
                 "pressure_drop": "kPa",
@@ -414,7 +415,6 @@ def test_loader_parses_output_units_block():
                 "pressure": 101325.0,
                 "density": 1000.0,
                 "viscosity": 1e-3,
-                "mass_flow_rate": 1.0,
             },
             "sections": [
                 section_cfg(),
@@ -447,6 +447,7 @@ def test_loader_design_margin_honors_section_override():
             "name": "margin",
             "direction": "forward",
             "design_margin": 8.0,
+            "mass_flow_rate": 1.0,
             "fluid": {
                 "name": "water",
                 "phase": "liquid",
@@ -454,7 +455,6 @@ def test_loader_design_margin_honors_section_override():
                 "pressure": 101325.0,
                 "density": 1000.0,
                 "viscosity": 1e-3,
-                "mass_flow_rate": 1.0,
             },
             "sections": [
                 section_cfg(id="s1", design_margin=12.0),
@@ -476,6 +476,7 @@ def test_loader_from_json_path(tmp_path: Path):
             "name": "json-network",
             "direction": "forward",
             "boundary_pressure": 101325.0,
+            "mass_flow_rate": 1.0, 
             "fluid": {
                 "name": "water",
                 "phase": "liquid",
@@ -483,7 +484,6 @@ def test_loader_from_json_path(tmp_path: Path):
                 "pressure": 250000.0,
                 "density": 997.0,
                 "viscosity": 1.0e-3,
-                "mass_flow_rate": 1.0, # Added default mass_flow_rate
             },
             "sections": [
                 section_cfg(

@@ -52,7 +52,6 @@ class NetworkSolver:
     """Runs calculations for all pipe sections in a network."""
 
     default_pipe_diameter: Optional[float] = None
-    volumetric_flow_rate: Optional[float] = None
     direction: Optional[str] = None
     boundary_pressure: Optional[float] = None
     gas_flow_model: Optional[str] = None
@@ -72,9 +71,9 @@ class NetworkSolver:
         for section in sections:
             self._reset_section(section)
 
-        base_vol_flow = self._determine_volumetric_flow(network)
-        base_mass_flow = self._determine_mass_flow(network, base_vol_flow)
-        self._assign_design_flows(sections, network, base_vol_flow, base_mass_flow)
+        base_mass_flow = network.mass_flow_rate
+        self._assign_design_flows(sections, network, base_mass_flow)
+
         for section in sections:
             self._validate_section_prerequisites(section)
             for calculator in calculators:
@@ -99,8 +98,6 @@ class NetworkSolver:
             network,
             direction=self.direction or network.direction,
             boundary=self.boundary_pressure if self.boundary_pressure is not None else network.boundary_pressure,
-            base_vol_flow=base_vol_flow,
-            base_mass_flow=base_mass_flow,
         )
         self._populate_states(sections, network)
         self._set_network_summary(network, sections)
@@ -133,7 +130,6 @@ class NetworkSolver:
             FrictionCalculator(
                 fluid=fluid,
                 default_pipe_diameter=self.default_pipe_diameter,
-                volumetric_flow_rate=self.volumetric_flow_rate,
                 friction_factor_type=self.friction_factor_type,
             ),
             elevation,
@@ -148,7 +144,6 @@ class NetworkSolver:
         section.pipe_length_K = None
         section.design_flow_multiplier = 1.0
         section.design_mass_flow_rate = None
-        section.design_volumetric_flow_rate = None
 
     def _validate_section_prerequisites(self, section: PipeSection) -> None:
         errors: list[str] = []
@@ -166,18 +161,15 @@ class NetworkSolver:
         self,
         sections: Iterable[PipeSection],
         network: Network,
-        base_vol_flow: Optional[float],
         base_mass_flow: Optional[float],
     ) -> None:
         for section in sections:
             multiplier = self._design_multiplier(section, network)
             section.design_flow_multiplier = multiplier
-            section.design_volumetric_flow_rate = (
-                base_vol_flow * multiplier if base_vol_flow is not None else None
-            )
             section.design_mass_flow_rate = (
                 base_mass_flow * multiplier if base_mass_flow is not None else None
             )
+            section.mass_flow_rate = section.design_mass_flow_rate
 
     @staticmethod
     def _design_multiplier(section: PipeSection, network: Network) -> float:
@@ -196,8 +188,6 @@ class NetworkSolver:
         network: Network,
         direction: str,
         boundary: Optional[float],
-        base_vol_flow: Optional[float] = None,
-        base_mass_flow: Optional[float] = None,
     ) -> None:
         sections = list(sections)
         if not sections:
@@ -209,18 +199,16 @@ class NetworkSolver:
         boundary_hint = boundary if boundary is not None else self._default_boundary(network, forward)
         component_overrides = self._initialize_component_sections(sections, network)
         current = self._initial_pressure(network, forward, boundary_hint)
-        vol_flow = base_vol_flow if base_vol_flow is not None else self._determine_volumetric_flow(network)
-        mass_flow = base_mass_flow if base_mass_flow is not None else self._determine_mass_flow(network, vol_flow)
+        mass_flow = network.mass_flow_rate
         gas_flow_model = self.gas_flow_model or network.gas_flow_model
 
         control_valve_calculator = ControlValveCalculator(
             fluid=network.fluid,
-            volumetric_flow_rate=self.volumetric_flow_rate,
         )
         orifice_calculator = OrificeCalculator(
             fluid=network.fluid,
             default_pipe_diameter=self.default_pipe_diameter,
-            mass_flow_rate=mass_flow,
+            mass_flow_rate=mass_flow, # This will be updated per section
         )
 
         if network.fluid.is_gas():
@@ -235,6 +223,9 @@ class NetworkSolver:
 
                 if section_start_pressure is None:
                     break
+
+                # Update orifice calculator with section's mass flow rate
+                orifice_calculator.mass_flow_rate = section.mass_flow_rate
 
                 self._apply_pressure_dependent_losses(
                     section,
@@ -259,7 +250,7 @@ class NetworkSolver:
                 roughness = section.roughness or 0.0
                 viscosity = network.fluid.viscosity
 
-                section_mass_flow = section.design_mass_flow_rate or mass_flow
+                section_mass_flow = section.mass_flow_rate
                 missing_params: list[str] = []
                 positive_required = {
                     "temperature": temperature,
@@ -484,6 +475,9 @@ class NetworkSolver:
                 if section_start_pressure is None:
                     break
 
+                # Update orifice calculator with section's mass flow rate
+                orifice_calculator.mass_flow_rate = section.mass_flow_rate
+
                 self._apply_pressure_dependent_losses(
                     section,
                     inlet_pressure=section_start_pressure,
@@ -601,44 +595,13 @@ class NetworkSolver:
             self._populate_section_state(
                 section,
                 fluid,
-                section.design_volumetric_flow_rate,
-                section.design_mass_flow_rate,
+                section.mass_flow_rate,
             )
-
-    def _determine_volumetric_flow(self, network: Network) -> Optional[float]:
-        if self.volumetric_flow_rate and self.volumetric_flow_rate > 0:
-            return self.volumetric_flow_rate
-        fluid = network.fluid
-        if fluid.volumetric_flow_rate and fluid.volumetric_flow_rate > 0:
-            return fluid.volumetric_flow_rate
-        if fluid.mass_flow_rate and fluid.mass_flow_rate > 0:
-            try:
-                density = fluid.current_density()
-            except ValueError:
-                density = fluid.density if fluid.density and fluid.density > 0 else None
-            if density and density > 0:
-                return fluid.mass_flow_rate / density
-        return None
-
-    def _determine_mass_flow(self, network: Network, vol_flow: Optional[float]) -> Optional[float]:
-        fluid = network.fluid
-        if fluid.mass_flow_rate and fluid.mass_flow_rate > 0:
-            return fluid.mass_flow_rate
-        density: Optional[float] = None
-        try:
-            density = fluid.current_density()
-        except ValueError:
-            if fluid.density and fluid.density > 0:
-                density = fluid.density
-        if vol_flow and vol_flow > 0 and density and density > 0:
-            return vol_flow * density
-        return None
 
     def _populate_section_state(
         self,
         section: PipeSection,
         fluid,
-        vol_flow: Optional[float],
         mass_flow: Optional[float],
     ) -> None:
         summary = section.result_summary
@@ -646,9 +609,18 @@ class NetworkSolver:
         if not diameter or diameter <= 0:
             return
         area = pi * diameter * diameter * 0.25
+        
+        vol_flow = None
+        if section.mass_flow_rate is not None:
+            try:
+                vol_flow = section.current_volumetric_flow_rate(fluid)
+            except ValueError:
+                vol_flow = None
+
         velocity = None
         if vol_flow and vol_flow > 0 and area > 0:
             velocity = vol_flow / area
+        
         base_density = fluid.current_density()
         reference_pressure = fluid.pressure if fluid.pressure and fluid.pressure > 0 else None
         reference_temperature = fluid.temperature if fluid.temperature and fluid.temperature > 0 else None
