@@ -1,6 +1,7 @@
 """Control valve pressure loss calculations."""
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Callable, Optional
 
@@ -16,6 +17,9 @@ MIN_PRESSURE = 1.0  # Pa to avoid zero/negative outlet pressures
 @dataclass
 class ControlValveCalculator(LossCalculator):
     fluid: Fluid
+
+    def __post_init__(self) -> None:
+        self.logger = logging.getLogger(__name__)
 
     def calculate(
         self,
@@ -75,7 +79,7 @@ class ControlValveCalculator(LossCalculator):
         if valve.cv is None:
             if section.temperature is None or section.temperature <= 0:
                 raise ValueError("section.temperature must be set and positive for control valve calculations")
-            kv = self._kv_from_drop(phase, inlet_pressure, drop, flow_rate, valve, section.temperature)
+            kv = self._kv_from_drop(phase, inlet_pressure, drop, flow_rate, valve, section.temperature, section.id)
             valve.cv = convert_flow_coefficient(kv, "Kv", "Cv")
             if valve.cg is None:
                 valve.cg = self._cg_from_cv(valve.cv, valve)
@@ -93,7 +97,7 @@ class ControlValveCalculator(LossCalculator):
         def kv_from_drop(delta_p: float) -> float:
             if section.temperature is None or section.temperature <= 0:
                 raise ValueError("section.temperature must be set and positive for control valve calculations")
-            return self._kv_from_drop(phase, inlet_pressure, delta_p, flow_rate, valve, section.temperature)
+            return self._kv_from_drop(phase, inlet_pressure, delta_p, flow_rate, valve, section.temperature, section.id)
 
         drop = self._bisect_on_drop(kv_target, kv_from_drop, max_drop)
         return drop
@@ -106,18 +110,26 @@ class ControlValveCalculator(LossCalculator):
         flow_rate: float,
         valve,
         temperature: float,
+        section_id: str,
     ) -> float:
         outlet_pressure = max(inlet_pressure - drop, MIN_PRESSURE)
         if phase == "liquid":
-            return self._kv_liquid(inlet_pressure, outlet_pressure, flow_rate, valve)
+            return self._kv_liquid(inlet_pressure, outlet_pressure, flow_rate, valve, section_id)
         return self._kv_gas(inlet_pressure, outlet_pressure, flow_rate, valve, temperature)
 
     def _kv_liquid(
-        self, inlet_pressure: float, outlet_pressure: float, flow_rate: float, valve
+        self, inlet_pressure: float, outlet_pressure: float, flow_rate: float, valve, section_id: str
     ) -> float:
         if self.fluid.vapor_pressure is None or self.fluid.critical_pressure is None:
-            raise ValueError(
-                "Liquid control valve calculations require vapor_pressure and critical_pressure"
+            # Fallback to general valve Cv calculation
+            # Log a warning that a simplified calculation is being used
+            self.logger.warning(
+                "Fluid properties (vapor_pressure or critical_pressure) missing for liquid control valve calculation. "
+                "Using a simplified Kv calculation for section %s.",
+                section_id,
+            )
+            return self._kv_liquid_simplified(
+                inlet_pressure, outlet_pressure, flow_rate, self.fluid.density
             )
         return size_control_valve_l(
             rho=self.fluid.density,
@@ -133,6 +145,34 @@ class ControlValveCalculator(LossCalculator):
             FL=valve.FL if valve.FL is not None else 0.9,
             Fd=valve.Fd if valve.Fd is not None else 1.0,
         )
+
+    def _kv_liquid_simplified(
+        self, inlet_pressure: float, outlet_pressure: float, flow_rate_m3s: float, fluid_density: float
+    ) -> float:
+        # Convert flow rate from m^3/s to m^3/h
+        flow_rate_m3h = flow_rate_m3s * 3600
+
+        # Calculate pressure drop in Pa
+        pressure_drop_pa = inlet_pressure - outlet_pressure
+
+        # Convert pressure drop from Pa to bar
+        pressure_drop_bar = pressure_drop_pa / 100000.0
+
+        # Calculate specific gravity (relative to water at 1000 kg/m^3)
+        # Assuming water density at 1000 kg/m^3 for specific gravity calculation
+        specific_gravity = fluid_density / 1000.0
+
+        if pressure_drop_bar <= 0 or specific_gravity <= 0:
+            # This case should ideally be handled upstream or result in an error
+            # For now, return a very large Kv to indicate minimal resistance
+            # or raise a more specific error if this state is truly invalid.
+            raise ValueError(
+                "Cannot perform simplified liquid Kv calculation with non-positive pressure drop or specific gravity."
+            )
+
+        # Kv = Q_m3h / sqrt(dP_bar / SG)
+        kv_value = flow_rate_m3h / (pressure_drop_bar / specific_gravity)**0.5
+        return kv_value
 
     def _kv_gas(
         self, inlet_pressure: float, outlet_pressure: float, flow_rate: float, valve, temperature: float
