@@ -80,6 +80,9 @@ SECTION_ALLOWED_KEYS = {
     "direction",
     "inlet_diameter_specified",
     "outlet_diameter_specified",
+    "flow_splitting_factor",
+    "from_pipe_id",
+    "to_pipe_id",
 }
 
 def _yaml_loader() -> YAML:
@@ -275,6 +278,9 @@ class ConfigurationLoader:
             orifice=orifice,
             boundary_pressure=boundary_pressure,
             direction=cfg.get("direction"),
+            flow_splitting_factor=self._coerce_optional_float(cfg.get("flow_splitting_factor"), "section.flow_splitting_factor") or 1.0,
+            from_pipe_id=cfg.get("from_pipe_id"),
+            to_pipe_id=cfg.get("to_pipe_id"),
         )
         return pipe_section
 

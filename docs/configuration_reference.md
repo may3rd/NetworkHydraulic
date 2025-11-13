@@ -75,6 +75,9 @@
  - `direction` – overrides network direction for that section.
  - `design_margin` – percent overriding network-level margin.
  - `erosional_constant` – used for erosional velocity checks.
+ - `flow_splitting_factor` – multiplier for network mass flow rate (defaults to 1.0).
+ - `from_pipe_id` – reference to another pipe section ID for flow splitting.
+ - `to_pipe_id` – reference to another pipe section ID for flow splitting.
 
  ### 3.1 Auto-Swage
 

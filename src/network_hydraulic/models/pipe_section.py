@@ -106,6 +106,9 @@ class PipeSection:
     mass_flow_rate: Optional[float] = None
     temperature: Optional[float] = None
     pressure: Optional[float] = None
+    flow_splitting_factor: float = 1.0
+    from_pipe_id: Optional[str] = None
+    to_pipe_id: Optional[str] = None
 
     def __post_init__(self) -> None:
         errors: list[str] = []
@@ -136,6 +139,9 @@ class PipeSection:
         
         if not self.fitting_type:
             errors.append("PipeSection fitting_type must be a non-empty string")
+
+        if self.flow_splitting_factor <= 0:
+            errors.append("PipeSection flow_splitting_factor must be positive")
 
         if errors:
             raise ValueError("; ".join(errors))
