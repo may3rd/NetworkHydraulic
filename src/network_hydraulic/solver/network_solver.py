@@ -166,7 +166,7 @@ class NetworkSolver:
             multiplier = self._design_multiplier(section, network)
             section.design_flow_multiplier = multiplier
             section.design_mass_flow_rate = (
-                base_mass_flow * multiplier if base_mass_flow is not None else None
+                base_mass_flow * multiplier * section.flow_splitting_factor if base_mass_flow is not None else None
             )
             section.mass_flow_rate = section.design_mass_flow_rate
             section.temperature = network.temperature
