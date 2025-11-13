@@ -14,20 +14,15 @@ network:
     volumetric_flow_rate: m^3/h
     mass_flow_rate: kg/h
     flow_momentum: Pa
+  mass_flow_rate:
+    value: 90513.6
+    unit: kg/h
+  temperature:
+    value: 105.19
+    unit: degC
   fluid:
     name: liquid
     phase: liquid
-    mass_flow_rate:
-      value: 90513.6
-      unit: kg/h
-    volumetric_flow_rate: null
-    temperature:
-      value: 105.19
-      unit: degC
-    density:
-      value: 784.3
-      unit: kg/m^3
-    viscosity: 2.43e-4
   sections:
     - id: "42"
       schedule: "40"

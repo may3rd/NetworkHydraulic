@@ -13,23 +13,15 @@ network:
     temperature: degC
     volumetric_flow_rate: m^3/h
     mass_flow_rate: kg/h
+  mass_flow_rate:
+    value: 1000.0
+    unit: kg/h
+  temperature:
+    value: 42.0
+    unit: degC
   fluid:
     name: Butene-1
     phase: liquid
-    mass_flow_rate:
-      value: 1000.0
-      unit: kg/h
-    volumetric_flow_rate: null
-    temperature:
-      value: 42.0
-      unit: degC
-    pressure:
-      value: 32.2
-      unit: kPag
-    density:
-      value: 580
-      unit: kg/m^3
-    viscosity: 0.00013
   sections:
     - id: "1"
       schedule: "40"

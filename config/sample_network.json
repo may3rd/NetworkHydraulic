@@ -16,22 +16,22 @@
       "mass_flow_rate": "kg/h",
       "flow_momentum": "kPa"
     },
+    "mass_flow_rate": {
+      "value": 90513.6,
+      "unit": "kg/h"
+    },
+    "temperature": {
+      "value": 103.42,
+      "unit": "degC"
+    },
+    "pressure": {
+      "value": 101.008,
+      "unit": "kPag"
+    },
     "fluid": {
       "name": "liquid",
-      "phase": "liquid",
-      "mass_flow_rate": {
-        "value": 90513.6,
-        "unit": "kg/h"
-      },
-      "volumetric_flow_rate": null,
-      "temperature": {
-        "value": 103.42,
-        "unit": "degC"
-      },
-      "pressure": {
-        "value": 101.008,
-        "unit": "kPag"
-      },
+      "phase": "liquid"
+    },
       "density": {
         "value": 783.4,
         "unit": "kg/m^3"
