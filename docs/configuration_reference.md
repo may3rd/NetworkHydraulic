@@ -16,6 +16,9 @@
    downstream_pressure: {value: …, unit: …}      # optional
    gas_flow_model: isothermal | adiabatic        # required for gas, ignored for liquid
    design_margin: 10.0                           # percent, optional
+   mass_flow_rate: 1.0                           # kg/s, required
+   temperature: {value: 25, unit: degC}          # K, required
+   pressure: {value: 101.3, unit: kPag}          # Pa, required
    output_units:                                 # optional (see §4)
      pressure: kPag
      …
@@ -37,14 +40,11 @@
  | --- | --- | --- |
  | `name` | No | Identifier for summaries. |
  | `phase` | **Yes** | `liquid`, `gas`, or `vapor`. Dictates density logic and gas-model requirements. |
- | `temperature` | **Yes** | Absolute temperature; specify units (K, degC, degF). |
- | `pressure` | Yes* | Absolute pressure; can be omitted if `network.boundary_pressure` is provided. |
  | `density` | Required for liquids | kg/m³ in SI or convertible units. |
  | `molecular_weight` | Required for gas/vapor | kg/mol or g/mol. |
  | `z_factor` | Required for gas/vapor | Compressibility factor (dimensionless). |
  | `specific_heat_ratio` | Required for gas/vapor | γ = Cp/Cv. |
  | `viscosity` | **Yes** | Dynamic viscosity (Pa·s). |
- | `mass_flow_rate` / `volumetric_flow_rate` | At least one required | Design flow. The solver derives the other from density. |
  | `standard_flow_rate` | Optional | Desired standard volumetric flow for output. |
  | `vapor_pressure`, `critical_pressure` | Optional; required for liquid valve calcs. |
 
@@ -144,16 +144,16 @@
    name: demo
    direction: auto
    boundary_pressure: {value: 300, unit: kPa}
+   mass_flow_rate: 2.5
+   temperature: {value: 35, unit: degC}
+   pressure: {value: 300, unit: kPa}
    fluid:
      name: nitrogen
      phase: gas
-     temperature: {value: 35, unit: degC}
-     pressure: {value: 300, unit: kPa}
      molecular_weight: 28
      z_factor: 0.98
      specific_heat_ratio: 1.32
      viscosity: 1.8e-5
-     mass_flow_rate: 2.5
    sections:
      - id: inlet
        schedule: 40
