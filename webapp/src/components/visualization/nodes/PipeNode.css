@@ -1,0 +1,271 @@
+.pipe-node {
+  width: 280px;
+  min-height: 120px;
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  color: white;
+  border: 2px solid #1d4ed8;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3);
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+.pipe-node.selected {
+  box-shadow: 0 0 0 3px #3b82f6, 0 4px 20px rgba(59, 130, 246, 0.4);
+  transform: scale(1.02);
+}
+
+.pipe-node.critical {
+  animation: criticalPulse 2s ease-in-out infinite;
+  border-color: #ef4444;
+  box-shadow: 0 0 0 2px #ef4444, 0 4px 16px rgba(239, 68, 68, 0.3);
+}
+
+.pipe-node:hover {
+  transform: scale(1.02);
+  box-shadow: 0 6px 24px rgba(59, 130, 246, 0.4);
+}
+
+/* Node content styling */
+.node-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 12px;
+}
+
+.node-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.node-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+}
+
+.node-title {
+  font-weight: 600;
+  color: white;
+  flex: 1;
+  min-width: 0;
+}
+
+.critical-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  background: rgba(239, 68, 68, 0.8);
+  border-radius: 50%;
+  animation: criticalBlink 1.5s ease-in-out infinite;
+}
+
+/* Properties section */
+.node-properties {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 11px;
+}
+
+.property-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.property-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+}
+
+.property-item .MuiChip-root {
+  font-size: 10px;
+  height: 20px;
+}
+
+.velocity-chip,
+.pressure-drop-chip {
+  font-weight: 500;
+}
+
+.material-text {
+  color: rgba(255, 255, 255, 0.9);
+  font-style: italic;
+}
+
+/* Footer section */
+.node-footer {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.section-id {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 10px;
+  font-family: 'Courier New', monospace;
+}
+
+/* Handle styling */
+.react-flow__handle {
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+.react-flow__handle:hover {
+  transform: scale(1.1);
+}
+
+/* Animations */
+@keyframes criticalPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 12px rgba(239, 68, 68, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+  }
+}
+
+@keyframes criticalBlink {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .pipe-node {
+    width: 240px;
+    min-height: 100px;
+  }
+  
+  .node-content {
+    padding: 8px;
+  }
+  
+  .node-header {
+    margin-bottom: 6px;
+    gap: 6px;
+  }
+  
+  .property-row {
+    gap: 4px;
+  }
+  
+  .property-item {
+    gap: 2px;
+    font-size: 10px;
+  }
+}
+
+/* Performance optimizations for large networks */
+.pipe-node.performance-mode {
+  transition: none;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
+}
+
+.pipe-node.performance-mode:hover {
+  transform: none;
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+  .pipe-node {
+    border-width: 3px;
+  }
+  
+  .pipe-node.selected {
+    box-shadow: 0 0 0 4px #3b82f6;
+  }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .pipe-node {
+    transition: none;
+  }
+  
+  .pipe-node.critical {
+    animation: none;
+  }
+  
+  .critical-indicator {
+    animation: none;
+  }
+  
+  .react-flow__handle:hover {
+    transform: none;
+  }
+}
+
+/* Focus styles for accessibility */
+.pipe-node:focus-visible {
+  outline: 3px solid #fbbf24;
+  outline-offset: 2px;
+}
+
+/* Status indicators */
+.pipe-node.status-high-flow {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  border-color: #dc2626;
+}
+
+.pipe-node.status-medium-flow {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  border-color: #d97706;
+}
+
+.pipe-node.status-low-flow {
+  background: linear-gradient(135deg, #10b981, #059669);
+  border-color: #059669;
+}
+
+/* Connection state indicators */
+.pipe-node.connected::before {
+  content: '';
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 8px;
+  height: 8px;
+  background: #10b981;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px white;
+}
+
+.pipe-node.disconnected::before {
+  content: '';
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 8px;
+  height: 8px;
+  background: #ef4444;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px white;
+}

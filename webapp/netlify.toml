@@ -1,0 +1,193 @@
+# Netlify configuration for Hydraulic Network Web Application
+[build]
+  command = "npm run build"
+  publish = "dist"
+  functions = "netlify/functions"
+
+[build.environment]
+  NODE_VERSION = "18"
+  NPM_FLAGS = "--production=false"
+
+# Build plugins
+[[plugins]]
+  package = "@netlify/plugin-edge-handlers"
+
+# Redirects and rewrites
+[[redirects]]
+  from = "/api/*"
+  to = "https://api.yourservice.com/api/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/ws"
+  to = "wss://api.yourservice.com/ws"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/health"
+  to = "/health"
+  status = 200
+
+# SPA fallback
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Security headers
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "SAMEORIGIN"
+    X-XSS-Protection = "1; mode=block"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "geolocation=(), microphone=(), camera=()"
+
+# Content Security Policy
+[[headers]]
+  for = "*.js"
+  [headers.values]
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' *.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: *.googleapis.com; font-src 'self' *.googleapis.com; connect-src 'self' wss: ws: *.googleapis.com; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self';"
+
+# Cache headers for static assets
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "*.html"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+    Pragma = "no-cache"
+    Expires = "0"
+
+# API proxy configuration
+[[proxy]]
+  from = "/api/*"
+  to = "https://api.yourservice.com/api/:splat"
+  status = 200
+
+# Environment variables
+[build.environment]
+  VITE_API_BASE_URL = "https://api.yourservice.com/api"
+  VITE_WEBSOCKET_URL = "wss://api.yourservice.com/ws"
+  VITE_APP_NAME = "Hydraulic Network Analyzer"
+  VITE_APP_VERSION = "1.0.0"
+  VITE_ENABLE_LOGGING = "true"
+  VITE_ENABLE_ANALYTICS = "false"
+
+# Forms configuration
+[build.processing]
+  skip_processing = false
+
+[build.processing.css]
+  bundle = true
+  minify = true
+
+[build.processing.js]
+  bundle = true
+  minify = true
+
+[build.processing.html]
+  pretty_urls = true
+
+[build.processing.images]
+  compress = true
+
+# Functions configuration
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+  esbuild_target = ["node18"]
+
+# Context-specific configuration
+[context.production]
+  command = "npm run build"
+  environment = { NODE_VERSION = "18" }
+
+[context.deploy-preview]
+  command = "npm run build"
+  environment = { NODE_VERSION = "18" }
+  publish = "dist"
+
+[context.branch-deploy]
+  command = "npm run build"
+  environment = { NODE_VERSION = "18" }
+
+# Post-processing
+[post_processing]
+  skip_processing = false
+
+[post_processing.bundles]
+  bundle = true
+
+[post_processing.minification]
+  css = true
+  js = true
+
+[post_processing.imagemin]
+  png = []
+  jpg = []
+  gif = []
+  webp = []
+
+# Dev configuration
+[dev]
+  command = "npm run dev"
+  auto_launch = false
+  port = 3000
+  target_port = 3000
+  publish = "dist"
+  
+  [[dev.headers]]
+    for = "/*"
+    [dev.headers.values]
+      Access-Control-Allow-Origin = "*"
+      Access-Control-Allow-Methods = "GET, POST, PUT, DELETE, OPTIONS"
+      Access-Control-Allow-Headers = "Content-Type, Authorization"
+
+# Edge handlers
+[[edge_handlers]]
+  path = "/api/*"
+  handler = "api-proxy"
+
+# Functions
+[[functions]]
+  path = "netlify/functions/*"
+  memory = 1024
+  timeout = 30
+
+# Analytics
+[analytics]
+  enabled = false
+  excluded_domains = ["localhost"]
+
+# Split testing
+[split_testing]
+  experiments = { }
+
+# Form handling
+[form]
+  name = "contact"
+  action = "/success"
+
+[form.field]
+  name = "name"
+  label = "Name"
+  required = true
+
+[form.field]
+  name = "email"
+  label = "Email"
+  required = true
+  pattern = "email"
+
+[form.field]
+  name = "message"
+  label = "Message"
+  required = true
+  widget = "textarea"

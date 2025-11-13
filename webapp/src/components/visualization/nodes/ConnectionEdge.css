@@ -1,0 +1,273 @@
+.connection-edge {
+  transition: all 0.3s ease;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.connection-edge.animated {
+  animation: flowAnimation 2s ease-in-out infinite;
+}
+
+.connection-edge.critical {
+  stroke-width: 3px !important;
+  animation: criticalFlowPulse 1.5s ease-in-out infinite;
+}
+
+.connection-edge:hover {
+  stroke-width: 4px;
+  filter: brightness(1.1);
+}
+
+/* Flow animation */
+@keyframes flowAnimation {
+  0% {
+    stroke-dashoffset: 100;
+  }
+  50% {
+    stroke-dashoffset: 50;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Critical flow pulse animation */
+@keyframes criticalFlowPulse {
+  0%, 100% {
+    stroke-width: 2px;
+    filter: brightness(1);
+  }
+  50% {
+    stroke-width: 4px;
+    filter: brightness(1.2);
+  }
+}
+
+/* Edge label styling */
+.edge-label {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.edge-label-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: center;
+  padding: 4px;
+}
+
+.edge-property {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+}
+
+.edge-property .MuiChip-root {
+  font-size: 9px;
+  height: 18px;
+  font-weight: 500;
+}
+
+.velocity-chip,
+.pressure-drop-chip {
+  margin-left: 2px;
+}
+
+/* Flow arrow styling */
+.flow-arrow {
+  transition: all 0.3s ease;
+}
+
+.flow-arrow:hover {
+  filter: brightness(1.2);
+}
+
+/* Direction indicators */
+.edge-label-content::before {
+  content: '→';
+  position: absolute;
+  top: -20px;
+  font-size: 12px;
+  color: #6b7280;
+  animation: directionPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes directionPulse {
+  0%, 100% {
+    opacity: 0.5;
+    transform: translateX(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translateX(2px);
+  }
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .edge-label {
+    width: 100px;
+    height: 30px;
+  }
+  
+  .edge-label-content {
+    gap: 1px;
+  }
+  
+  .edge-property {
+    gap: 2px;
+    font-size: 9px;
+  }
+  
+  .edge-property .MuiChip-root {
+    font-size: 8px;
+    height: 16px;
+  }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+  .connection-edge {
+    stroke-width: 3px;
+  }
+  
+  .edge-label {
+    border-width: 2px;
+    border-color: #000000;
+  }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .connection-edge {
+    transition: none;
+  }
+  
+  .connection-edge.animated {
+    animation: none;
+  }
+  
+  .connection-edge.critical {
+    animation: none;
+  }
+  
+  .flow-arrow {
+    transition: none;
+  }
+  
+  .edge-label-content::before {
+    animation: none;
+  }
+}
+
+/* Performance optimizations */
+.connection-edge.performance-mode {
+  transition: none;
+}
+
+.connection-edge.performance-mode.animated {
+  animation: none;
+}
+
+.connection-edge.performance-mode:hover {
+  stroke-width: 2px;
+}
+
+/* Edge status indicators */
+.connection-edge.status-high-velocity {
+  stroke: #dc2626;
+  stroke-width: 3px;
+}
+
+.connection-edge.status-medium-velocity {
+  stroke: #d97706;
+  stroke-width: 2.5px;
+}
+
+.connection-edge.status-low-velocity {
+  stroke: #10b981;
+  stroke-width: 2px;
+}
+
+.connection-edge.status-high-pressure-drop {
+  stroke-dasharray: 10, 10;
+  stroke: #dc2626;
+}
+
+.connection-edge.status-medium-pressure-drop {
+  stroke-dasharray: 8, 8;
+  stroke: #d97706;
+}
+
+/* Focus styles for accessibility */
+.connection-edge:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 4px;
+}
+
+/* Edge gradient effects */
+.connection-edge.gradient-velocity {
+  stroke: linear-gradient(
+    to right,
+    #10b981,
+    #3b82f6,
+    #d97706,
+    #dc2626
+  );
+  stroke-width: 2px;
+}
+
+/* Edge clustering indicators */
+.connection-edge.cluster-main {
+  stroke-width: 4px;
+  stroke: #8b5cf6;
+  filter: drop-shadow(0 0 4px rgba(139, 92, 246, 0.5));
+}
+
+.connection-edge.cluster-secondary {
+  stroke-width: 1.5px;
+  stroke: #a78bfa;
+  stroke-dasharray: 4, 4;
+}
+
+/* Edge transparency based on flow rate */
+.connection-edge.flow-low {
+  stroke-opacity: 0.3;
+}
+
+.connection-edge.flow-medium {
+  stroke-opacity: 0.7;
+}
+
+.connection-edge.flow-high {
+  stroke-opacity: 1;
+}
+
+/* Edge curvature variations */
+.connection-edge.curved-gentle {
+  pathLength: 1.1;
+}
+
+.connection-edge.curved-medium {
+  pathLength: 1.25;
+}
+
+.connection-edge.curved-sharp {
+  pathLength: 1.5;
+}
+
+/* Edge interaction states */
+.connection-edge.interaction-hover {
+  filter: brightness(1.2) contrast(1.1);
+}
+
+.connection-edge.interaction-selected {
+  stroke-width: 5px;
+  filter: drop-shadow(0 0 6px rgba(59, 130, 246, 0.5));
+}

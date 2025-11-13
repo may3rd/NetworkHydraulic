@@ -1,0 +1,247 @@
+.network-diagram-container {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  background: #f8fafc;
+}
+
+.network-diagram-wrapper {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.network-flow {
+  width: 100%;
+  height: 100%;
+}
+
+/* React Flow Custom Styles */
+.network-flow .react-flow__node {
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.network-flow .react-flow__node:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.network-flow .react-flow__node.selected {
+  box-shadow: 0 0 0 3px #3b82f6, 0 4px 16px rgba(59, 130, 246, 0.3);
+}
+
+.network-flow .react-flow__edge {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.network-flow .react-flow__edge.selected {
+  stroke-width: 3px;
+  stroke: #3b82f6;
+}
+
+/* Custom Controls */
+.network-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 10;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  padding: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.network-controls .MuiIconButton-root {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid #e2e8f0;
+}
+
+.network-controls .MuiIconButton-root:hover {
+  background: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* React Flow Controls Override */
+.react-flow-controls {
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  margin: 8px;
+}
+
+/* Mini Map Styles */
+.network-flow .react-flow__minimap {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.95);
+}
+
+/* Node-specific styles */
+.pipe-node {
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  color: white;
+  border: 2px solid #1d4ed8;
+}
+
+.fitting-node {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+  border: 2px solid #059669;
+}
+
+.valve-node {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: white;
+  border: 2px solid #d97706;
+}
+
+.orifice-node {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: white;
+  border: 2px solid #dc2626;
+}
+
+.boundary-node {
+  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+  color: white;
+  border: 2px solid #7c3aed;
+}
+
+/* Edge styles */
+.connection-edge {
+  stroke-width: 2px;
+  transition: all 0.3s ease;
+}
+
+.connection-edge.animated {
+  animation: flowAnimation 2s ease-in-out infinite;
+}
+
+@keyframes flowAnimation {
+  0% {
+    stroke-dashoffset: 100;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Analysis overlay styles */
+.flow-analysis-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.loss-analysis-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .network-controls {
+    top: 10px;
+    right: 10px;
+    padding: 8px;
+  }
+  
+  .network-controls .MuiIconButton-root {
+    min-width: 32px;
+    height: 32px;
+  }
+  
+  .react-flow-controls {
+    margin: 4px;
+  }
+}
+
+/* Loading states */
+.network-diagram-container.loading .network-flow .react-flow__node {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.network-diagram-container.loading::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.8);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Critical point highlighting */
+.critical-point {
+  animation: criticalPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes criticalPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+  }
+}
+
+/* Performance optimization for large networks */
+.network-flow.large-network .react-flow__node {
+  transition: none;
+}
+
+.network-flow.large-network .react-flow__edge {
+  transition: none;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .network-flow .react-flow__node {
+    border-width: 3px;
+  }
+  
+  .network-flow .react-flow__edge {
+    stroke-width: 3px;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .network-flow .react-flow__node,
+  .network-flow .react-flow__edge {
+    transition: none;
+  }
+  
+  .connection-edge.animated {
+    animation: none;
+  }
+  
+  .critical-point {
+    animation: none;
+  }
+}

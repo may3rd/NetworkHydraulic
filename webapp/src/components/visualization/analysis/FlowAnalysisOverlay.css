@@ -1,0 +1,310 @@
+.flow-analysis-overlay {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  min-width: 300px;
+  max-height: 400px;
+  overflow-y: auto;
+  z-index: 15;
+}
+
+.analysis-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.analysis-title {
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.analysis-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.analysis-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.section-title {
+  font-weight: 600;
+  color: #374151;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.metric-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+}
+
+.metric-value {
+  font-weight: 500;
+  color: #1f2937;
+}
+
+.progress-container {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.velocity-progress {
+  background-color: #fef2f2;
+}
+
+.velocity-progress .MuiLinearProgress-bar {
+  background-color: #ef4444;
+}
+
+.pressure-progress {
+  background-color: #f0fdf4;
+}
+
+.pressure-progress .MuiLinearProgress-bar {
+  background-color: #10b981;
+}
+
+.direction-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.direction-text {
+  font-weight: 500;
+  color: #374151;
+}
+
+.critical-points-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.critical-point-chip {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
+}
+
+.recommendations-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.recommendation {
+  font-size: 13px;
+  padding: 4px 0;
+  line-height: 1.4;
+}
+
+.recommendation.good {
+  color: #059669;
+}
+
+.recommendation.warning {
+  color: #d97706;
+}
+
+.recommendation.error {
+  color: #dc2626;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .flow-analysis-overlay {
+    position: relative;
+    top: auto;
+    right: auto;
+    margin-bottom: 16px;
+    min-width: auto;
+    width: 100%;
+  }
+  
+  .metric-row {
+    font-size: 12px;
+  }
+  
+  .section-title {
+    font-size: 14px;
+  }
+  
+  .recommendation {
+    font-size: 12px;
+  }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+  .flow-analysis-overlay {
+    border-width: 2px;
+    border-color: #000000;
+  }
+  
+  .analysis-header {
+    border-bottom: 2px solid #000000;
+  }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .flow-analysis-overlay {
+    transition: none;
+  }
+}
+
+/* Animation for critical alerts */
+.critical-alert {
+  animation: criticalPulse 2s ease-in-out infinite;
+}
+
+@keyframes criticalPulse {
+  0%, 100% {
+    background-color: rgba(239, 68, 68, 0.1);
+  }
+  50% {
+    background-color: rgba(239, 68, 68, 0.2);
+  }
+}
+
+/* Health status indicators */
+.health-excellent {
+  border-left: 4px solid #10b981;
+}
+
+.health-good {
+  border-left: 4px solid #3b82f6;
+}
+
+.health-warning {
+  border-left: 4px solid #f59e0b;
+}
+
+.health-critical {
+  border-left: 4px solid #ef4444;
+}
+
+/* Performance optimizations */
+.flow-analysis-overlay.performance-mode {
+  max-height: 300px;
+}
+
+/* Focus styles for accessibility */
+.flow-analysis-overlay:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Scrollbar styling */
+.flow-analysis-overlay::-webkit-scrollbar {
+  width: 6px;
+}
+
+.flow-analysis-overlay::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 3px;
+}
+
+.flow-analysis-overlay::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+  transition: background 0.2s ease;
+}
+
+.flow-analysis-overlay::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+/* Network health indicators */
+.network-health-excellent {
+  color: #059669;
+  background: rgba(16, 185, 129, 0.1);
+}
+
+.network-health-good {
+  color: #0ea5e9;
+  background: rgba(30, 144, 255, 0.1);
+}
+
+.network-health-warning {
+  color: #d97706;
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.network-health-critical {
+  color: #dc2626;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+/* Metric value animations */
+.metric-value.updating {
+  animation: valueUpdate 0.5s ease-in-out;
+}
+
+@keyframes valueUpdate {
+  0% {
+    background-color: rgba(59, 130, 246, 0.1);
+    padding: 2px 4px;
+    border-radius: 4px;
+  }
+  100% {
+    background-color: transparent;
+    padding: 0;
+    border-radius: 0;
+  }
+}
+
+/* Section expand/collapse */
+.analysis-section.collapsed .section-content {
+  display: none;
+}
+
+.analysis-section.expanded .section-content {
+  display: block;
+}
+
+.section-toggle {
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+}
+
+.section-toggle:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+/* Tooltip styling for detailed information */
+.analysis-tooltip {
+  max-width: 300px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.analysis-tooltip .tooltip-title {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.analysis-tooltip .tooltip-content {
+  color: rgba(255, 255, 255, 0.9);
+}

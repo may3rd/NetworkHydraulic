@@ -1,0 +1,299 @@
+# Development Docker Compose configuration for Hydraulic Network Web Application
+# Optimized for local development with hot reloading and debugging
+
+version: '3.8'
+
+services:
+  # Frontend Web Application (Development)
+  webapp:
+    build:
+      context: ../..
+      dockerfile: webapp/Dockerfile
+      target: development
+    ports:
+      - "3000:3000"
+    volumes:
+      - ../../webapp:/app
+      - /app/node_modules
+      - ./logs:/var/log/nginx
+    environment:
+      - VITE_API_BASE_URL=http://backend:8000/api
+      - VITE_WEBSOCKET_URL=ws://backend:8000/ws
+      - VITE_ENABLE_LOGGING=true
+      - VITE_DEV_MODE=true
+      - VITE_ENABLE_MOCK_DATA=true
+      - VITE_DEBUG_MODE=true
+    working_dir: /app
+    command: ["npm", "run", "dev"]
+    networks:
+      - hydraulic-dev-network
+    depends_on:
+      - backend
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
+
+  # Backend API Service (Development)
+  backend:
+    build:
+      context: ../../backend
+      dockerfile: Dockerfile
+      target: development
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../../backend:/app
+      - /app/__pycache__
+      - ./logs:/app/logs
+    environment:
+      - ENVIRONMENT=development
+      - DATABASE_URL=postgresql://hydraulic_user:hydraulic_password@postgres:5432/hydraulic_dev
+      - REDIS_URL=redis://redis:6379/1
+      - LOG_LEVEL=DEBUG
+      - DEBUG=true
+      - RELOAD=true
+    working_dir: /app
+    command: ["python", "-m", "debugpy", "--listen", "0.0.0.0:5678", "--wait-for-client", "main.py"]
+    networks:
+      - hydraulic-dev-network
+    depends_on:
+      - postgres
+      - redis
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
+
+  # PostgreSQL Database (Development)
+  postgres:
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=hydraulic_dev
+      - POSTGRES_USER=hydraulic_user
+      - POSTGRES_PASSWORD=hydraulic_password
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ../../backend/database:/app/database
+    networks:
+      - hydraulic-dev-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hydraulic_user -d hydraulic_dev"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis Cache (Development)
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --requirepass redis_password --loglevel debug
+    volumes:
+      - redis_dev_data:/data
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf
+    networks:
+      - hydraulic-dev-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # PostgreSQL Admin Interface
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    ports:
+      - "5050:80"
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=dev@example.com
+      - PGADMIN_DEFAULT_PASSWORD=dev_password
+      - PGADMIN_CONFIG_SERVER_MODE=False
+    volumes:
+      - pgadmin_dev_data:/var/lib/pgadmin
+      - ./pgadmin/servers.json:/pgadmin/servers.json
+    networks:
+      - hydraulic-dev-network
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+  # Redis Admin Interface
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    ports:
+      - "8081:8081"
+    environment:
+      - REDIS_HOSTS=local:redis:6379:0
+      - REDIS_PASSWORD=redis_password
+    networks:
+      - hydraulic-dev-network
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  # Elasticsearch (for logging and search)
+  elasticsearch:
+    image: elasticsearch:8.8.0
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    volumes:
+      - elasticsearch_dev_data:/usr/share/elasticsearch/data
+    networks:
+      - hydraulic-dev-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Kibana (for log visualization)
+  kibana:
+    image: kibana:8.8.0
+    ports:
+      - "5601:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - xpack.security.enabled=false
+    networks:
+      - hydraulic-dev-network
+    depends_on:
+      - elasticsearch
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5601/api/status || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Logstash (for log processing)
+  logstash:
+    image: logstash:8.8.0
+    ports:
+      - "5044:5044"
+      - "9600:9600"
+    volumes:
+      - ./logstash/pipeline:/usr/share/logstash/pipeline
+      - ./logstash/config:/usr/share/logstash/config
+    environment:
+      - "LS_JAVA_OPTS=-Xmx256m -Xms256m"
+    networks:
+      - hydraulic-dev-network
+    depends_on:
+      - elasticsearch
+    restart: unless-stopped
+
+  # File Storage (MinIO for S3-compatible storage)
+  minio:
+    image: minio/minio:latest
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_dev_data:/data
+    networks:
+      - hydraulic-dev-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Mock API Server (for testing)
+  mock-server:
+    image: mockserver/mockserver:latest
+    ports:
+      - "1080:1080"
+    environment:
+      - MOCKSERVER_PROPERTY_FILE=mockserver.properties
+      - MOCKSERVER_INITIALIZATION_JSON_PATH=/mockserver/initialization.json
+    volumes:
+      - ./mock-server/mockserver.properties:/mockserver/mockserver.properties
+      - ./mock-server/initialization.json:/mockserver/initialization.json
+    networks:
+      - hydraulic-dev-network
+    restart: unless-stopped
+
+  # Development Tools
+  dev-tools:
+    image: node:18-alpine
+    ports:
+      - "3001:3000"
+    volumes:
+      - ../../webapp:/app
+      - /app/node_modules
+    working_dir: /app
+    command: ["npx", "@storybook/cli", "dev", "-p", "3001", "--ci"]
+    networks:
+      - hydraulic-dev-network
+    profiles:
+      - tools
+
+  # Code Quality Tools
+  code-quality:
+    image: node:18-alpine
+    volumes:
+      - ../../webapp:/app
+      - /app/node_modules
+    working_dir: /app
+    command: ["npm", "run", "test:coverage"]
+    networks:
+      - hydraulic-dev-network
+    profiles:
+      - quality
+
+# Volumes
+volumes:
+  postgres_dev_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${PWD}/volumes/postgres_dev
+  redis_dev_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${PWD}/volumes/redis_dev
+  pgadmin_dev_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${PWD}/volumes/pgadmin_dev
+  elasticsearch_dev_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${PWD}/volumes/elasticsearch_dev
+  minio_dev_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${PWD}/volumes/minio_dev
+
+# Networks
+networks:
+  hydraulic-dev-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

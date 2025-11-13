@@ -1,0 +1,159 @@
+{
+  "$schema": "https://vercel.com/schemas/vercel.json",
+  "version": 2,
+  "name": "hydraulic-network-webapp",
+  "build": {
+    "env": {
+      "NODE_VERSION": "18"
+    }
+  },
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "functions": {
+    "api/**/*.js": {
+      "maxDuration": 30
+    }
+  },
+  "regions": ["sfo1"],
+  "github": {
+    "enabled": true,
+    "autoAssignSubdomain": true
+  },
+  "redirects": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://api.yourservice.com/api/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/ws",
+      "destination": "wss://api.yourservice.com/ws",
+      "permanent": true
+    },
+    {
+      "source": "/health",
+      "destination": "/health"
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://api.yourservice.com/api/:path*"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/api/:path*",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET, POST, PUT, DELETE, OPTIONS"
+        },
+        {
+          "key": "Access-Control-Allow-Headers",
+          "value": "Content-Type, Authorization"
+        }
+      ]
+    },
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Frame-Options",
+          "value": "SAMEORIGIN"
+        },
+        {
+          "key": "X-XSS-Protection",
+          "value": "1; mode=block"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "geolocation=(), microphone=(), camera=()"
+        }
+      ]
+    },
+    {
+      "source": "static/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "sw.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    }
+  ],
+  "env": {
+    "VITE_API_BASE_URL": "https://api.yourservice.com/api",
+    "VITE_WEBSOCKET_URL": "wss://api.yourservice.com/ws",
+    "VITE_APP_NAME": "Hydraulic Network Analyzer",
+    "VITE_APP_VERSION": "1.0.0",
+    "VITE_ENABLE_LOGGING": "true",
+    "VITE_ENABLE_ANALYTICS": "false"
+  },
+  "preview": {
+    "env": {
+      "VITE_API_BASE_URL": "https://api-staging.yourservice.com/api",
+      "VITE_WEBSOCKET_URL": "wss://api-staging.yourservice.com/ws"
+    }
+  },
+  "production": {
+    "env": {
+      "VITE_API_BASE_URL": "https://api.yourservice.com/api",
+      "VITE_WEBSOCKET_URL": "wss://api.yourservice.com/ws"
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/health",
+      "schedule": "*/5 * * * *"
+    }
+  ],
+  "analytics": {
+    "enabled": false
+  },
+  "image": {
+    "sizes": [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
+    "domains": ["api.yourservice.com"],
+    "minimumCacheTTL": 60
+  },
+  "cleanUrls": true,
+  "trailingSlash": false,
+  "excludeFiles": ".git/**",
+  "regions": ["sfo1"],
+  "target": "production",
+  "branch": "main",
+  "overrides": {
+    "headers": [
+      {
+        "source": "/*",
+        "headers": [
+          {
+            "key": "Content-Security-Policy",
+            "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' *.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: *.googleapis.com; font-src 'self' *.googleapis.com; connect-src 'self' wss: ws: *.googleapis.com; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self';"
+          }
+        ]
+      }
+    ]
+  }
+}

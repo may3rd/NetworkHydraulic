@@ -1,0 +1,227 @@
+.network-layout-selector {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  z-index: 10;
+  min-width: 300px;
+}
+
+.layout-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.layout-title {
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.apply-layout-btn {
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  color: white;
+  border: none;
+}
+
+.apply-layout-btn:hover {
+  background: linear-gradient(135deg, #1d4ed8, #1e40af);
+}
+
+.apply-layout-btn:disabled {
+  background: #9ca3af;
+  color: #d1d5db;
+}
+
+.layout-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.layout-btn {
+  flex: 1;
+  min-width: 80px;
+  max-width: 120px;
+  background: white;
+  color: #374151;
+  border: 1px solid #d1d5db;
+  border-radius: 8px !important;
+  transition: all 0.2s ease;
+  font-size: 12px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+}
+
+.layout-btn:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+  transform: translateY(-1px);
+}
+
+.layout-btn.active {
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8) !important;
+  color: white !important;
+  border-color: #1d4ed8 !important;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+}
+
+.layout-btn.active .MuiChip-root {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+}
+
+.layout-btn:disabled {
+  background: #f9fafb;
+  color: #9ca3af;
+  border-color: #e5e7eb;
+  cursor: not-allowed;
+}
+
+.active-chip {
+  font-size: 10px;
+  height: 18px;
+  margin-left: auto;
+}
+
+.layout-info {
+  text-align: center;
+  padding-top: 8px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.layout-info .MuiTypography-caption {
+  font-weight: 500;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .network-layout-selector {
+    position: relative;
+    bottom: auto;
+    left: auto;
+    margin-bottom: 16px;
+    min-width: auto;
+    width: 100%;
+  }
+  
+  .layout-header {
+    flex-direction: column;
+    gap: 8px;
+    align-items: stretch;
+  }
+  
+  .layout-buttons {
+    gap: 2px;
+  }
+  
+  .layout-btn {
+    min-width: 70px;
+    max-width: 100px;
+    font-size: 11px;
+    padding: 4px 6px;
+  }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+  .network-layout-selector {
+    border-width: 2px;
+    border-color: #000000;
+  }
+  
+  .layout-btn {
+    border-width: 2px;
+  }
+  
+  .layout-btn.active {
+    border-width: 2px;
+  }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .layout-btn {
+    transition: none;
+  }
+  
+  .layout-btn:hover {
+    transform: none;
+  }
+}
+
+/* Focus styles for accessibility */
+.layout-btn:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Animation for button selection */
+.layout-btn.selected {
+  animation: selectPulse 0.3s ease-out;
+}
+
+@keyframes selectPulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Layout-specific styling */
+.layout-btn[value="hierarchical"] {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+}
+
+.layout-btn[value="hierarchical"].active {
+  background: linear-gradient(135deg, #059669, #047857) !important;
+}
+
+.layout-btn[value="force-directed"] {
+  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+  color: white;
+}
+
+.layout-btn[value="force-directed"].active {
+  background: linear-gradient(135deg, #7c3aed, #6b21a8) !important;
+}
+
+/* Tooltip styling */
+.MuiTooltip-tooltip {
+  background: #1f2937;
+  color: white;
+  font-size: 12px;
+  max-width: 200px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.MuiTooltip-arrow {
+  color: #1f2937;
+}
+
+/* Performance mode */
+.network-layout-selector.performance-mode .layout-btn {
+  transition: none;
+}
+
+.network-layout-selector.performance-mode .layout-btn:hover {
+  transform: none;
+}

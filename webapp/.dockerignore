@@ -1,0 +1,333 @@
+# Docker ignore file for Hydraulic Network Web Application
+# Excludes unnecessary files from Docker build context to reduce build time and image size
+
+# Node.js
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+
+# Development files
+.env.local
+.env.development
+.env.test
+.env.development.local
+.env.test.local
+.env.*.local
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+
+# nyc test coverage
+.nyc_output
+
+# Grunt intermediate storage
+.grunt
+
+# Bower dependency directory
+bower_components
+
+# node-waf configuration
+.lock-wscript
+
+# Compiled binary addons
+build/Release
+
+# Dependency directories
+node_modules/
+jspm_packages/
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Microbundle cache
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# parcel-bundler cache
+.cache
+.parcel-cache
+
+# Next.js build output
+.next
+
+# Nuxt.js build / generate output
+.nuxt
+
+# Gatsby files
+.cache/
+public
+
+# Storybook build outputs
+.out
+.storybook-out
+
+# Temporary folders
+tmp/
+temp/
+
+# Testing
+/test
+/tests
+__tests__/
+test-results/
+coverage/
+
+# Documentation (except what's needed)
+docs/
+!docs/CHANGELOG.md
+!docs/LICENSE
+!docs/README.md
+
+# Source control
+.git
+.gitignore
+.gitattributes
+.gitmodules
+
+# Build artifacts
+dist/
+build/
+out/
+
+# Cache directories
+.cache/
+.parcel-cache/
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+# Backup files
+*.bak
+*.backup
+*.orig
+
+# Temporary files
+*.tmp
+*.temp
+*~
+
+# OS X
+.fseventsd
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# Windows
+$RECYCLE.BIN/
+Desktop.ini
+pagefile.sys
+hibernfil.sys
+swapfile.sys
+
+# Linux
+*~
+
+# Application specific
+src/**/*.test.*
+src/**/*.spec.*
+src/**/*.stories.*
+src/**/*.mock.*
+
+# Cypress
+cypress/
+cypress.json
+
+# Jest
+coverage/
+
+# ESLint
+.eslintcache
+
+# TypeScript
+*.tsbuildinfo
+
+# VS Code
+.vscode-test/
+
+# Webpack
+.webpack/
+
+# ESLint cache
+.eslintcache
+
+# TSLint cache
+.tslintcache
+
+# Prettier cache
+.prettierignore
+
+# Docker
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+
+# Ansible
+ansible/
+
+# Kubernetes
+*.kube/
+
+# CloudFormation
+*.template
+*.yml
+*.yaml
+
+# Configuration files that might contain secrets
+config/secrets.yml
+config/database.yml
+config/application.yml
+
+# Local configuration
+config/environments/local.rb
+
+# Vendor cache
+vendor/bundle/
+
+# Public uploads (if any)
+public/uploads/
+
+# Temporary download directory
+downloads/
+
+# Mail
+mails/
+
+# Documentation builds
+doc/
+
+# Ruby
+*.rbc
+*.rbo
+.ruby-version
+.ruby-gemset
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Java
+*.class
+*.jar
+*.war
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# PHP
+vendor/
+.php_cs.cache
+.php_cs
+
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Rust
+target/
+Cargo.lock
+
+# .NET
+bin/
+obj/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# C++
+*.o
+*.a
+*.so
+
+# Objective-C
+*.m.o
+*.pch
+*.gcno
+
+# Swift
+*.xcodeproj/
+DerivedData/
+
+# macOS
+.AppleDouble
+.LSOverride
+
+# Windows
+[C-c]*
+desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
