@@ -171,11 +171,19 @@ class NetworkSolver:
             section.mass_flow_rate = section.design_mass_flow_rate
             section.temperature = network.temperature
             if network.pressure is None:
+                fallback_pressure = None
                 if network.boundary_pressure is not None and network.boundary_pressure > 0:
-                    section.pressure = network.boundary_pressure
+                    fallback_pressure = network.boundary_pressure
+                elif network.upstream_pressure is not None and network.upstream_pressure > 0:
+                    fallback_pressure = network.upstream_pressure
+                elif network.downstream_pressure is not None and network.downstream_pressure > 0:
+                    fallback_pressure = network.downstream_pressure
+                
+                if fallback_pressure is not None:
+                    section.pressure = fallback_pressure
                 else:
                     raise ValueError(
-                        "Network pressure or boundary pressure must be provided for fluid property calculations."
+                        "Network pressure, boundary pressure, upstream pressure, or downstream pressure must be provided for fluid property calculations."
                     )
             else:
                 section.pressure = network.pressure
@@ -201,7 +209,7 @@ class NetworkSolver:
         sections = list(sections)
         if not sections:
             return
-        resolved_direction = self._resolve_direction(network, direction)
+        resolved_direction = self._resolve_direction(network, self.direction)
         network.direction = resolved_direction
         forward = resolved_direction != "backward"
         iterator = sections if forward else reversed(sections)
@@ -854,14 +862,20 @@ class NetworkSolver:
     def _resolve_direction(self, network: Network, requested: Optional[str]) -> str:
         candidate = (requested or "").lower()
         if candidate in {"forward", "backward"}:
-            return candidate
-        net_dir = (network.direction or "").lower()
-        if net_dir in {"forward", "backward"}:
-            return net_dir
+            return candidate # 1. Explicitly requested direction (solver arg)
+
+        # 2. Attempt to infer from pressure boundaries
         if network.upstream_pressure and not network.downstream_pressure:
             return "forward"
         if network.downstream_pressure and not network.upstream_pressure:
             return "backward"
+
+        # 3. If no clear inference from pressure, use network.direction from config
+        net_dir = (network.direction or "").lower()
+        if net_dir in {"forward", "backward"}:
+            return net_dir
+        
+        # 4. Default
         return "forward"
 
     def _default_boundary(self, network: Network, forward: bool) -> Optional[float]:
