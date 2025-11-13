@@ -36,7 +36,7 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    React Web Application                     │
+│                    React Web Application                    │
 ├─────────────────────────────────────────────────────────────┤
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
 │  │  Config UI  │  │ Results UI  │  │   Visualization     │  │
@@ -50,7 +50,7 @@
 │  │  Handler    │  │   (Axios)   │  │   Error Handling    │  │
 │  └─────────────┘  └─────────────┘  └─────────────────────┘  │
 ├─────────────────────────────────────────────────────────────┤
-│                Backend Integration Layer                     │
+│                Backend Integration Layer                    │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
 │  │   FastAPI   │  │   Python    │  │   JSON/YAML         │  │
 │  │   Server    │  │   Bridge    │  │   Serialization     │  │
@@ -84,16 +84,16 @@ App
 │   │   ├── BoundaryConditions
 │   │   ├── FlowDirection
 │   │   └── OutputUnits
-│   ├── PipeSections
-│   │   ├── SectionList
-│   │   ├── SectionEditor
-│   │   ├── PipeProperties
-│   │   ├── FittingsSelector
-│   │   └── ElevationProfile
-│   └── Components
-│       ├── ControlValve
-│       ├── Orifice
-│       └── UserDefinedLosses
+│   └── PipeSections
+│       ├── SectionList
+│       ├── SectionEditor
+│       ├── PipeProperties
+│       ├── FittingsSelector
+│       ├── ElevationProfile
+│       └── Components
+│           ├── ControlValve
+│           ├── Orifice
+│           └── UserDefinedLosses
 ├── Calculation
 │   ├── SolverControls
 │   ├── ProgressIndicator
@@ -126,7 +126,6 @@ interface ConfigurationStore {
   network: NetworkConfig;
   fluid: FluidConfig;
   sections: PipeSection[];
-  components: ComponentConfig[];
   validation: ValidationState;
   actions: {
     updateNetwork: (network: Partial<NetworkConfig>) => void;
@@ -216,16 +215,16 @@ UI Re-render with Results
 ┌─────────────────────────────────────────┐
 │ Header: [Logo] [Save] [Load] [Theme] [] │
 ├─────────────────────────────────────────┤
-│ │                                   │   │
-│ │                                   │   │
-│ S│  Main Content Area              │   │
-│ i│  - Configuration Forms          │ R │
-│ d│  - Results Dashboard            │ i │
-│ e│  - Network Visualization        │ g │
-│ b│  - Reports & Export            │ h │
-│ a│                                  │ t │
-│ r│                                  │   │
-│   │                                  │   │
+│   │                                 │   │
+│   │                                 │   │
+│ S │  Main Content Area              │   │
+│ i │  - Configuration Forms          │ R │
+│ d │  - Results Dashboard            │ i │
+│ e │  - Network Visualization        │ g │
+│ b │  - Reports & Export             │ h │
+│ a │                                 │ t │
+│ r │                                 │   │
+│   │                                 │   │
 └─────────────────────────────────────────┘
 ```
 
@@ -233,14 +232,11 @@ UI Re-render with Results
 
 #### Fluid Properties Panel
 - **Phase Selection**: Radio buttons for liquid/gas/vapor
-- **Basic Properties**: 
-  - Temperature (with unit selector)
+- **Basic Conditions**: 
+  - Temperature
   - Pressure (gauge/absolute toggle)
-  - Density (auto-calculated for gases)
-- **Flow Conditions**:
-  - Mass flow rate OR volumetric flow rate
-  - Design margin percentage
 - **Advanced Properties** (shown when needed):
+  - Density (auto-calculated for gases)
   - Molecular weight (for gases)
   - Z-factor (for gases)
   - Viscosity
@@ -250,6 +246,10 @@ UI Re-render with Results
 - **Boundary Conditions**:
   - Upstream/Downstream pressure
   - Boundary pressure
+  - Temperature
+- **Flow Conditions**:
+  - Mass flow rate OR volumetric flow rate
+  - Design margin percentage
 - **Flow Direction**: Auto/Forward/Backward
 - **Gas Flow Model**: Isothermal/Adiabatic (for gas phases)
 - **Output Units**: Dropdown selectors for each unit type
@@ -276,16 +276,16 @@ UI Re-render with Results
 ┌─────────────────────────────────────────────────────────┐
 │                    RESULTS SUMMARY                      │
 ├─────────────────────────────────────────────────────────┤
-│ Total Pressure Drop:    199.7 kPa                      │
-│ Maximum Velocity:       4.30 m/s                       │
-│ Design Margin Applied:  0.0%                           │
-│ Critical Conditions:    None Detected                  │
+│ Total Pressure Drop:    199.7 kPa                       │
+│ Maximum Velocity:       4.30 m/s                        │
+│ Design Margin Applied:  0.0%                            │
+│ Critical Conditions:    None Detected                   │
 ├─────────────────────────────────────────────────────────┤
-│ INLET                    │ OUTLET                      │
-│ Pressure: 101.0 kPa     │ Pressure: 300.7 kPa         │
-│ Temperature: 103.4°C    │ Temperature: 103.4°C        │
-│ Density: 783.4 kg/m³    │ Density: 783.4 kg/m³        │
-│ Velocity: 1.09 m/s      │ Velocity: 4.30 m/s          │
+│ INLET                   │ OUTLET                        │
+│ Pressure: 101.0 kPa     │ Pressure: 300.7 kPa           │
+│ Temperature: 103.4°C    │ Temperature: 103.4°C          │
+│ Density: 783.4 kg/m³    │ Density: 783.4 kg/m³          │
+│ Velocity: 1.09 m/s      │ Velocity: 4.30 m/s            │
 └─────────────────────────────────────────────────────────┘
 ```
 
