@@ -19,9 +19,6 @@ network:
   temperature:
     value: 42.0
     unit: degC
-  pressure:
-    value: 133.525
-    unit: kPa
   fluid:
     name: Butene-1
     phase: liquid

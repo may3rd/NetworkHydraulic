@@ -22,9 +22,6 @@ network:
   temperature:
     value: 103.42
     unit: degC
-  pressure:
-    value: 101.008
-    unit: kPag
   fluid:
     name: liquid
     phase: liquid
