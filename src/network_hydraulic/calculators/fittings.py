@@ -131,13 +131,13 @@ class FittingLossCalculator(LossCalculator):
         if coeffs:
             k_value = self._two_k(coeffs[0], coeffs[1], reynolds, diameter)
         elif ftype == "pipe_entrance_normal":
-            k_value = self._normal_entrance_k(reynolds)
+            k_value = self._normal_entrance_k(section, reynolds)
         elif ftype == "pipe_entrance_raise":
             inlet = self._inlet_diameter(section) or diameter
             ratio = diameter / inlet
             k_value = (160.0 / reynolds + 1.0) * ratio**4
         elif ftype == "pipe_exit":
-            k_value = 1.0
+            k_value = self._normal_exit_k(section)
         elif ftype == "inlet_swage":
             k_value = self._inlet_swage_k(section, reynolds)
         elif ftype == "outlet_swage":
@@ -171,8 +171,24 @@ class FittingLossCalculator(LossCalculator):
         return k1 / reynolds + kinf * (1.0 + 1.0 / diameter_in)
 
     @staticmethod
-    def _normal_entrance_k(reynolds: float) -> float:
-        return 160.0 / reynolds + 0.5
+    def _diameter_ratio(numerator: Optional[float], denominator: Optional[float]) -> float:
+        if numerator is None or denominator is None or denominator <= 0:
+            return 1.0
+        return max(0.0, numerator / denominator)
+
+    def _normal_exit_k(self, section: PipeSection) -> float:
+        pipe = self._pipe_diameter(section)
+        outlet = self._outlet_diameter(section) or pipe
+        ratio = self._diameter_ratio(outlet, pipe)
+        base = 1.0
+        return base * ratio**4
+
+    def _normal_entrance_k(self, section: PipeSection, reynolds: float) -> float:
+        pipe = self._pipe_diameter(section)
+        inlet = self._inlet_diameter(section) or pipe
+        ratio = self._diameter_ratio(inlet, pipe)
+        base = 0.5
+        return (160.0 / reynolds + base) * ratio**4
 
     def _inlet_swage_k(self, section: PipeSection, reynolds: float) -> float:
         inlet = self._inlet_diameter(section) or self._pipe_diameter(section)

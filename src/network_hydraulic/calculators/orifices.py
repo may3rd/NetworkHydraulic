@@ -203,9 +203,9 @@ class OrificeCalculator(LossCalculator):
         summary = section.result_summary.inlet
         if summary.pressure and summary.pressure > 0:
             return summary.pressure
-        if self.fluid.pressure <= 0:
-            raise ValueError("Fluid pressure must be positive for orifice calculations")
-        return self.fluid.pressure
+        if section.pressure is None or section.pressure <= 0:
+            raise ValueError("section.pressure must be set and positive for orifice calculations")
+        return section.pressure
 
     def _fluid_density(self, temperature: float, pressure: float) -> float:
         density = self.fluid.current_density(temperature, pressure)
