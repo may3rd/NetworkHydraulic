@@ -1,16 +1,10 @@
 import React from 'react';
-import { Box, Drawer, AppBar, Toolbar, IconButton, Typography, Container } from '@mui/material';
-import { Menu as MenuIcon, DarkMode, LightMode } from '@mui/icons-material';
-
-import { useUIStore } from '@stores/ui';
+import { Box, Drawer, AppBar, Toolbar, IconButton, Typography } from '@mui/material';
+import { Menu as MenuIcon } from '@mui/icons-material';
 import Navigation from '@components/layout/Navigation';
-import Header from '@components/layout/Header';
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const sidebarExpanded = useUIStore((state) => state.sidebarExpanded);
-  const theme = useUIStore((state) => state.theme);
-  const toggleSidebar = useUIStore((state) => state.actions.toggleSidebar);
-  const toggleTheme = useUIStore((state) => state.actions.toggleTheme);
+  const [sidebarExpanded, setSidebarExpanded] = React.useState(true);
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh' }}>
@@ -27,7 +21,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             color="inherit"
             aria-label="open drawer"
             edge="start"
-            onClick={toggleSidebar}
+            onClick={() => setSidebarExpanded(!sidebarExpanded)}
             sx={{ mr: 2 }}
           >
             <MenuIcon />
@@ -35,9 +29,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
             Hydraulic Network Analysis
           </Typography>
-          <IconButton color="inherit" onClick={toggleTheme} sx={{ mr: 1 }}>
-            {theme === 'light' ? <DarkMode /> : <LightMode />}
-          </IconButton>
         </Toolbar>
       </AppBar>
 
@@ -53,9 +44,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               easing: theme.transitions.easing.sharp,
               duration: theme.transitions.duration.enteringScreen,
             }),
-          },
-          '&.MuiDrawer-docked': {
-            width: sidebarExpanded ? 240 : 64,
           },
         }}
         open={sidebarExpanded}
@@ -79,9 +67,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         }}
       >
         <Toolbar />
-        <Container maxWidth={false}>
-          {children}
-        </Container>
+        {children}
       </Box>
     </Box>
   );

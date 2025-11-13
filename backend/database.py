@@ -14,7 +14,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql import func
 
-from backend.config import settings
+from config import settings
 
 # SQLAlchemy setup
 Base = declarative_base()

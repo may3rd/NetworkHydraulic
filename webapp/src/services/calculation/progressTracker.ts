@@ -308,5 +308,5 @@ export class ProgressTracker {
 
 // Export singleton instance
 export const progressTracker = new ProgressTracker({
-  enableLogging: process.env.NODE_ENV === 'development',
+  enableLogging: (typeof process !== 'undefined' && process.env.NODE_ENV === 'development') || false,
 });

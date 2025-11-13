@@ -28,7 +28,7 @@ export class ProgressWebSocket {
     this.config = {
       autoConnect: false,
       reconnectOnClose: true,
-      enableLogging: process.env.NODE_ENV === 'development',
+      enableLogging: (typeof process !== 'undefined' && process.env.NODE_ENV === 'development') || false,
       ...config,
     };
 
@@ -217,5 +217,5 @@ export class ProgressWebSocket {
 // Export singleton instance
 export const progressWebSocket = new ProgressWebSocket({
   autoConnect: false, // Only connect when needed
-  enableLogging: process.env.NODE_ENV === 'development',
+  enableLogging: (typeof process !== 'undefined' && process.env.NODE_ENV === 'development') || false,
 });

@@ -33,13 +33,13 @@ import {
   CheckCircle,
   Info,
   Speed,
-  PressureSensor,
   Gavel,
   Settings as SettingsIcon,
   EmojiObjects,
   ShowChart,
   BarChart,
 } from '@mui/icons-material';
+import SensorsIcon from '@mui/icons-material/Sensors';
 import { styled } from '@mui/material/styles';
 
 import type { ReportTemplateProps } from './types';
@@ -129,9 +129,17 @@ const getSeverityColor = (severity: string) => {
 };
 
 const getRecommendationIcon = (type: string, priority: string) => {
+  const getIconColor = (priority: string) => {
+    switch (priority) {
+      case 'high': return 'error' as const;
+      case 'medium': return 'warning' as const;
+      default: return 'info' as const;
+    }
+  };
+
   const iconProps = {
     fontSize: 'small' as const,
-    color: priority === 'high' ? 'error' : priority === 'medium' ? 'warning' : 'info',
+    color: getIconColor(priority),
   };
 
   switch (type) {

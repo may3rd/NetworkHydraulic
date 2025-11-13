@@ -1,0 +1,97 @@
+
+> hydraulic-network-webapp@1.0.0 type-check
+> tsc --noEmit
+
+src/components/calculation/CalculationHistory.tsx(80,56): error TS2339: Property 'history' does not exist on type 'CalculationStore'.
+src/components/export/index.ts(5,42): error TS2307: Cannot find module './ExportHistory' or its corresponding type declarations.
+src/components/export/index.ts(6,40): error TS2307: Cannot find module './BatchExport' or its corresponding type declarations.
+src/components/export/templates/ExecutiveSummaryReport.tsx(36,3): error TS2305: Module '"@mui/icons-material"' has no exported member 'PressureSensor'.
+src/components/export/templates/ExecutiveSummaryReport.tsx(139,15): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(props: { component: ElementType<any, keyof IntrinsicElements>; } & SvgIconOwnProps & CommonProps & Omit<any, "color" | ... 10 more ... | "titleAccess">): Element', gave the following error.
+    Property 'component' is missing in type '{ fontSize: "small"; color: string; }' but required in type '{ component: ElementType<any, keyof IntrinsicElements>; }'.
+  Overload 2 of 2, '(props: DefaultComponentProps<SvgIconTypeMap<{}, "svg">>): Element', gave the following error.
+    Type '{ fontSize: "small"; color: string; }' is not assignable to type 'SvgIconOwnProps'.
+      Types of property 'color' are incompatible.
+        Type 'string' is not assignable to type 'OverridableStringUnion<"success" | "error" | "warning" | "info" | "disabled" | "action" | "inherit" | "primary" | "secondary", SvgIconPropsColorOverrides>'.
+src/components/export/templates/ExecutiveSummaryReport.tsx(141,15): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(props: { component: ElementType<any, keyof IntrinsicElements>; } & SvgIconOwnProps & CommonProps & Omit<any, "color" | ... 10 more ... | "titleAccess">): Element', gave the following error.
+    Property 'component' is missing in type '{ fontSize: "small"; color: string; }' but required in type '{ component: ElementType<any, keyof IntrinsicElements>; }'.
+  Overload 2 of 2, '(props: DefaultComponentProps<SvgIconTypeMap<{}, "svg">>): Element', gave the following error.
+    Type '{ fontSize: "small"; color: string; }' is not assignable to type 'SvgIconOwnProps'.
+      Types of property 'color' are incompatible.
+        Type 'string' is not assignable to type 'OverridableStringUnion<"success" | "error" | "warning" | "info" | "disabled" | "action" | "inherit" | "primary" | "secondary", SvgIconPropsColorOverrides>'.
+src/components/export/templates/ExecutiveSummaryReport.tsx(143,15): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(props: { component: ElementType<any, keyof IntrinsicElements>; } & SvgIconOwnProps & CommonProps & Omit<any, "color" | ... 10 more ... | "titleAccess">): Element', gave the following error.
+    Property 'component' is missing in type '{ fontSize: "small"; color: string; }' but required in type '{ component: ElementType<any, keyof IntrinsicElements>; }'.
+  Overload 2 of 2, '(props: DefaultComponentProps<SvgIconTypeMap<{}, "svg">>): Element', gave the following error.
+    Type '{ fontSize: "small"; color: string; }' is not assignable to type 'SvgIconOwnProps'.
+      Types of property 'color' are incompatible.
+        Type 'string' is not assignable to type 'OverridableStringUnion<"success" | "error" | "warning" | "info" | "disabled" | "action" | "inherit" | "primary" | "secondary", SvgIconPropsColorOverrides>'.
+src/components/export/templates/ExecutiveSummaryReport.tsx(145,15): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(props: { component: ElementType<any, keyof IntrinsicElements>; } & SvgIconOwnProps & CommonProps & Omit<any, "color" | ... 10 more ... | "titleAccess">): Element', gave the following error.
+    Property 'component' is missing in type '{ fontSize: "small"; color: string; }' but required in type '{ component: ElementType<any, keyof IntrinsicElements>; }'.
+  Overload 2 of 2, '(props: DefaultComponentProps<SvgIconTypeMap<{}, "svg">>): Element', gave the following error.
+    Type '{ fontSize: "small"; color: string; }' is not assignable to type 'SvgIconOwnProps'.
+      Types of property 'color' are incompatible.
+        Type 'string' is not assignable to type 'OverridableStringUnion<"success" | "error" | "warning" | "info" | "disabled" | "action" | "inherit" | "primary" | "secondary", SvgIconPropsColorOverrides>'.
+src/components/export/templates/ExecutiveSummaryReport.tsx(147,15): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(props: { component: ElementType<any, keyof IntrinsicElements>; } & SvgIconOwnProps & CommonProps & Omit<any, "color" | ... 10 more ... | "titleAccess">): Element', gave the following error.
+    Property 'component' is missing in type '{ fontSize: "small"; color: string; }' but required in type '{ component: ElementType<any, keyof IntrinsicElements>; }'.
+  Overload 2 of 2, '(props: DefaultComponentProps<SvgIconTypeMap<{}, "svg">>): Element', gave the following error.
+    Type '{ fontSize: "small"; color: string; }' is not assignable to type 'SvgIconOwnProps'.
+      Types of property 'color' are incompatible.
+        Type 'string' is not assignable to type 'OverridableStringUnion<"success" | "error" | "warning" | "info" | "disabled" | "action" | "inherit" | "primary" | "secondary", SvgIconPropsColorOverrides>'.
+src/components/export/templates/ExecutiveSummaryReport.tsx(593,19): error TS2339: Property 'confidentialityNotice' does not exist on type 'ReportBranding'.
+src/components/export/templates/ExecutiveSummaryReport.tsx(595,23): error TS2339: Property 'confidentialityNotice' does not exist on type 'ReportBranding'.
+src/components/export/templates/index.ts(3,52): error TS2307: Cannot find module './DetailedTechnicalReport' or its corresponding type declarations.
+src/components/export/templates/index.ts(4,46): error TS2307: Cannot find module './CalculationReport' or its corresponding type declarations.
+src/components/export/templates/index.ts(5,45): error TS2307: Cannot find module './ComparisonReport' or its corresponding type declarations.
+src/components/export/templates/index.ts(6,42): error TS2307: Cannot find module './OnePageReport' or its corresponding type declarations.
+src/components/export/templates/index.ts(7,40): error TS2307: Cannot find module './PrintLayout' or its corresponding type declarations.
+src/components/export/templates/types.ts(1,38): error TS2307: Cannot find module '../../services/calculation/resultProcessor' or its corresponding type declarations.
+src/components/file/FileUpload.tsx(2,29): error TS2307: Cannot find module 'react-dropzone' or its corresponding type declarations.
+src/components/results/ResultsDashboard.tsx(35,36): error TS2307: Cannot find module './analysis/CriticalConditions' or its corresponding type declarations.
+src/components/results/ResultsDashboard.tsx(36,37): error TS2307: Cannot find module './analysis/PerformanceAnalysis' or its corresponding type declarations.
+src/components/results/ResultsDashboard.tsx(37,35): error TS2307: Cannot find module './analysis/ResultsComparison' or its corresponding type declarations.
+src/components/results/ResultsDashboard.tsx(40,30): error TS2307: Cannot find module './display/AlertSummary' or its corresponding type declarations.
+src/components/results/ResultsDashboard.tsx(41,33): error TS2307: Cannot find module './display/ResultsMetadata' or its corresponding type declarations.
+src/components/results/ResultsDashboard.tsx(151,15): error TS2322: Type '{ id: string; type: string; severity: "critical"; message: string; sectionId: string; value: number; threshold: number; recommendation: string; }[]' is not assignable to type 'CriticalCondition[]'.
+  Type '{ id: string; type: string; severity: "critical"; message: string; sectionId: string; value: number; threshold: number; recommendation: string; }' is not assignable to type 'CriticalCondition'.
+    Types of property 'type' are incompatible.
+      Type 'string' is not assignable to type '"temperature" | "pressure" | "velocity" | "flow_rate"'.
+src/components/results/ResultsDashboard.tsx(483,13): error TS2304: Cannot find name 'panel'.
+src/components/results/ResultsTabs.tsx(23,36): error TS2307: Cannot find module './tables/LossBreakdownTable' or its corresponding type declarations.
+src/components/results/ResultsTabs.tsx(24,42): error TS2307: Cannot find module './tables/FlowCharacteristicsTable' or its corresponding type declarations.
+src/components/results/ResultsTabs.tsx(25,39): error TS2307: Cannot find module './tables/ComponentResultsTable' or its corresponding type declarations.
+src/components/results/ResultsTabs.tsx(27,38): error TS2307: Cannot find module './charts/VelocityProfileChart' or its corresponding type declarations.
+src/components/results/ResultsTabs.tsx(28,36): error TS2307: Cannot find module './charts/LossBreakdownChart' or its corresponding type declarations.
+src/components/results/ResultsTabs.tsx(29,31): error TS2307: Cannot find module './charts/ReynoldsChart' or its corresponding type declarations.
+src/components/results/ResultsTabs.tsx(30,37): error TS2307: Cannot find module './charts/FrictionFactorChart' or its corresponding type declarations.
+src/components/results/ResultsTabs.tsx(31,34): error TS2307: Cannot find module './charts/InteractiveChart' or its corresponding type declarations.
+src/components/visualization/NetworkDiagram.tsx(40,27): error TS2307: Cannot find module './interactive/NodeInspector' or its corresponding type declarations.
+src/components/visualization/NetworkDiagram.tsx(41,27): error TS2307: Cannot find module './interactive/EdgeInspector' or its corresponding type declarations.
+src/components/visualization/NetworkDiagram.tsx(43,33): error TS2307: Cannot find module './analysis/LossAnalysisOverlay' or its corresponding type declarations.
+src/components/visualization/NetworkDiagram.tsx(44,10): error TS2614: Module '"../../hooks/network/useNetworkDiagram"' has no exported member 'useNetworkDiagram'. Did you mean to use 'import useNetworkDiagram from "../../hooks/network/useNetworkDiagram"' instead?
+src/hooks/network/useNetworkDiagram.ts(97,14): error TS2345: Argument of type '(prevNodes: NetworkNode[]) => { data: { type: "pipe"; sectionId: string; diameter: number; length: number; roughness: number; flowRate?: number; velocity?: number; pressure?: number; ... 5 more ...; position?: { ...; }; } | ... 23 more ... | { ...; }; ... 26 more ...; [internalsSymbol]?: { ...; }; }[]' is not assignable to parameter of type 'SetStateAction<NetworkNode[]>'.
+  Type '(prevNodes: NetworkNode[]) => { data: { type: "pipe"; sectionId: string; diameter: number; length: number; roughness: number; flowRate?: number; velocity?: number; pressure?: number; ... 5 more ...; position?: { ...; }; } | ... 23 more ... | { ...; }; ... 26 more ...; [internalsSymbol]?: { ...; }; }[]' is not assignable to type '(prevState: NetworkNode[]) => NetworkNode[]'.
+    Type '{ data: { type: "pipe"; sectionId: string; diameter: number; length: number; roughness: number; flowRate?: number; velocity?: number; pressure?: number; pressureDrop?: number; material?: string; id: string; label: string; description?: string; position?: { ...; }; } | ... 23 more ... | { ...; }; ... 26 more ...; [in...' is not assignable to type 'NetworkNode[]'.
+      Type '{ data: { type: "pipe"; sectionId: string; diameter: number; length: number; roughness: number; flowRate?: number; velocity?: number; pressure?: number; pressureDrop?: number; material?: string; id: string; label: string; description?: string; position?: { x: number; y: number; }; } | ... 23 more ... | { ...; }; ......' is not assignable to type 'NetworkNode'.
+        Types of property 'data' are incompatible.
+          Type '{ type: "pipe"; sectionId: string; diameter: number; length: number; roughness: number; flowRate?: number; velocity?: number; pressure?: number; pressureDrop?: number; material?: string; id: string; label: string; description?: string; position?: { ...; }; } | ... 23 more ... | { ...; }' is not assignable to type 'PipeNodeData | FittingNodeData | ValveNodeData | OrificeNodeData | BoundaryNodeData'.
+            Type '{ type: "pipe" | "fitting"; fittingType?: string; kFactor?: number; diameter: number; flowRate?: number; velocity?: number; pressureDrop?: number; description?: string; id: string; label: string; ... 5 more ...; material?: string; }' is not assignable to type 'PipeNodeData | FittingNodeData | ValveNodeData | OrificeNodeData | BoundaryNodeData'.
+              Type '{ type: "pipe" | "fitting"; fittingType?: string; kFactor?: number; diameter: number; flowRate?: number; velocity?: number; pressureDrop?: number; description?: string; id: string; label: string; ... 5 more ...; material?: string; }' is not assignable to type 'PipeNodeData | FittingNodeData'.
+                Type '{ type: "pipe" | "fitting"; fittingType?: string; kFactor?: number; diameter: number; flowRate?: number; velocity?: number; pressureDrop?: number; description?: string; id: string; label: string; ... 5 more ...; material?: string; }' is not assignable to type 'PipeNodeData'.
+                  Types of property 'type' are incompatible.
+                    Type '"pipe" | "fitting"' is not assignable to type '"pipe"'.
+                      Type '"fitting"' is not assignable to type '"pipe"'.
+src/hooks/useFileUpload.ts(2,10): error TS2614: Module '"../components/file/FileUpload"' has no exported member 'FileUploadProps'. Did you mean to use 'import FileUploadProps from "../components/file/FileUpload"' instead?
+src/services/calculation/resultProcessor.ts(105,27): error TS2554: Expected 3 arguments, but got 2.
+src/services/export/index.ts(3,15): error TS2307: Cannot find module './excelExport' or its corresponding type declarations.
+src/services/export/index.ts(5,15): error TS2307: Cannot find module './jsonExport' or its corresponding type declarations.
+src/services/export/index.ts(6,15): error TS2307: Cannot find module './xmlExport' or its corresponding type declarations.
+src/services/export/index.ts(7,15): error TS2307: Cannot find module './imageExport' or its corresponding type declarations.
+src/services/export/index.ts(8,15): error TS2307: Cannot find module './htmlExport' or its corresponding type declarations.
+src/services/export/pdfExport.ts(176,15): error TS2367: This comparison appears to be unintentional because the types 'ExportFormat' and '"a3"' have no overlap.
+src/test/setup.ts(88,1): error TS2322: Type 'typeof WebSocket' is not assignable to type '{ new (url: string | URL, protocols?: string | string[]): WebSocket; prototype: WebSocket; readonly CONNECTING: 0; readonly OPEN: 1; readonly CLOSING: 2; readonly CLOSED: 3; }'.
+  Types of property 'prototype' are incompatible.
+    Type 'WebSocket' is missing the following properties from type 'WebSocket': binaryType, extensions, protocol, CONNECTING, and 3 more.

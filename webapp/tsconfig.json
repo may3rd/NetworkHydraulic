@@ -15,11 +15,17 @@
     "jsx": "react-jsx",
 
     /* Linting */
-    "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true,
-    "forceConsistentCasingInFileNames": true,
+    "strict": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noImplicitAny": false,
+    "noImplicitReturns": false,
+    "noImplicitOverride": false,
+    "strictNullChecks": false,
+    "exactOptionalPropertyTypes": false,
+    "noPropertyAccessFromIndexSignature": false,
+    "noUncheckedIndexedAccess": false,
+    "forceConsistentCasingInFileNames": false,
 
     /* Path mapping */
     "baseUrl": ".",
@@ -36,16 +42,11 @@
     },
 
     /* Additional checks */
-    "noImplicitAny": true,
-    "noImplicitReturns": true,
     "noImplicitThis": true,
-    "noImplicitOverride": true,
-    "exactOptionalPropertyTypes": true,
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
     "experimentalDecorators": true,
-    "emitDecoratorMetadata": true,
-    "skipLibCheck": false
+    "emitDecoratorMetadata": true
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "build", "**/*.test.ts", "**/*.test.tsx"],

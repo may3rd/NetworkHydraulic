@@ -62,12 +62,10 @@ interface CalculationHistoryProps {
 }
 
 export const CalculationHistory: React.FC<CalculationHistoryProps> = ({
-  items = [],
   onRunCalculation,
   onDeleteCalculation,
   onExportCalculation,
   onDuplicateCalculation,
-  onClearHistory,
   showActions = true,
   maxItemsPerPage = 10,
   searchable = true,
@@ -78,6 +76,7 @@ export const CalculationHistory: React.FC<CalculationHistoryProps> = ({
   const [page, setPage] = React.useState(1);
 
   const history = useCalculationStore((state) => state.history);
+  const clearHistory = useCalculationStore((state) => state.clearHistory);
 
   const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, itemId: string) => {
     setMenuAnchor(event.currentTarget);
@@ -135,7 +134,7 @@ export const CalculationHistory: React.FC<CalculationHistoryProps> = ({
   };
 
   // Filter items based on search term
-  const filteredItems = items.filter(item => 
+  const filteredItems = history.filter(item => 
     item.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     item.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
     formatDate(item.timestamp).toLowerCase().includes(searchTerm.toLowerCase())
@@ -164,9 +163,9 @@ export const CalculationHistory: React.FC<CalculationHistoryProps> = ({
             <Typography variant="h6" sx={{ ml: 1 }}>
               Calculation History
             </Typography>
-            {items.length > 0 && (
+            {history.length > 0 && (
               <Chip
-                label={items.length}
+                label={history.length}
                 size="small"
                 sx={{ ml: 1 }}
               />
@@ -174,10 +173,10 @@ export const CalculationHistory: React.FC<CalculationHistoryProps> = ({
           </Box>
         }
         action={
-          items.length > 0 && (
+          history.length > 0 && (
             <Button
               startIcon={<ClearIcon />}
-              onClick={onClearHistory}
+              onClick={clearHistory}
               size="small"
               color="error"
             >
@@ -215,7 +214,7 @@ export const CalculationHistory: React.FC<CalculationHistoryProps> = ({
           </Box>
         )}
 
-        {items.length === 0 ? (
+        {history.length === 0 ? (
           <Alert severity="info" icon={<HistoryIcon />}>
             No calculations in history. Run your first calculation to see it here.
           </Alert>

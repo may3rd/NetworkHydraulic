@@ -18,14 +18,15 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
-from backend.config import settings
-from backend.database import init_db
-from backend.exceptions import (
+# Import from local modules (relative imports)
+from config import settings
+from database import init_db
+from exceptions import (
     ConfigurationError,
     HydraulicCalculationError,
     ValidationError,
 )
-from backend.routers import (
+from routers import (
     calculation_router,
     configuration_router,
     history_router,
@@ -227,14 +228,6 @@ def create_app() -> FastAPI:
         }
     
     # Include routers
-    from backend.routers import (
-        calculation_router,
-        configuration_router,
-        history_router,
-        results_router,
-        websocket_router,
-    )
-    
     app.include_router(calculation_router, prefix="/api")
     app.include_router(configuration_router, prefix="/api")
     app.include_router(results_router, prefix="/api")

@@ -1,45 +1,76 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { CssBaseline, ThemeProvider } from '@mui/material';
-import { Toaster } from 'react-hot-toast';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { ThemeProvider, createTheme } from '@mui/material/styles';
+import CssBaseline from '@mui/material/CssBaseline';
+import { Box, AppBar, Toolbar, Typography, Container } from '@mui/material';
 
-import { useUIStore } from '@stores/ui';
-import createTheme from './themes';
-import Layout from '@layouts/Layout';
-import ConfigurationPage from '@pages/ConfigurationPage';
-import ResultsPage from '@pages/ResultsPage';
-import HistoryPage from '@pages/HistoryPage';
+// Import pages directly to avoid lazy loading issues
+import ConfigurationPage from './pages/ConfigurationPage';
+import ResultsPage from './pages/ResultsPage';
+import HistoryPage from './pages/HistoryPage';
+import TestPage from './pages/TestPage';
+import SimpleTestPage from './pages/SimpleTestPage';
+import MinimalTest from './pages/MinimalTest';
 
-const App: React.FC = () => {
-  const themeMode = useUIStore((state) => state.theme);
-  const theme = createTheme(themeMode);
+// Create a simple theme
+const theme = createTheme({
+  palette: {
+    primary: {
+      main: '#1976d2',
+    },
+    secondary: {
+      main: '#dc004e',
+    },
+    background: {
+      default: '#ffffff',
+      paper: '#f5f5f5',
+    },
+  },
+  typography: {
+    fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
+  },
+});
 
+function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <Router>
-        <Layout>
-          <Routes>
-            <Route path="/" element={<Navigate to="/config" replace />} />
-            <Route path="/config" element={<ConfigurationPage />} />
-            <Route path="/results" element={<ResultsPage />} />
-            <Route path="/history" element={<HistoryPage />} />
-            <Route path="*" element={<Navigate to="/config" replace />} />
-          </Routes>
-        </Layout>
+        <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+          {/* Simple AppBar */}
+          <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
+            <Toolbar>
+              <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
+                Hydraulic Network Analysis
+              </Typography>
+            </Toolbar>
+          </AppBar>
+
+          {/* Main Content */}
+          <Box
+            component="main"
+            sx={{
+              flexGrow: 1,
+              p: 3,
+              width: '100%',
+              minHeight: '100vh',
+              backgroundColor: (theme) => theme.palette.background.default,
+              marginTop: '64px', // Account for AppBar height
+            }}
+          >
+            <Container maxWidth={false}>
+              <Routes>
+                 <Route path="/" element={<ConfigurationPage />} />
+                 <Route path="/config" element={<ConfigurationPage />} />
+                 <Route path="/results" element={<ConfigurationPage />} />
+                 <Route path="/history" element={<ConfigurationPage />} />
+               </Routes>
+            </Container>
+          </Box>
+        </Box>
       </Router>
-      <Toaster
-        position="top-right"
-        toastOptions={{
-          duration: 5000,
-          style: {
-            background: theme.palette.background.paper,
-            color: theme.palette.text.primary,
-          },
-        }}
-      />
     </ThemeProvider>
   );
-};
+}
 
 export default App;

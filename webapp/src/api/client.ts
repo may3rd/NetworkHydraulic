@@ -1,133 +1,199 @@
-import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
-import type { CalculationRequest, CalculationResult } from '../types/models';
+import axios from 'axios';
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:8000/api';
+// Base API configuration
+const API_BASE_URL = (typeof process !== 'undefined' && process.env.VITE_API_URL) || (typeof window !== 'undefined' && (window as any).VITE_API_URL) || 'http://localhost:8000/api';
 
-class ApiClient {
-  private client: AxiosInstance;
+export const apiClient = axios.create({
+  baseURL: API_BASE_URL,
+  timeout: 30000, // 30 seconds timeout
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
 
-  constructor() {
-    this.client = axios.create({
-      baseURL: API_BASE_URL,
-      timeout: 30000, // 30 seconds
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-
-    this.setupInterceptors();
+// Request interceptor
+apiClient.interceptors.request.use(
+  (config) => {
+    // Add auth token if available
+    const token = localStorage.getItem('auth_token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
   }
+);
 
-  private setupInterceptors(): void {
-    // Request interceptor
-    this.client.interceptors.request.use(
-      (config) => {
-        // Add auth token if available
-        const token = localStorage.getItem('auth_token');
-        if (token) {
-          config.headers.Authorization = `Bearer ${token}`;
-        }
-        return config;
-      },
-      (error) => {
-        return Promise.reject(error);
-      }
-    );
-
-    // Response interceptor
-    this.client.interceptors.response.use(
-      (response: AxiosResponse) => {
-        return response;
-      },
-      (error) => {
-        if (error.response?.status === 401) {
-          // Handle unauthorized access
-          localStorage.removeItem('auth_token');
-          window.location.href = '/login';
-        }
-        return Promise.reject(error);
-      }
-    );
+// Response interceptor
+apiClient.interceptors.response.use(
+  (response) => {
+    return response;
+  },
+  (error) => {
+    // Handle authentication errors
+    if (error.response?.status === 401) {
+      localStorage.removeItem('auth_token');
+      // Redirect to login or dispatch logout action
+    }
+    
+    // Handle network errors
+    if (!error.response) {
+      throw new Error('Network error: Unable to connect to server');
+    }
+    
+    // Handle specific error codes
+    const message = error.response.data?.message || 
+                   error.response.statusText || 
+                   'An unexpected error occurred';
+    
+    throw new Error(message);
   }
+);
 
+// API endpoints
+export const apiEndpoints = {
   // Configuration endpoints
-  async validateConfiguration(config: CalculationRequest['configuration']): Promise<any> {
-    return this.client.post('/validate', config);
-  }
+  validateConfiguration: '/calculate/validate',
+  uploadConfiguration: '/upload-config',
+  getTemplates: '/templates',
+  getFittingProperties: '/fittings',
+  
+  // Calculation endpoints
+  calculate: '/calculate',
+  calculateAsync: '/calculate/async',
+  getCalculationStatus: '/calculate/status',
+  cancelCalculation: '/calculate/cancel',
+  getCalculationResult: '/calculate/result',
+  
+  // Results endpoints
+  getResults: '/results',
+  getResult: '/results/',
+  exportResult: '/results/export',
+  deleteResult: '/results/',
+  
+  // History endpoints
+  getHistory: '/history',
+  clearHistory: '/history/clear',
+  deleteHistoryItem: '/history/',
+  
+  // System endpoints
+  getSystemStatus: '/system/status',
+  getSystemInfo: '/system/info',
+} as const;
 
-  async uploadConfiguration(file: File): Promise<any> {
+// Configuration API
+export const configApi = {
+  validate: async (config: any) => {
+    const response = await apiClient.post(apiEndpoints.validateConfiguration, { config });
+    return response.data;
+  },
+  
+  upload: async (file: File) => {
     const formData = new FormData();
     formData.append('file', file);
     
-    return this.client.post('/upload-config', formData, {
+    const response = await apiClient.post(apiEndpoints.uploadConfiguration, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
     });
-  }
+    return response.data;
+  },
+  
+  getTemplates: async () => {
+    const response = await apiClient.get(apiEndpoints.getTemplates);
+    return response.data;
+  },
+  
+  getFittingProperties: async (type: string) => {
+    const response = await apiClient.get(`${apiEndpoints.getFittingProperties}/${type}`);
+    return response.data;
+  },
+};
 
-  async getConfigurationTemplates(): Promise<any> {
-    return this.client.get('/templates');
-  }
+// Calculation API
+export const calculationApi = {
+  execute: async (request: any) => {
+    const response = await apiClient.post(apiEndpoints.calculate, request);
+    return response.data;
+  },
+  
+  executeAsync: async (request: any) => {
+    const response = await apiClient.post(apiEndpoints.calculateAsync, request);
+    return response.data;
+  },
+  
+  getStatus: async (taskId: string) => {
+    const response = await apiClient.get(`${apiEndpoints.getCalculationStatus}/${taskId}`);
+    return response.data;
+  },
+  
+  cancel: async (taskId: string) => {
+    const response = await apiClient.post(apiEndpoints.cancelCalculation, { taskId });
+    return response.data;
+  },
+  
+  getResult: async (taskId: string) => {
+    const response = await apiClient.get(`${apiEndpoints.getCalculationResult}/${taskId}`);
+    return response.data;
+  },
+};
 
-  async getFittingProperties(fittingType: string): Promise<any> {
-    return this.client.get(`/fittings/${fittingType}`);
-  }
-
-  // Calculation endpoints
-  async calculateHydraulics(request: CalculationRequest): Promise<AxiosResponse<CalculationResult>> {
-    return this.client.post('/calculate', request);
-  }
-
-  async getCalculationStatus(calculationId: string): Promise<any> {
-    return this.client.get(`/calculate/${calculationId}/status`);
-  }
-
-  async cancelCalculation(calculationId: string): Promise<any> {
-    return this.client.post(`/calculate/${calculationId}/cancel`);
-  }
-
-  async streamCalculation(calculationId: string): Promise<any> {
-    return this.client.get(`/calculate/${calculationId}/stream`, {
-      responseType: 'stream',
+// Results API
+export const resultsApi = {
+  getAll: async () => {
+    const response = await apiClient.get(apiEndpoints.getResults);
+    return response.data;
+  },
+  
+  getById: async (id: string) => {
+    const response = await apiClient.get(`${apiEndpoints.getResult}${id}`);
+    return response.data;
+  },
+  
+  export: async (id: string, format: string, options: any = {}) => {
+    const response = await apiClient.post(`${apiEndpoints.exportResult}/${id}`, {
+      format,
+      ...options,
     });
-  }
+    return response.data;
+  },
+  
+  delete: async (id: string) => {
+    const response = await apiClient.delete(`${apiEndpoints.deleteResult}${id}`);
+    return response.data;
+  },
+};
 
-  // Results endpoints
-  async getResult(calculationId: string): Promise<CalculationResult> {
-    const response = this.client.get(`/results/${calculationId}`);
-    return response.then(r => r.data);
-  }
+// History API
+export const historyApi = {
+  getAll: async () => {
+    const response = await apiClient.get(apiEndpoints.getHistory);
+    return response.data;
+  },
+  
+  clear: async () => {
+    const response = await apiClient.post(apiEndpoints.clearHistory);
+    return response.data;
+  },
+  
+  deleteItem: async (id: string) => {
+    const response = await apiClient.delete(`${apiEndpoints.deleteHistoryItem}${id}`);
+    return response.data;
+  },
+};
 
-  async exportResult(calculationId: string, format: 'pdf' | 'excel' | 'json'): Promise<Blob> {
-    const response = this.client.get(`/results/${calculationId}/export/${format}`, {
-      responseType: 'blob',
-    });
-    return response.then(r => r.data);
-  }
-
-  async getCalculationHistory(): Promise<any> {
-    return this.client.get('/history');
-  }
-
-  async deleteResult(calculationId: string): Promise<any> {
-    return this.client.delete(`/results/${calculationId}`);
-  }
-
-  // System endpoints
-  async getSystemStatus(): Promise<any> {
-    return this.client.get('/system/status');
-  }
-
-  async getSystemInfo(): Promise<any> {
-    return this.client.get('/system/info');
-  }
-
-  // Generic request method
-  async request<T = any>(config: AxiosRequestConfig): Promise<AxiosResponse<T>> {
-    return this.client.request<T>(config);
-  }
-}
-
-export const apiClient = new ApiClient();
-export default apiClient;
+// System API
+export const systemApi = {
+  getStatus: async () => {
+    const response = await apiClient.get(apiEndpoints.getSystemStatus);
+    return response.data;
+  },
+  
+  getInfo: async () => {
+    const response = await apiClient.get(apiEndpoints.getSystemInfo);
+    return response.data;
+  },
+};

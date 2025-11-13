@@ -1,136 +1,151 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
-import { immer } from 'zustand/middleware/immer';
-import type { CalculationRequest, CalculationResult } from '../../types/models';
+import { persist } from 'zustand/middleware';
+import type { CalculationState, CalculationActions, CalculationStore } from './types';
+import type { CalculationRequest } from '../../types/models';
 
-interface CalculationState {
-  // State
-  status: 'idle' | 'validating' | 'running' | 'completed' | 'error';
-  progress: number;
-  result: CalculationResult | null;
-  error: string | null;
-  configuration: string;
-  history: Array<{
-    id: string;
-    timestamp: string;
-    request: CalculationRequest;
-    result: CalculationResult | null;
-    error: string | null;
-  }>;
+const initialState: Omit<CalculationState, 'actions'> = {
+  status: 'idle',
+  progress: 0,
+  result: null,
+  error: null,
+  configuration: null,
+  taskId: null,
+  startTime: null,
+  endTime: null,
+  executionTime: 0,
+  history: [],
+};
 
-  // Actions
-  actions: {
-    startCalculation: (request: CalculationRequest) => Promise<void>;
-    cancelCalculation: () => void;
-    setProgress: (progress: number) => void;
-    setStatus: (status: CalculationState['status']) => void;
-    setResult: (result: CalculationResult) => void;
-    setError: (error: string | null) => void;
-    clearResult: () => void;
-    saveToHistory: (request: CalculationRequest, result: CalculationResult | null, error: string | null) => void;
-    loadFromHistory: (id: string) => CalculationResult | null;
-    clearHistory: () => void;
-    removeHistoryItem: (id: string) => void;
-  };
-}
-
-export const useCalculationStore = create<CalculationState>()(
+export const useCalculationStore = create<CalculationStore>()(
   persist(
-    immer((set, get) => ({
-      status: 'idle',
-      progress: 0,
-      result: null,
-      error: null,
-      configuration: '',
-      history: [],
-      actions: {
-        startCalculation: async (request) => {
-          set((state) => {
-            state.status = 'running';
-            state.progress = 0;
-            state.result = null;
-            state.error = null;
-            state.configuration = JSON.stringify(request, null, 2);
-          });
-        },
-        cancelCalculation: () =>
-          set((state) => {
-            state.status = 'idle';
-            state.progress = 0;
-          }),
-        setProgress: (progress) =>
-          set((state) => {
-            state.progress = Math.min(100, Math.max(0, progress));
-          }),
-        setStatus: (status) =>
-          set((state) => {
-            state.status = status;
-          }),
-        setResult: (result) =>
-          set((state) => {
-            state.status = 'completed';
-            state.result = result;
-            state.error = null;
-          }),
-        setError: (error) =>
-          set((state) => {
-            state.status = 'error';
-            state.error = error;
-            state.progress = 0;
-          }),
-        clearResult: () =>
-          set((state) => {
-            state.status = 'idle';
-            state.progress = 0;
-            state.result = null;
-            state.error = null;
-            state.configuration = '';
-          }),
-        saveToHistory: (request, result, error) =>
-          set((state) => {
-            const id = Date.now().toString();
-            state.history.unshift({
-              id,
-              timestamp: new Date().toISOString(),
-              request,
-              result,
-              error,
-            });
-            // Keep only last 50 calculations
-            if (state.history.length > 50) {
-              state.history = state.history.slice(0, 50);
-            }
-          }),
-        loadFromHistory: (id) => {
-          const state = get();
-          const item = state.history.find((h) => h.id === id);
-          return item?.result || null;
-        },
-        clearHistory: () =>
-          set((state) => {
-            state.history = [];
-          }),
-        removeHistoryItem: (id) =>
-          set((state) => {
-            state.history = state.history.filter((h: typeof state.history[0]) => h.id !== id);
-          }),
+    (set, get) => ({
+      ...initialState,
+      
+      setStatus: (status) => set({ status }),
+      
+      setProgress: (progress) => set({ progress }),
+      
+      setResult: (result) => {
+        const startTime = get().startTime;
+        set({
+          result,
+          status: 'completed',
+          endTime: new Date(),
+          executionTime: startTime ? Date.now() - startTime.getTime() : 0
+        });
       },
-    })),
+      
+      setError: (error) => {
+        const startTime = get().startTime;
+        set({
+          error,
+          status: 'error',
+          endTime: new Date(),
+          executionTime: startTime ? Date.now() - startTime.getTime() : 0
+        });
+      },
+      
+      setConfiguration: (config) => set({ 
+        configuration: JSON.stringify(config),
+        startTime: new Date()
+      }),
+      
+      setTaskId: (taskId) => set({ taskId }),
+      
+      setStartTime: (startTime) => set({ startTime }),
+      
+      setEndTime: (endTime) => set({ endTime }),
+      
+      clearResult: () => set({ 
+        result: null, 
+        status: 'idle',
+        progress: 0,
+        error: null,
+        endTime: null,
+        executionTime: 0
+      }),
+      
+      clearError: () => set({ error: null }),
+      
+      reset: () => set(initialState),
+      
+      startCalculation: (request: CalculationRequest) => {
+        const newTaskId = `calc_${Date.now()}`;
+        set((state) => ({
+          status: 'running',
+          progress: 0,
+          result: null,
+          error: null,
+          configuration: JSON.stringify(request),
+          taskId: newTaskId,
+          startTime: new Date(),
+          endTime: null,
+          executionTime: 0,
+          history: [
+            {
+              id: newTaskId,
+              timestamp: new Date().toISOString(),
+              status: 'running',
+              sectionsCount: request.sections.length,
+              description: request.network.name,
+            },
+            ...state.history,
+          ],
+        }));
+      },
+      
+      completeCalculation: (result) => {
+        const startTime = get().startTime;
+        const taskId = get().taskId;
+        set((state) => ({
+          result,
+          status: 'completed',
+          endTime: new Date(),
+          executionTime: startTime ? Date.now() - startTime.getTime() : 0,
+          history: state.history.map((item) =>
+            item.id === taskId
+              ? {
+                  ...item,
+                  status: 'completed',
+                  duration: startTime ? (Date.now() - startTime.getTime()) / 1000 : undefined,
+                  result: result,
+                }
+              : item
+          ),
+        }));
+      },
+      
+      failCalculation: (error: string) => {
+        const startTime = get().startTime;
+        const taskId = get().taskId;
+        set((state) => ({
+          error,
+          status: 'error',
+          endTime: new Date(),
+          executionTime: startTime ? Date.now() - startTime.getTime() : 0,
+          history: state.history.map((item) =>
+            item.id === taskId
+              ? {
+                  ...item,
+                  status: 'error',
+                  duration: startTime ? (Date.now() - startTime.getTime()) / 1000 : undefined,
+                  error: error,
+                }
+              : item
+          ),
+        }));
+      },
+      clearHistory: () => set({ history: [] }),
+    }),
     {
-      name: 'hydraulic-calculation',
-      storage: createJSONStorage(() => localStorage),
+      name: 'calculation-storage',
       partialize: (state) => ({
+        // Only persist certain fields
+        result: state.result,
+        configuration: state.configuration,
+        executionTime: state.executionTime,
         history: state.history,
       }),
-      version: 1,
     }
   )
 );
-
-// Selector hooks for better performance
-export const useCalculationStatus = () => useCalculationStore((state) => state.status);
-export const useCalculationProgress = () => useCalculationStore((state) => state.progress);
-export const useCalculationResult = () => useCalculationStore((state) => state.result);
-export const useCalculationError = () => useCalculationStore((state) => state.error);
-export const useCalculationHistory = () => useCalculationStore((state) => state.history);
-export const useCalculationActions = () => useCalculationStore((state) => state.actions);

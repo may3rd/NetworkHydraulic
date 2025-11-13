@@ -41,7 +41,7 @@ import NodeInspector from './interactive/NodeInspector';
 import EdgeInspector from './interactive/EdgeInspector';
 import FlowAnalysisOverlay from './analysis/FlowAnalysisOverlay';
 import LossAnalysisOverlay from './analysis/LossAnalysisOverlay';
-import { useNetworkDiagram } from '../../hooks/network/useNetworkDiagram';
+import useNetworkDiagram from '../../hooks/network/useNetworkDiagram';
 
 import './NetworkDiagram.css';
 

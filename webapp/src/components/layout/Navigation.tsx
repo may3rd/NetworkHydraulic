@@ -1,16 +1,17 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { List, ListItem, ListItemIcon, ListItemText, Divider } from '@mui/material';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Settings as SettingsIcon,
   Analytics as AnalyticsIcon,
   History as HistoryIcon,
   Home as HomeIcon,
 } from '@mui/icons-material';
-import { useUIStore } from '@stores/ui';
 
 const Navigation: React.FC = () => {
-  const activeView = useUIStore((state) => state.activeView);
-  const setActiveView = useUIStore((state) => state.actions.setActiveView);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [sidebarExpanded] = useState(true); // Always expanded for simplicity
 
   const navigationItems = [
     {
@@ -34,14 +35,14 @@ const Navigation: React.FC = () => {
   ];
 
   return (
-    <div>
+    <div style={{ width: sidebarExpanded ? 240 : 64 }}>
       <List>
         {navigationItems.map((item) => (
           <ListItem
             button
             key={item.id}
-            selected={activeView === item.id}
-            onClick={() => setActiveView(item.id as any)}
+            selected={location.pathname === item.path}
+            onClick={() => navigate(item.path)}
             sx={{
               '&.Mui-selected': {
                 backgroundColor: (theme) => theme.palette.action.selected,

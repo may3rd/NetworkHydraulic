@@ -9,7 +9,23 @@ export interface ResultsDashboardProps {
 
 export interface ResultsSummaryProps {
   summary: ProcessedResult['summary'];
-  performance: ProcessedResult['performance'];
+  performance?: {
+    efficiency: {
+      pressureEfficiency: number;
+      velocityEfficiency: number;
+      overallEfficiency: number;
+    };
+    optimizationPotential: {
+      sectionsToOptimize: string[];
+      potentialImprovements: string[];
+      estimatedBenefit: number;
+    };
+    costAnalysis: {
+      energyLossCost: number;
+      optimizationCost: number;
+      roi: number;
+    };
+  };
   warnings: string[];
   criticalConditions?: CriticalCondition[];
 }
@@ -400,4 +416,48 @@ export interface ResultsCardProps {
 export type ExportFormats = 'pdf' | 'excel' | 'csv' | 'json' | 'xml';
 
 // Import necessary types from existing modules
-import type { ProcessedResult, ProcessedSectionResult } from '../../services/calculation/resultProcessor';
+// Note: These types will be defined in the resultProcessor service
+export interface ProcessedResult {
+  network: {
+    name: string;
+    direction: string;
+    boundaryPressure: number;
+    fluid: any; // FluidConfiguration
+  };
+  sections: ProcessedSectionResult[];
+  summary: {
+    inlet: any; // StatePoint
+    outlet: any; // StatePoint
+    pressureDrop: any; // PressureDropSummary
+  };
+  warnings?: string[];
+  executionTime: number;
+  metadata: {
+    version: string;
+    timestamp: string;
+    solver: string;
+  };
+}
+
+export interface ProcessedSectionResult {
+  id: string;
+  position: number;
+  inletPressure: number;
+  outletPressure: number;
+  pressureDrop: number;
+  velocity: number;
+  reynoldsNumber: number;
+  frictionFactor: number;
+  elevation: number;
+  length: number;
+  diameter: number;
+  roughness: number;
+  flowRate: number;
+  status: 'normal' | 'warning' | 'critical';
+  losses: {
+    friction: number;
+    fittings: number;
+    elevation: number;
+    components: number;
+  };
+}

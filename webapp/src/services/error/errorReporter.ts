@@ -182,7 +182,7 @@ class ErrorReporterService {
       reports,
       timestamp: new Date().toISOString(),
       source: 'hydraulic-network-webapp',
-      version: process.env.REACT_APP_VERSION || '1.0.0'
+      version: (typeof process !== 'undefined' && process.env.REACT_APP_VERSION) || '1.0.0'
     };
 
     const response = await fetch(endpoint, {
