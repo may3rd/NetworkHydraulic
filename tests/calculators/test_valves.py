@@ -7,8 +7,8 @@ from network_hydraulic.models.fluid import Fluid
 from network_hydraulic.models.pipe_section import PipeSection
 
 
-def make_section(control_valve: ControlValve) -> PipeSection:
-    return PipeSection(
+def make_section(control_valve: ControlValve, **overrides) -> PipeSection:
+    base = dict(
         id="sec",
         schedule="40",
         roughness=1e-4,
@@ -31,17 +31,18 @@ def make_section(control_valve: ControlValve) -> PipeSection:
         boundary_pressure=None,
         control_valve=control_valve,
         orifice=None,
+        mass_flow_rate=1.0,
+        temperature=300.0,
+        pressure=680e3,
     )
+    base.update(overrides)
+    return PipeSection(**base)
 
 
 def liquid_fluid() -> Fluid:
     return Fluid(
         name="water",
-        mass_flow_rate=None,
-        volumetric_flow_rate=0.1,
         phase="liquid",
-        temperature=300.0,
-        pressure=680e3,
         density=965.4,
         molecular_weight=18.0,
         z_factor=1.0,
@@ -56,11 +57,7 @@ def liquid_fluid() -> Fluid:
 def gas_fluid() -> Fluid:
     return Fluid(
         name="gas",
-        mass_flow_rate=None,
-        volumetric_flow_rate=0.8,
         phase="gas",
-        temperature=310.0,
-        pressure=600e3,
         density=45.0,
         molecular_weight=20.0,
         z_factor=0.92,
@@ -87,17 +84,17 @@ def test_liquid_cv_from_pressure_drop():
         outlet_diameter=0.15,
         valve_diameter=0.15,
     )
-    section = make_section(valve)
+    section = make_section(valve, mass_flow_rate=1.0, temperature=300.0, pressure=680e3)
     calc = ControlValveCalculator(fluid=fluid)
     calc.calculate(section)
     kv_expected = size_control_valve_l(
-        rho=fluid.density,
+        rho=fluid.current_density(section.temperature, section.pressure),
         Psat=fluid.vapor_pressure,
         Pc=fluid.critical_pressure,
         mu=fluid.viscosity,
-        P1=fluid.pressure,
-        P2=fluid.pressure - drop,
-        Q=fluid.volumetric_flow_rate,
+        P1=section.pressure,
+        P2=section.pressure - drop,
+        Q=section.current_volumetric_flow_rate(fluid),
         D1=valve.inlet_diameter,
         D2=valve.outlet_diameter,
         d=valve.valve_diameter,
@@ -126,7 +123,7 @@ def test_liquid_drop_sets_cg_when_c1_present():
         outlet_diameter=0.15,
         valve_diameter=0.15,
     )
-    section = make_section(valve)
+    section = make_section(valve, mass_flow_rate=1.0, temperature=300.0, pressure=680e3)
     ControlValveCalculator(fluid=fluid).calculate(section)
     assert valve.cv is not None
     assert valve.cg == pytest.approx(15.0 * valve.cv)
@@ -147,7 +144,7 @@ def test_pressure_drop_from_cg_only():
         outlet_diameter=0.15,
         valve_diameter=0.15,
     )
-    base_section = make_section(base_valve)
+    base_section = make_section(base_valve, mass_flow_rate=1.0, temperature=300.0, pressure=680e3)
     calc = ControlValveCalculator(fluid=fluid)
     calc.calculate(base_section)
     expected_cv = base_valve.cv
@@ -165,25 +162,26 @@ def test_pressure_drop_from_cg_only():
         outlet_diameter=0.15,
         valve_diameter=0.15,
     )
-    section = make_section(valve)
+    section = make_section(valve, mass_flow_rate=1.0, temperature=300.0, pressure=680e3)
     calc.calculate(section)
     assert pytest.approx(valve.pressure_drop, rel=1e-4) == drop
 
 
 def test_liquid_pressure_drop_from_cv():
     fluid = liquid_fluid()
+    section = make_section(ControlValve(tag="temp"), mass_flow_rate=1.0, temperature=300.0, pressure=680e3)
     kv = size_control_valve_l(
-        rho=fluid.density,
+        rho=fluid.current_density(section.temperature, section.pressure),
         Psat=fluid.vapor_pressure,
         Pc=fluid.critical_pressure,
         mu=fluid.viscosity,
-        P1=fluid.pressure,
-        P2=fluid.pressure - 460e3,
-        Q=fluid.volumetric_flow_rate,
+        P1=section.pressure,
+        P2=section.pressure - 460e3,
+        Q=section.current_volumetric_flow_rate(fluid),
     )
     cv = convert_flow_coefficient(kv, "Kv", "Cv")
     valve = ControlValve(tag="CV-2", cv=cv, cg=None, pressure_drop=None, C1=None)
-    section = make_section(valve)
+    section.control_valve = valve
     calc = ControlValveCalculator(fluid=fluid)
     calc.calculate(section)
     assert pytest.approx(valve.pressure_drop, rel=1e-4) == 460e3
@@ -192,19 +190,20 @@ def test_liquid_pressure_drop_from_cv():
 
 def test_gas_valve_drop_from_cv():
     fluid = gas_fluid()
+    section = make_section(ControlValve(tag="temp"), mass_flow_rate=1.0, temperature=310.0, pressure=600e3)
     kv = size_control_valve_g(
-        T=fluid.temperature,
+        T=section.temperature,
         MW=fluid.molecular_weight,
         mu=fluid.viscosity,
         gamma=fluid.specific_heat_ratio,
         Z=fluid.z_factor,
-        P1=fluid.pressure,
-        P2=fluid.pressure - 120e3,
-        Q=fluid.volumetric_flow_rate,
+        P1=section.pressure,
+        P2=section.pressure - 120e3,
+        Q=section.current_volumetric_flow_rate(fluid),
     )
     cv = convert_flow_coefficient(kv, "Kv", "Cv")
     valve = ControlValve(tag="CV-3", cv=cv, cg=None, pressure_drop=None, C1=None)
-    section = make_section(valve)
+    section.control_valve = valve
     calc = ControlValveCalculator(fluid=fluid)
     calc.calculate(section)
     assert pytest.approx(valve.pressure_drop, rel=1e-4) == 120e3
@@ -214,33 +213,10 @@ def test_gas_valve_drop_from_cv():
 def test_control_valve_note_when_insufficient_data():
     fluid = liquid_fluid()
     valve = ControlValve(tag="CV-missing", cv=None, cg=None, pressure_drop=None, C1=None)
-    section = make_section(valve)
+    section = make_section(valve, mass_flow_rate=1.0, temperature=300.0, pressure=680e3)
     calc = ControlValveCalculator(fluid=fluid)
     calc.calculate(section)
     assert valve.calculation_note.startswith("Skipped control valve calculation")
 
 
-def test_missing_flow_rate_raises():
-    with pytest.raises(ValueError, match="Either mass_flow_rate or volumetric_flow_rate must be provided"):
-        fluid = Fluid(
-            name="bad",
-            mass_flow_rate=None,
-            volumetric_flow_rate=None,
-            phase="liquid",
-            temperature=300.0,
-            pressure=100e3,
-            density=1000.0,
-            molecular_weight=18.0,
-            z_factor=1.0,
-            specific_heat_ratio=1.0,
-            viscosity=1e-3,
-            standard_flow_rate=None,
-            vapor_pressure=10e3,
-            critical_pressure=22e6,
-        )
-    # The rest of the test is now unreachable, but keeping it for context if needed later.
-    # valve = ControlValve(tag="CV-4", cv=10.0, cg=None, pressure_drop=None, C1=None)
-    # section = make_section(valve)
-    # calc = ControlValveCalculator(fluid=fluid)
-    # with pytest.raises(ValueError):
-    #     calc.calculate(section)
+

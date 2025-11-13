@@ -7,8 +7,6 @@ def make_fluid(**overrides) -> Fluid:
     defaults = dict(
         name="test",
         phase="liquid",
-        temperature=300.0,
-        pressure=101325.0,
         density=1000.0,
         molecular_weight=18.0,
         z_factor=1.0,
@@ -33,29 +31,15 @@ def test_gas_density_from_state():
     fluid = make_fluid(
         phase="gas",
         density=0.0,
-        pressure=2.5e6,
-        temperature=330.0,
         molecular_weight=20.0,
         z_factor=0.85,
     )
-    expected = fluid.pressure * (fluid.molecular_weight / 1000.0) / (
-        8.314462618 * fluid.temperature * fluid.z_factor
+    pressure = 2.5e6
+    temperature = 330.0
+    expected = pressure * (fluid.molecular_weight / 1000.0) / (
+        8.314462618 * temperature * fluid.z_factor
     )
-    assert fluid.current_density() == pytest.approx(expected)
-
-
-def test_fluid_post_init_raises_for_non_positive_temperature():
-    with pytest.raises(ValueError, match="fluid.temperature must be positive"):
-        make_fluid(temperature=0.0)
-    with pytest.raises(ValueError, match="fluid.temperature must be positive"):
-        make_fluid(temperature=-10.0)
-
-
-def test_fluid_post_init_raises_for_non_positive_pressure():
-    with pytest.raises(ValueError, match="fluid.pressure must be positive"):
-        make_fluid(pressure=0.0)
-    with pytest.raises(ValueError, match="fluid.pressure must be positive"):
-        make_fluid(pressure=-10.0)
+    assert fluid.current_density(temperature, pressure) == pytest.approx(expected)
 
 
 def test_fluid_post_init_raises_for_non_positive_viscosity():

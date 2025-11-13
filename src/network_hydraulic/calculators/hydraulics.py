@@ -26,7 +26,13 @@ class FrictionCalculator(LossCalculator):
         area = 0.25 * pi * diameter * diameter
         flow_rate = self._determine_flow_rate(section)
         velocity = flow_rate / area
-        density = self.fluid.current_density()
+        
+        if section.temperature is None or section.temperature <= 0:
+            raise ValueError("section.temperature must be set and positive for friction calculations")
+        if section.pressure is None or section.pressure <= 0:
+            raise ValueError("section.pressure must be set and positive for friction calculations")
+
+        density = self.fluid.current_density(section.temperature, section.pressure)
         viscosity = self._require_positive(self.fluid.viscosity, "viscosity")
         reynolds = density * abs(velocity) * diameter / viscosity
         if reynolds <= 0:

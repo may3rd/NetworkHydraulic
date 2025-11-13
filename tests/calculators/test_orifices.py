@@ -30,6 +30,9 @@ def make_section(orifice: Orifice, **overrides) -> PipeSection:
         boundary_pressure=None,
         control_valve=None,
         orifice=orifice,
+        mass_flow_rate=7.70233803573,
+        temperature=293.15,
+        pressure=200_000.0,
     )
     base.update(overrides)
     return PipeSection(**base)
@@ -38,11 +41,7 @@ def make_section(orifice: Orifice, **overrides) -> PipeSection:
 def reference_fluid() -> Fluid:
     return Fluid(
         name="water",
-        mass_flow_rate=7.70233803573,
-        volumetric_flow_rate=None,
         phase="liquid",
-        temperature=293.15,
-        pressure=200_000.0,
         density=999.1,
         molecular_weight=18.0,
         z_factor=1.0,
@@ -63,7 +62,7 @@ def test_orifice_drop_computed_from_fluids():
         pipe_diameter=0.07366,
         taps="D",
     )
-    section = make_section(orifice)
+    section = make_section(orifice, mass_flow_rate=7.70233803573, temperature=293.15, pressure=200_000.0)
     section.result_summary.inlet.pressure = 200_000.0
     calc = OrificeCalculator(fluid=fluid)
     calc.calculate(section)
@@ -77,7 +76,7 @@ def test_orifice_drop_computed_from_fluids():
 def test_orifice_uses_specified_drop():
     fluid = reference_fluid()
     orifice = Orifice(tag="FE-2", d_over_D_ratio=None, pressure_drop=1500.0)
-    section = make_section(orifice)
+    section = make_section(orifice, mass_flow_rate=7.70233803573, temperature=293.15, pressure=200_000.0)
     calc = OrificeCalculator(fluid=fluid)
     calc.calculate(section)
     drop = section.calculation_output.pressure_drop
@@ -89,7 +88,7 @@ def test_orifice_uses_specified_drop():
 def test_missing_diameter_raises():
     fluid = reference_fluid()
     orifice = Orifice(tag="FE-3", d_over_D_ratio=None, pressure_drop=None)
-    section = make_section(orifice, pipe_diameter=None)
+    section = make_section(orifice, pipe_diameter=None, mass_flow_rate=7.70233803573, temperature=293.15, pressure=200_000.0)
     calc = OrificeCalculator(fluid=fluid)
     with pytest.raises(ValueError):
         calc.calculate(section)
@@ -98,7 +97,7 @@ def test_missing_diameter_raises():
 def test_orifice_defaults_to_section_pipe_diameter():
     fluid = reference_fluid()
     orifice = Orifice(tag="FE-4", d_over_D_ratio=0.5, pressure_drop=None)
-    section = make_section(orifice, pipe_diameter=0.2)
+    section = make_section(orifice, pipe_diameter=0.2, mass_flow_rate=7.70233803573, temperature=293.15, pressure=200_000.0)
     section.result_summary.inlet.pressure = 200000.0
     calc = OrificeCalculator(fluid=fluid)
     calc.calculate(section)

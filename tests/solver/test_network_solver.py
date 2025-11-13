@@ -16,8 +16,6 @@ def make_fluid() -> Fluid:
     return Fluid(
         name="water",
         phase="liquid",
-        temperature=298.15,
-        pressure=250000.0,
         density=998.2,
         molecular_weight=18.0,
         z_factor=1.0,
@@ -72,13 +70,23 @@ def make_section() -> PipeSection:
         boundary_pressure=None,
         control_valve=control_valve,
         orifice=orifice,
+        temperature=298.15,
+        pressure=250000.0,
     )
 
 
 def test_network_solver_runs_all_calculations():
     fluid = make_fluid()
     section = make_section()
-    network = Network(name="test", description=None, fluid=fluid, sections=[section], mass_flow_rate=5.0)
+    network = Network(
+        name="test",
+        description=None,
+        fluid=fluid,
+        sections=[section],
+        mass_flow_rate=5.0,
+        temperature=298.15,
+        pressure=250000.0,
+    )
     solver = NetworkSolver()
     result = solver.run(network)
 
@@ -100,8 +108,6 @@ def make_gas_fluid() -> Fluid:
     return Fluid(
         name="nitrogen",
         phase="gas",
-        temperature=320.0,
-        pressure=250000.0,
         density=1.2,
         molecular_weight=28.0,
         z_factor=0.95,
@@ -194,6 +200,8 @@ def test_solver_uses_section_pressures_for_components_forward():
         gas_flow_model="isothermal",
         sections=sections,
         mass_flow_rate=2.5,
+        temperature=320.0,
+        pressure=250000.0,
     )
 
     valve_pressures, orifice_pressures, fake_valve, fake_orifice = _capture_component_pressures()
@@ -223,6 +231,8 @@ def test_solver_uses_section_pressures_for_components_backward():
         gas_flow_model="adiabatic",
         sections=sections,
         mass_flow_rate=2.5,
+        temperature=320.0,
+        pressure=250000.0,
     )
 
     valve_pressures, orifice_pressures, fake_valve, fake_orifice = _capture_component_pressures()
@@ -290,6 +300,8 @@ def test_component_drops_match_total_loss_when_no_pipe_losses():
         boundary_pressure=250000.0,
         sections=[section],
         mass_flow_rate=5.0,
+        temperature=298.15,
+        pressure=250000.0,
     )
     solver = NetworkSolver()
     solver.run(network)
@@ -314,11 +326,13 @@ def test_solver_errors_for_missing_gas_parameters():
         gas_flow_model="isothermal",
         sections=[section],
         mass_flow_rate=2.5,
+        temperature=320.0,
+        pressure=250000.0,
     )
 
     solver = NetworkSolver(default_pipe_diameter=0.1)
     with patch.object(NetworkSolver, "_build_calculators", return_value=[]):
-        with pytest.raises(ValueError, match="missing.*gas-flow inputs"):
+        with pytest.raises(ValueError, match="missing required gas-flow inputs: temperature, pressure"):
             solver.run(network)
 
 
@@ -333,6 +347,8 @@ def test_solver_sets_direction_from_upstream_pressure():
         upstream_pressure=300000.0,
         sections=[section],
         mass_flow_rate=5.0,
+        temperature=298.15,
+        pressure=250000.0,
     )
     solver = NetworkSolver()
     solver.run(network)
@@ -351,6 +367,8 @@ def test_solver_sets_direction_from_downstream_pressure():
         downstream_pressure=150000.0,
         sections=[section],
         mass_flow_rate=5.0,
+        temperature=298.15,
+        pressure=250000.0,
     )
     solver = NetworkSolver()
     solver.run(network)
@@ -403,6 +421,8 @@ def test_component_only_section_uses_dual_boundaries():
         downstream_pressure=200000.0,
         sections=[section],
         mass_flow_rate=5.0,
+        temperature=298.15,
+        pressure=250000.0,
     )
     solver = NetworkSolver()
     solver.run(network)
@@ -413,7 +433,6 @@ def test_component_only_section_uses_dual_boundaries():
 
 def test_solver_handles_no_initial_pressure_gracefully():
     fluid = make_fluid()
-    fluid.pressure = None # Set fluid pressure to None for this test
     section = make_section()
     network = Network(
         name="no-initial-pressure",
@@ -425,6 +444,8 @@ def test_solver_handles_no_initial_pressure_gracefully():
         downstream_pressure=None,
         sections=[section],
         mass_flow_rate=5.0,
+        temperature=298.15,
+        pressure=250000.0,
     )
 
     solver = NetworkSolver()

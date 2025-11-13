@@ -31,8 +31,6 @@ GAS_CONSTANT = 8.314462618  # J/(mol*K)
 class Fluid:
     name: Optional[str]
     phase: str
-    temperature: float
-    pressure: float
     density: float
     molecular_weight: float
     z_factor: float
@@ -46,10 +44,6 @@ class Fluid:
         errors: list[str] = []
 
         # From _validate_fluid_inputs in ConfigurationLoader
-        if self.temperature <= 0:
-            errors.append("fluid.temperature must be positive")
-        if self.pressure <= 0:
-            errors.append("fluid.pressure must be positive")
         if self.viscosity <= 0:
             errors.append("fluid.viscosity must be positive")
 
@@ -79,14 +73,14 @@ class Fluid:
     def is_gas(self) -> bool:
         return self.phase_key() in {"gas", "vapor"}
 
-    def current_density(self) -> float:
+    def current_density(self, temperature: float, pressure: float) -> float:
         if self.is_gas():
-            return self._gas_density()
+            return self._gas_density(temperature, pressure)
         return self._require_positive(self.density, "density")
 
-    def _gas_density(self) -> float:
-        pressure = self._require_positive(self.pressure, "pressure")
-        temperature = self._require_positive(self.temperature, "temperature")
+    def _gas_density(self, temperature: float, pressure: float) -> float:
+        pressure = self._require_positive(pressure, "pressure")
+        temperature = self._require_positive(temperature, "temperature")
         molecular_weight = self._require_positive(self.molecular_weight, "molecular_weight")
         z_factor = self._require_positive(self.z_factor or 1.0, "z_factor")
         mw_kg_per_mol = molecular_weight if molecular_weight <= 0.5 else molecular_weight / 1000.0

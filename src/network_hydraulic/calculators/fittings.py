@@ -76,7 +76,13 @@ class FittingLossCalculator(LossCalculator):
 
         diameter = self._pipe_diameter(section)
         velocity = self._velocity(section, diameter)
-        density = self.fluid.current_density()
+        
+        if section.temperature is None or section.temperature <= 0:
+            raise ValueError("section.temperature must be set and positive for fittings calculations")
+        if section.pressure is None or section.pressure <= 0:
+            raise ValueError("section.pressure must be set and positive for fittings calculations")
+
+        density = self.fluid.current_density(section.temperature, section.pressure)
         viscosity = self._require_positive(self.fluid.viscosity, "viscosity")
         reynolds = density * abs(velocity) * diameter / viscosity
         if reynolds <= 0:

@@ -104,6 +104,8 @@ class PipeSection:
     design_flow_multiplier: float = 1.0
     design_mass_flow_rate: Optional[float] = None
     mass_flow_rate: Optional[float] = None
+    temperature: Optional[float] = None
+    pressure: Optional[float] = None
 
     def __post_init__(self) -> None:
         errors: list[str] = []
@@ -141,7 +143,11 @@ class PipeSection:
     def current_volumetric_flow_rate(self, fluid: Fluid) -> float:
         if self.mass_flow_rate is None:
             raise ValueError("mass_flow_rate must be set for the pipe section to calculate volumetric flow rate")
-        density = fluid.current_density()
+        if self.temperature is None or self.temperature <= 0:
+            raise ValueError("temperature must be set and positive for the pipe section to calculate volumetric flow rate")
+        if self.pressure is None or self.pressure <= 0:
+            raise ValueError("pressure must be set and positive for the pipe section to calculate volumetric flow rate")
+        density = fluid.current_density(self.temperature, self.pressure)
         if density == 0:
             raise ValueError("Cannot calculate volumetric flow rate with zero density")
         return self.mass_flow_rate / density

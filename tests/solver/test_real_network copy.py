@@ -24,8 +24,8 @@ def test_real_network_from_yaml():
     # as it's null in the real_network.yaml fixture.
     loader.raw["network"]["gas_flow_model"] = "isothermal"
     network = loader.build_network()
-    volumetric_flow = network.fluid.current_volumetric_flow_rate()
-    solver = NetworkSolver(volumetric_flow_rate=volumetric_flow)
+    volumetric_flow = network.current_volumetric_flow_rate()
+    solver = NetworkSolver()
     result = solver.run(network)
     assert len(result.sections) == 3
     # Section 1: id '1'

@@ -28,6 +28,8 @@ class Network:
     name: str
     description: Optional[str]
     fluid: Fluid
+    temperature: float
+    pressure: float
     direction: str = "auto"
     boundary_pressure: Optional[float] = None
     upstream_pressure: Optional[float] = None
@@ -42,6 +44,11 @@ class Network:
 
     def __post_init__(self) -> None:
         errors: list[str] = []
+
+        if self.temperature <= 0:
+            errors.append("network.temperature must be positive")
+        if self.pressure <= 0:
+            errors.append("network.pressure must be positive")
 
         if self.mass_flow_rate is None:
             errors.append("mass_flow_rate must be provided for the network")
@@ -95,7 +102,7 @@ class Network:
     def current_volumetric_flow_rate(self) -> float:
         if self.mass_flow_rate is None:
             raise ValueError("mass_flow_rate must be set to calculate volumetric flow rate")
-        density = self.fluid.current_density()
+        density = self.fluid.current_density(self.temperature, self.pressure)
         if density == 0:
             raise ValueError("Cannot calculate volumetric flow rate with zero density")
         return self.mass_flow_rate / density

@@ -6,19 +6,19 @@ network:
     value: 101.008
     unit: kPag
   gas_flow_model: null
+  temperature:
+    value: 103.42
+    unit: degC
+  pressure:
+    value: 101.008
+    unit: kPag
+  mass_flow_rate:
+    value: 90513.6
+    unit: kg/h
   fluid:
     name: liquid
     phase: liquid
-    mass_flow_rate:
-      value: 90513.6
-      unit: kg/h
     volumetric_flow_rate: null
-    temperature:
-      value: 103.42
-      unit: degC
-    pressure:
-      value: 101.008
-      unit: kPag
     density:
       value: 783.4
       unit: kg/m^3
@@ -74,5 +74,3 @@ network:
         unit: m
       erosional_constant: 100
       fitting_type: LR
-      
-

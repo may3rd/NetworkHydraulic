@@ -82,7 +82,13 @@ class OrificeCalculator(LossCalculator):
         if inlet_pressure is None or inlet_pressure <= 0:
             raise ValueError("Orifice inlet pressure must be positive")
         mass_flow = self._mass_flow_rate(section)
-        density = self._fluid_density()
+        
+        if section.temperature is None or section.temperature <= 0:
+            raise ValueError("section.temperature must be set and positive for orifice calculations")
+        if section.pressure is None or section.pressure <= 0:
+            raise ValueError("section.pressure must be set and positive for orifice calculations")
+
+        density = self._fluid_density(section.temperature, section.pressure)
         viscosity = self._fluid_viscosity()
         isentropic_exponent = self._isentropic_exponent()
         meter_type = orifice.meter_type or 'orifice' # ISO_5167_ORIFICE
@@ -201,10 +207,11 @@ class OrificeCalculator(LossCalculator):
             raise ValueError("Fluid pressure must be positive for orifice calculations")
         return self.fluid.pressure
 
-    def _fluid_density(self) -> float:
-        if self.fluid.density <= 0:
+    def _fluid_density(self, temperature: float, pressure: float) -> float:
+        density = self.fluid.current_density(temperature, pressure)
+        if density <= 0:
             raise ValueError("Fluid density must be positive for orifice calculations")
-        return self.fluid.density
+        return density
 
     def _fluid_viscosity(self) -> float:
         if self.fluid.viscosity <= 0:

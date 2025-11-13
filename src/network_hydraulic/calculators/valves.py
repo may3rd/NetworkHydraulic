@@ -49,12 +49,12 @@ class ControlValveCalculator(LossCalculator):
         drop: float
 
         if valve.pressure_drop is not None:
-            drop = self._apply_drop_from_spec(valve, inlet_pressure, flow, phase)
+            drop = self._apply_drop_from_spec(valve, inlet_pressure, flow, phase, section)
             valve.calculation_note = (
                 f"Used specified pressure_drop ({self._format_drop(drop)})."
             )
         else:
-            drop = self._solve_drop_from_cv(valve, inlet_pressure, flow, phase)
+            drop = self._solve_drop_from_cv(valve, inlet_pressure, flow, phase, section)
             valve.pressure_drop = drop
             valve.calculation_note = (
                 f"Calculated pressure_drop from Cv ({self._format_drop(drop)})."
@@ -66,14 +66,16 @@ class ControlValveCalculator(LossCalculator):
         pressure_drop.total_segment_loss = baseline + drop
 
     def _apply_drop_from_spec(
-        self, valve, inlet_pressure: float, flow_rate: float, phase: str
+        self, valve, inlet_pressure: float, flow_rate: float, phase: str, section: PipeSection
     ) -> float:
         drop = max(valve.pressure_drop or 0.0, 0.0)
         max_drop = max(inlet_pressure - MIN_PRESSURE, MIN_PRESSURE)
         if drop > max_drop:
             raise ValueError("Specified control valve pressure drop exceeds inlet pressure")
         if valve.cv is None:
-            kv = self._kv_from_drop(phase, inlet_pressure, drop, flow_rate, valve)
+            if section.temperature is None or section.temperature <= 0:
+                raise ValueError("section.temperature must be set and positive for control valve calculations")
+            kv = self._kv_from_drop(phase, inlet_pressure, drop, flow_rate, valve, section.temperature)
             valve.cv = convert_flow_coefficient(kv, "Kv", "Cv")
             if valve.cg is None:
                 valve.cg = self._cg_from_cv(valve.cv, valve)
@@ -81,7 +83,7 @@ class ControlValveCalculator(LossCalculator):
         return drop
 
     def _solve_drop_from_cv(
-        self, valve, inlet_pressure: float, flow_rate: float, phase: str
+        self, valve, inlet_pressure: float, flow_rate: float, phase: str, section: PipeSection
     ) -> float:
         if valve.cv is None or valve.cv <= 0:
             raise ValueError("Control valve Cv must be positive to compute pressure drop")
@@ -89,7 +91,9 @@ class ControlValveCalculator(LossCalculator):
         kv_target = convert_flow_coefficient(valve.cv, "Cv", "Kv")
 
         def kv_from_drop(delta_p: float) -> float:
-            return self._kv_from_drop(phase, inlet_pressure, delta_p, flow_rate, valve)
+            if section.temperature is None or section.temperature <= 0:
+                raise ValueError("section.temperature must be set and positive for control valve calculations")
+            return self._kv_from_drop(phase, inlet_pressure, delta_p, flow_rate, valve, section.temperature)
 
         drop = self._bisect_on_drop(kv_target, kv_from_drop, max_drop)
         return drop
@@ -101,11 +105,12 @@ class ControlValveCalculator(LossCalculator):
         drop: float,
         flow_rate: float,
         valve,
+        temperature: float,
     ) -> float:
         outlet_pressure = max(inlet_pressure - drop, MIN_PRESSURE)
         if phase == "liquid":
             return self._kv_liquid(inlet_pressure, outlet_pressure, flow_rate, valve)
-        return self._kv_gas(inlet_pressure, outlet_pressure, flow_rate, valve)
+        return self._kv_gas(inlet_pressure, outlet_pressure, flow_rate, valve, temperature)
 
     def _kv_liquid(
         self, inlet_pressure: float, outlet_pressure: float, flow_rate: float, valve
@@ -130,10 +135,10 @@ class ControlValveCalculator(LossCalculator):
         )
 
     def _kv_gas(
-        self, inlet_pressure: float, outlet_pressure: float, flow_rate: float, valve
+        self, inlet_pressure: float, outlet_pressure: float, flow_rate: float, valve, temperature: float
     ) -> float:
         return size_control_valve_g(
-            T=self.fluid.temperature,
+            T=temperature,
             MW=self.fluid.molecular_weight,
             mu=self.fluid.viscosity,
             gamma=self.fluid.specific_heat_ratio,

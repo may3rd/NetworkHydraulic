@@ -119,8 +119,7 @@ class NetworkSolver:
     def _build_calculators(self, network: Network) -> Iterable:
         fluid = network.fluid
         elevation = ElevationCalculator(
-            fluid_density=fluid.current_density(),
-            phase=fluid.phase,
+            fluid=fluid,
         )
         return [
             FittingLossCalculator(
@@ -170,6 +169,8 @@ class NetworkSolver:
                 base_mass_flow * multiplier if base_mass_flow is not None else None
             )
             section.mass_flow_rate = section.design_mass_flow_rate
+            section.temperature = network.temperature
+            section.pressure = network.pressure
 
     @staticmethod
     def _design_multiplier(section: PipeSection, network: Network) -> float:
@@ -237,7 +238,8 @@ class NetworkSolver:
                 loss = section.calculation_output.pressure_drop.total_segment_loss or 0.0
 
                 # Gather parameters for gas flow solvers
-                temperature = network.fluid.temperature
+                temperature = section.temperature
+                pressure = section.pressure
                 molar_mass = network.fluid.molecular_weight
                 z_factor = network.fluid.z_factor
                 gamma = network.fluid.specific_heat_ratio
@@ -254,6 +256,7 @@ class NetworkSolver:
                 missing_params: list[str] = []
                 positive_required = {
                     "temperature": temperature,
+                    "pressure": pressure,
                     "mass_flow": section_mass_flow,
                     "diameter": diameter,
                     "molar_mass": molar_mass,
@@ -544,14 +547,14 @@ class NetworkSolver:
                 summary.inlet.pressure,
                 network.upstream_pressure,
                 network.boundary_pressure,
-                network.fluid.pressure,
+                network.pressure,
             ]
             if forward
             else [
                 summary.outlet.pressure,
                 network.downstream_pressure,
                 network.boundary_pressure,
-                network.fluid.pressure,
+                network.pressure,
             ]
         )
         for candidate in candidates:
@@ -596,6 +599,8 @@ class NetworkSolver:
                 section,
                 fluid,
                 section.mass_flow_rate,
+                section.temperature,
+                section.pressure,
             )
 
     def _populate_section_state(
@@ -603,6 +608,8 @@ class NetworkSolver:
         section: PipeSection,
         fluid,
         mass_flow: Optional[float],
+        temperature: Optional[float],
+        pressure: Optional[float],
     ) -> None:
         summary = section.result_summary
         diameter = section.pipe_diameter or self.default_pipe_diameter
@@ -610,6 +617,11 @@ class NetworkSolver:
             return
         area = pi * diameter * diameter * 0.25
         
+        if temperature is None or temperature <= 0:
+            raise ValueError("temperature must be set and positive for section state calculations")
+        if pressure is None or pressure <= 0:
+            raise ValueError("pressure must be set and positive for section state calculations")
+
         vol_flow = None
         if section.mass_flow_rate is not None:
             try:
@@ -621,9 +633,9 @@ class NetworkSolver:
         if vol_flow and vol_flow > 0 and area > 0:
             velocity = vol_flow / area
         
-        base_density = fluid.current_density()
-        reference_pressure = fluid.pressure if fluid.pressure and fluid.pressure > 0 else None
-        reference_temperature = fluid.temperature if fluid.temperature and fluid.temperature > 0 else None
+        base_density = fluid.current_density(temperature, pressure)
+        reference_pressure = pressure
+        reference_temperature = temperature
         inlet_density = base_density
         outlet_density = base_density
         if fluid.is_gas() and base_density and reference_pressure:
@@ -643,9 +655,9 @@ class NetworkSolver:
             )
         phase = (fluid.phase or "").lower()
         mach = None
-        if velocity and phase in {"gas", "vapor"} and fluid.specific_heat_ratio and fluid.temperature and fluid.molecular_weight:
+        if velocity and phase in {"gas", "vapor"} and fluid.specific_heat_ratio and temperature and fluid.molecular_weight:
             rs = UNIVERSAL_GAS_CONSTANT / fluid.molecular_weight
-            sound_speed = sqrt(max(fluid.specific_heat_ratio, 1.0) * rs * fluid.temperature)
+            sound_speed = sqrt(max(fluid.specific_heat_ratio, 1.0) * rs * temperature)
             if sound_speed > 0:
                 mach = velocity / sound_speed
         eros_const = section.erosional_constant if section.erosional_constant is not None else 100.0
@@ -669,6 +681,8 @@ class NetworkSolver:
             flow_momentum_in,
             mach if phase in {"gas", "vapor"} else None,
             remarks,
+            temperature,
+            pressure,
         )
         self._assign_state(
             summary.outlet,
@@ -679,21 +693,27 @@ class NetworkSolver:
             flow_momentum_out,
             mach if phase in {"gas", "vapor"} else None,
             remarks,
+            temperature,
+            pressure,
         )
 
     @staticmethod
     def _assign_state(
         state,
-        fluid,
+        fluid, # fluid is not used here, but kept for compatibility
         density: Optional[float],
         velocity: Optional[float],
         erosional_velocity: Optional[float],
         flow_momentum: Optional[float],
         mach: Optional[float],
         remarks: str,
+        temperature: Optional[float],
+        pressure: Optional[float],
     ) -> None:
-        if state.temperature is None:
-            state.temperature = fluid.temperature
+        if state.temperature is None and temperature is not None:
+            state.temperature = temperature
+        if state.pressure is None and pressure is not None:
+            state.pressure = pressure
         if state.density is None and density is not None:
             state.density = density
         if state.velocity is None and velocity is not None:

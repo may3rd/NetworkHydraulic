@@ -46,6 +46,8 @@ NETWORK_ALLOWED_KEYS = {
     "output_units",
     "design_margin",
     "mass_flow_rate",
+    "temperature",
+    "pressure",
 }
 
 SECTION_ALLOWED_KEYS = {
@@ -117,6 +119,18 @@ class ConfigurationLoader:
         logger.info("Building network configuration from loader data")
         self._validate_keys(network_cfg, NETWORK_ALLOWED_KEYS, context="network")
         fluid_cfg = network_cfg.get("fluid", {})
+        
+        network_temperature = self._require_positive_quantity(
+            network_cfg.get("temperature"),
+            "network.temperature",
+            target_unit="K",
+        )
+        network_pressure = self._require_positive_quantity(
+            network_cfg.get("pressure"),
+            "network.pressure",
+            target_unit="Pa",
+        )
+
         boundary_pressure = self._quantity(network_cfg.get("boundary_pressure"), "network.boundary_pressure", target_unit="Pa")
         upstream_pressure = self._quantity(
             network_cfg.get("upstream_pressure"), "network.upstream_pressure", target_unit="Pa"
@@ -125,15 +139,7 @@ class ConfigurationLoader:
             network_cfg.get("downstream_pressure"), "network.downstream_pressure", target_unit="Pa"
         )
         phase = fluid_cfg.get("phase", "liquid")
-        temperature = self._require_positive_quantity(
-            fluid_cfg.get("temperature"),
-            "fluid.temperature",
-            target_unit="K",
-        )
-        pressure = self._resolve_fluid_pressure(
-            raw_pressure=fluid_cfg.get("pressure"),
-            boundary_pressure=boundary_pressure,
-        )
+        
         density_value = self._quantity(
             fluid_cfg.get("density"),
             "fluid.density",
@@ -165,8 +171,6 @@ class ConfigurationLoader:
         fluid = Fluid(
             name=fluid_cfg.get("name"),
             phase=phase,
-            temperature=temperature,
-            pressure=pressure,
             density=density_value if density_value is not None else 0.0,
             molecular_weight=molecular_weight if molecular_weight is not None else 0.0,
             z_factor=z_factor if z_factor is not None else 1.0,
@@ -198,6 +202,8 @@ class ConfigurationLoader:
             name=network_cfg.get("name", "network"),
             description=network_cfg.get("description"),
             fluid=fluid,
+            temperature=network_temperature,
+            pressure=network_pressure,
             direction=direction,
             boundary_pressure=boundary_pressure,
             upstream_pressure=upstream_pressure,
@@ -487,25 +493,6 @@ class ConfigurationLoader:
         magnitude = float(match.group(1))
         unit = match.group(2).strip()
         return convert_units(magnitude, unit, target_unit)
-
-    def _resolve_fluid_pressure(
-        self,
-        *,
-        raw_pressure: Optional[Any],
-        boundary_pressure: Optional[float],
-    ) -> float:
-        pressure = self._quantity(raw_pressure, "fluid.pressure", target_unit="Pa")
-        source = "fluid.pressure"
-        if pressure is None:
-            if boundary_pressure is None:
-                raise ValueError(
-                    "fluid.pressure must be provided unless network.boundary_pressure is specified"
-                )
-            pressure = boundary_pressure
-            source = "network.boundary_pressure"
-        if pressure is None or pressure <= 0:
-            raise ValueError(f"{source} must be positive in absolute units")
-        return pressure
 
     def _require_positive_quantity(
         self,
