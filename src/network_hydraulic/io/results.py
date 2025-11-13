@@ -321,11 +321,9 @@ def _network_config(network: "Network", converter: _OutputUnitConverter) -> Dict
         "description": network.description,
         "direction": network.direction,
         "boundary_pressure": converter.pressure(network.boundary_pressure),
-        "upstream_pressure": converter.pressure(network.upstream_pressure),
-        "downstream_pressure": converter.pressure(network.downstream_pressure),
         "gas_flow_model": network.gas_flow_model,
-        "temperature": converter.temperature(network.temperature),
-        "pressure": converter.pressure(network.pressure),
+        "boundary_temperature": converter.temperature(network.boundary_temperature),
+        "mass_flow_rate": converter.mass_flow(network.mass_flow_rate),
         "fluid": _fluid_dict(network.fluid, converter),
         "sections": [],
         "output_units": network.output_units.as_dict(),
@@ -504,8 +502,8 @@ def _print_section_overview(
     actual_vol_flow = network.current_volumetric_flow_rate()
 
     standard_flow = fluid.standard_flow_rate if fluid.is_gas() else None
-    temperature = network.temperature
-    density = fluid.current_density(network.temperature, network.pressure)
+    temperature = network.boundary_temperature
+    density = fluid.current_density(network.boundary_temperature, network.boundary_pressure)
 
     def pipe_value(value: Optional[float], unit: Optional[str] = None) -> str:
         if value is None:
@@ -562,7 +560,7 @@ def _print_section_overview(
         else "—"
     )
     print("  Standard Flow Rate (@15 degC, 1 ATM):", standard_flow_text)
-    print(f"  Temperature: {format_measure(temperature, converter.temperature, network.output_units.temperature)}")
+    print(f"  Boundary Temperature: {format_measure(temperature, converter.temperature, network.output_units.temperature)}")
     print(f"  Density: {format_measure(density, converter.density, network.output_units.density)}")
     print(f"  Viscosity: {format_measure(fluid.viscosity, converter.viscosity, 'cP')}")
     if fluid.is_gas():

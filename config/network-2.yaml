@@ -17,7 +17,7 @@ network:
   mass_flow_rate:
     value: 90513.6
     unit: kg/h
-  temperature:
+  boundary_temperature:
     value: 105.19
     unit: degC
   fluid:
@@ -86,4 +86,3 @@ network:
         - {type: tee_through, count: 1}
         - {type: check_valve_swing, count: 1}
       
-

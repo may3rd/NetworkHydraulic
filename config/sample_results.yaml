@@ -3,9 +3,8 @@ network:
   description: Phenol Test
   direction: forward
   boundary_pressure: 101.008
-  upstream_pressure: null
-  downstream_pressure: null
   gas_flow_model: null
+  boundary_temperature: 103.42
   fluid:
     name: liquid
     mass_flow_rate: 90513.6

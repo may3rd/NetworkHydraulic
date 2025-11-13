@@ -12,13 +12,10 @@
    description: Optional human-readable label
    direction: auto | forward | backward
    boundary_pressure: {value: 101.3, unit: kPag}
-   upstream_pressure: {value: …, unit: …}        # optional
-   downstream_pressure: {value: …, unit: …}      # optional
+   boundary_temperature: {value: 25, unit: degC}  # K, required
    gas_flow_model: isothermal | adiabatic        # required for gas, ignored for liquid
    design_margin: 10.0                           # percent, optional
    mass_flow_rate: 1.0                           # kg/s, required
-   temperature: {value: 25, unit: degC}          # K, required
-   pressure: {value: 101.3, unit: kPag}          # Pa, required
    output_units:                                 # optional (see §4)
      pressure: kPag
      …
@@ -146,10 +143,9 @@
  network:
    name: demo
    direction: auto
-   boundary_pressure: {value: 300, unit: kPa}
-   mass_flow_rate: 2.5
-   temperature: {value: 35, unit: degC}
-   pressure: {value: 300, unit: kPa}
+ boundary_pressure: {value: 300, unit: kPa}
+ mass_flow_rate: 2.5
+  boundary_temperature: {value: 35, unit: degC}
    fluid:
      name: nitrogen
      phase: gas

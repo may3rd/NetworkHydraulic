@@ -76,14 +76,15 @@ App
 │   ├── MainContent
 │   └── Footer
 ├── Configuration
-│   ├── FluidProperties
-│   │   ├── BasicProperties
-│   │   ├── PhaseSelection
-│   │   └── FlowConditions
 │   ├── NetworkSettings
-│   │   ├── BoundaryConditions
+│   │   ├── BoundaryConditions (Pressure, Temperature)
 │   │   ├── FlowDirection
+│   │   ├── MassFlowRate
 │   │   └── OutputUnits
+│   ├── FluidProperties
+│   │   ├── PhaseSelection
+│   │   ├── Properties
+│   │   └── Others
 │   └── PipeSections
 │       ├── SectionList
 │       ├── SectionEditor
@@ -230,29 +231,25 @@ UI Re-render with Results
 
 ### 3.2 Configuration Interface Design
 
-#### Fluid Properties Panel
-- **Phase Selection**: Radio buttons for liquid/gas/vapor
-- **Basic Conditions**: 
-  - Temperature
-  - Pressure (gauge/absolute toggle)
-- **Advanced Properties** (shown when needed):
-  - Density (auto-calculated for gases)
-  - Molecular weight (for gases)
-  - Z-factor (for gases)
-  - Viscosity
-  - Specific heat ratio (for gases)
-
 #### Network Settings Panel
 - **Boundary Conditions**:
-  - Upstream/Downstream pressure
   - Boundary pressure
-  - Temperature
+  - Boundary Temperature
 - **Flow Conditions**:
-  - Mass flow rate OR volumetric flow rate
+  - Mass flow rate
   - Design margin percentage
-- **Flow Direction**: Auto/Forward/Backward
+- **Flow Direction**: Forward/Backward
 - **Gas Flow Model**: Isothermal/Adiabatic (for gas phases)
 - **Output Units**: Dropdown selectors for each unit type
+
+#### Fluid Properties Panel
+- **Phase Selection**: Radio buttons for liquid/gas
+- **Properties** (shown when needed):
+  - Density (fixed for liquid, auto-calculated for gases)
+  - Molecular weight (for gases)
+  - Z-factor (for gases)
+  - Specific heat ratio (for gases)
+  - Viscosity
 
 #### Pipe Section Editor
 - **Section List**: Tabular view with add/edit/delete actions
@@ -260,14 +257,14 @@ UI Re-render with Results
   - Basic geometry (NPS/schedule or direct diameter)
   - Length and elevation change
   - Roughness (with typical values)
-- **Fittings Selector**:
+- **Fittings Selector**: (add/edit/delete)
   - Visual fitting library
   - K-factor lookup table
   - Drag-and-drop interface
 - **Component Integration**:
-  - Control valve configuration
-  - Orifice setup
-  - User-defined losses
+  - Control valve configuration (Optional)
+  - Orifice setup (Optional)
+  - User-defined losses (Optional)
 
 ### 3.3 Results Display Design
 

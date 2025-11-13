@@ -19,12 +19,9 @@ network:
   mass_flow_rate:
     value: 90513.6
     unit: kg/h
-  temperature:
+  boundary_temperature:
     value: 103.42
     unit: degC
-  pressure:
-    value: 101.008
-    unit: kPag
   fluid:
     name: liquid
     phase: liquid

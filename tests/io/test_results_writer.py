@@ -84,8 +84,7 @@ def test_write_output_includes_flow_rates(tmp_path: Path):
         boundary_pressure=150000.0,
         gas_flow_model="isothermal",
         sections=[section],
-        temperature=300.0,
-        pressure=150000.0,
+        boundary_temperature=300.0,
         mass_flow_rate=2.0,
     )
     summary = make_summary(density=4.0)
@@ -108,8 +107,6 @@ def test_write_output_includes_flow_rates(tmp_path: Path):
     section_flow = data["network"]["sections"][0]["calculation_result"]["flow"]
     assert section_flow["volumetric_actual"] == pytest.approx(actual_expected)
     assert section_flow["volumetric_standard"] == pytest.approx(standard_expected)
-    assert data["network"]["upstream_pressure"] is None
-    assert data["network"]["downstream_pressure"] is None
     assert data["network"]["output_units"] == {
         "pressure": "Pa",
         "pressure_drop": "Pa",
@@ -133,8 +130,7 @@ def test_write_output_respects_custom_output_units(tmp_path: Path):
         boundary_pressure=150000.0,
         gas_flow_model="isothermal",
         sections=[section],
-        temperature=300.0,
-        pressure=150000.0,
+        boundary_temperature=300.0,
         mass_flow_rate=2.0,
     )
     network.output_units = OutputUnits(
@@ -161,7 +157,7 @@ def test_write_output_respects_custom_output_units(tmp_path: Path):
 
     units_block = data["network"]["output_units"]
     assert units_block["pressure"] == "kPag"
-    boundary_expected = convert(network.pressure, "Pa", "kPag")
+    boundary_expected = convert(network.boundary_pressure, "Pa", "kPag")
     assert data["network"]["boundary_pressure"] == pytest.approx(boundary_expected)
 
     fluid_block = data["network"]["fluid"]
@@ -186,8 +182,7 @@ def test_write_output_writes_json_when_requested(tmp_path: Path):
         boundary_pressure=150000.0,
         gas_flow_model="isothermal",
         sections=[section],
-        temperature=300.0,
-        pressure=150000.0,
+        boundary_temperature=300.0,
         mass_flow_rate=2.0,
     )
     summary = make_summary(density=4.0)
@@ -215,8 +210,7 @@ def test_section_description_included_in_output(tmp_path: Path):
         boundary_pressure=150000.0,
         gas_flow_model="isothermal",
         sections=[section],
-        temperature=300.0,
-        pressure=150000.0,
+        boundary_temperature=300.0,
         mass_flow_rate=2.0,
     )
     summary = make_summary(density=4.0)
@@ -242,8 +236,7 @@ def test_print_summary_output(capfd):
         boundary_pressure=150000.0,
         gas_flow_model="isothermal",
         sections=[section],
-        temperature=300.0,
-        pressure=150000.0,
+        boundary_temperature=300.0,
         mass_flow_rate=2.0,
     )
     network.output_units = OutputUnits(
@@ -325,11 +318,10 @@ def test_write_results_with_none_values(tmp_path: Path):
         description=None, # Set to None
         fluid=fluid,
         direction="forward",
-        boundary_pressure=None, # Set to None
+        boundary_pressure=150000.0,
         gas_flow_model="isothermal", # Corrected to a valid value
         sections=[section],
-        temperature=300.0,
-        pressure=150000.0,
+        boundary_temperature=300.0,
         mass_flow_rate=2.0,
     )
     summary = make_summary(density=4.0)
@@ -350,7 +342,7 @@ def test_write_results_with_none_values(tmp_path: Path):
 
     # Assert that None values are represented as null or omitted
     assert data["network"]["description"] is None
-    assert data["network"]["boundary_pressure"] is None
+    assert data["network"]["boundary_pressure"] == pytest.approx(150000.0)
     assert data["network"]["gas_flow_model"] == "isothermal" # Should not be None
     assert data["network"]["sections"][0]["calculation_result"]["summary"]["inlet"]["mach_number"] is None
     assert data["network"]["sections"][0]["calculation_result"]["summary"]["outlet"]["mach_number"] is None

@@ -88,8 +88,8 @@ def test_network_solver_runs_all_calculations():
         fluid=fluid,
         sections=[section],
         mass_flow_rate=5.0,
-        temperature=298.15,
-        pressure=250000.0,
+        boundary_temperature=298.15,
+        boundary_pressure=250000.0,
     )
     solver = NetworkSolver()
     result = solver.run(network)
@@ -206,8 +206,7 @@ def test_solver_uses_section_pressures_for_components_forward():
         gas_flow_model="isothermal",
         sections=sections,
         mass_flow_rate=2.5,
-        temperature=320.0,
-        pressure=250000.0,
+        boundary_temperature=320.0,
     )
 
     valve_pressures, orifice_pressures, fake_valve, fake_orifice = _capture_component_pressures()
@@ -237,8 +236,7 @@ def test_solver_uses_section_pressures_for_components_backward():
         gas_flow_model="adiabatic",
         sections=sections,
         mass_flow_rate=2.5,
-        temperature=320.0,
-        pressure=250000.0,
+        boundary_temperature=320.0,
     )
 
     valve_pressures, orifice_pressures, fake_valve, fake_orifice = _capture_component_pressures()
@@ -306,8 +304,7 @@ def test_component_drops_match_total_loss_when_no_pipe_losses():
         boundary_pressure=250000.0,
         sections=[section],
         mass_flow_rate=5.0,
-        temperature=298.15,
-        pressure=250000.0,
+        boundary_temperature=298.15,
     )
     solver = NetworkSolver()
     solver.run(network)
@@ -334,12 +331,10 @@ def test_solver_errors_for_missing_gas_parameters():
         gas_flow_model="isothermal",
         sections=[section],
         mass_flow_rate=2.5,
-        temperature=320.0,
-        pressure=250000.0,
+        boundary_temperature=320.0,
     )
-    # Intentionally set temperature and pressure to None on the section to trigger the solver's validation
-    section.temperature = None
-    section.pressure = None
+    # Intentionally drop a required gas parameter to trigger validation
+    fluid.molecular_weight = None
 
     solver = NetworkSolver(default_pipe_diameter=0.1)
     def mock_assign_design_flows(self, sections, network, base_mass_flow):
@@ -347,131 +342,16 @@ def test_solver_errors_for_missing_gas_parameters():
             s.mass_flow_rate = network.mass_flow_rate # Set mass_flow_rate
             s.temperature = None # Ensure temperature is None
             s.pressure = None # Ensure pressure is None
+            s.calculation_output.pressure_drop.frictional_factor = 0.02
     with patch.object(NetworkSolver, "_assign_design_flows", new=mock_assign_design_flows), \
          patch.object(PipeSection, "current_volumetric_flow_rate", return_value=1.0), \
          patch.object(FittingLossCalculator, "calculate", return_value=None), \
          patch.object(FrictionCalculator, "calculate", return_value=None), \
          patch.object(ControlValveCalculator, "calculate", return_value=None):
-        with pytest.raises(ValueError, match="missing required gas-flow inputs: temperature, pressure"):
+        with pytest.raises(ValueError, match="missing required gas-flow inputs: molar_mass"):
             solver.run(network)
 
 
-def test_solver_sets_direction_from_upstream_pressure():
-    fluid = make_fluid()
-    section = make_section()
-    network = Network(
-        name="auto-forward",
-        description=None,
-        fluid=fluid,
-        direction="auto",
-        upstream_pressure=300000.0,
-        sections=[section],
-        mass_flow_rate=5.0,
-        temperature=298.15,
-        pressure=250000.0,
-    )
-    solver = NetworkSolver()
-    solver.run(network)
-    assert network.direction == "forward"
-    assert section.result_summary.inlet.pressure == pytest.approx(300000.0)
-
-
-def test_solver_sets_direction_from_downstream_pressure():
-    fluid = make_fluid()
-    section = make_section()
-    network = Network(
-        name="auto-backward",
-        description=None,
-        fluid=fluid,
-        direction="auto",
-        downstream_pressure=150000.0,
-        sections=[section],
-        mass_flow_rate=5.0,
-        temperature=298.15,
-        pressure=250000.0,
-    )
-    solver = NetworkSolver()
-    solver.run(network)
-    assert network.direction == "backward"
-    assert section.result_summary.outlet.pressure == pytest.approx(150000.0)
-
-
-def test_component_only_section_uses_dual_boundaries():
-    fluid = make_fluid()
-    control_valve = ControlValve(
-        tag="CV-dual",
-        cv=None,
-        cg=None,
-        pressure_drop=None,
-        C1=None,
-        FL=0.9,
-        Fd=0.95,
-        xT=0.7,
-        inlet_diameter=0.1,
-        outlet_diameter=0.1,
-        valve_diameter=0.1,
-    )
-    section = PipeSection(
-        id="component-dual",
-        schedule="40",
-        roughness=4.6e-5,
-        length=0.0,
-        elevation_change=0.0,
-        fitting_type="LR",
-        fittings=[],
-        fitting_K=None,
-        pipe_length_K=None,
-        user_K=None,
-        piping_and_fitting_safety_factor=None,
-        total_K=None,
-        user_specified_fixed_loss=None,
-        pipe_NPD=None,
-        pipe_diameter=0.1,
-        inlet_diameter=0.1,
-        outlet_diameter=0.1,
-        control_valve=control_valve,
-        orifice=None,
-    )
-    network = Network(
-        name="dual-boundary",
-        description=None,
-        fluid=fluid,
-        direction="auto",
-        upstream_pressure=250000.0,
-        downstream_pressure=200000.0,
-        sections=[section],
-        mass_flow_rate=5.0,
-        temperature=298.15,
-        pressure=250000.0,
-    )
-    solver = NetworkSolver()
-    solver.run(network)
-    assert control_valve.pressure_drop == pytest.approx(50000.0)
-    assert section.result_summary.inlet.pressure == pytest.approx(250000.0)
-    assert section.result_summary.outlet.pressure == pytest.approx(200000.0)
-
-
-# def test_solver_handles_no_initial_pressure_gracefully():
-#     fluid = make_fluid()
-#     section = make_section()
-#     network = Network(
-#         name="no-initial-pressure",
-#         description=None,
-#         fluid=fluid,
-#         direction="auto",
-#         boundary_pressure=None,
-#         upstream_pressure=None,
-#         downstream_pressure=None,
-#         sections=[section],
-#         mass_flow_rate=5.0,
-#         temperature=298.15,
-#         pressure=None,
-#     )
-
-#     solver = NetworkSolver()
-#     result = solver.run(network)
-
-#     # Expect initial pressure to be None, leading to None pressures in results
 #     assert result.sections[0].summary.inlet.pressure is None
 #     assert result.sections[0].summary.outlet.pressure is None
 #     assert result.summary.inlet.pressure is None

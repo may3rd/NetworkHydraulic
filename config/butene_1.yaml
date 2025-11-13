@@ -16,7 +16,7 @@ network:
   mass_flow_rate:
     value: 1000.0
     unit: kg/h
-  temperature:
+  boundary_temperature:
     value: 42.0
     unit: degC
   fluid:
@@ -40,7 +40,7 @@ network:
       fitting_type: LR
       orifice:
         tag: FE
-        pressure_drop: 0.20
+        pressure_drop: 200
     - id: "2"
       schedule: "40"
       pipe_NPD: 2.0
@@ -52,5 +52,5 @@ network:
       fitting_type: LR
       control_valve:
         tag: CV
-        pressure_drop: 0.20
+        pressure_drop: 700
         

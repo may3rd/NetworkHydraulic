@@ -37,8 +37,9 @@ NETWORK_ALLOWED_KEYS = {
     "description",
     "direction",
     "boundary_pressure",
-    "upstream_pressure",
-    "downstream_pressure",
+    "boundary_temperature",
+    "pressure",
+    "temperature",
     "gas_flow_model",
     "gas_flow_type",
     "fluid",
@@ -46,8 +47,6 @@ NETWORK_ALLOWED_KEYS = {
     "output_units",
     "design_margin",
     "mass_flow_rate",
-    "temperature",
-    "pressure",
 }
 
 SECTION_ALLOWED_KEYS = {
@@ -123,23 +122,25 @@ class ConfigurationLoader:
         self._validate_keys(network_cfg, NETWORK_ALLOWED_KEYS, context="network")
         fluid_cfg = network_cfg.get("fluid", {})
         
-        network_temperature = self._require_positive_quantity(
-            network_cfg.get("temperature"),
-            "network.temperature",
+        raw_boundary_temperature = (
+            network_cfg.get("boundary_temperature")
+            if network_cfg.get("boundary_temperature") is not None
+            else network_cfg.get("temperature")
+        )
+        raw_boundary_pressure = (
+            network_cfg.get("boundary_pressure")
+            if network_cfg.get("boundary_pressure") is not None
+            else network_cfg.get("pressure")
+        )
+        boundary_temperature = self._require_positive_quantity(
+            raw_boundary_temperature,
+            "network.boundary_temperature",
             target_unit="K",
         )
-        network_pressure = self._quantity(
-            network_cfg.get("pressure"),
-            "network.pressure",
+        boundary_pressure = self._require_positive_quantity(
+            raw_boundary_pressure,
+            "network.boundary_pressure",
             target_unit="Pa",
-        )
-
-        boundary_pressure = self._quantity(network_cfg.get("boundary_pressure"), "network.boundary_pressure", target_unit="Pa")
-        upstream_pressure = self._quantity(
-            network_cfg.get("upstream_pressure"), "network.upstream_pressure", target_unit="Pa"
-        )
-        downstream_pressure = self._quantity(
-            network_cfg.get("downstream_pressure"), "network.downstream_pressure", target_unit="Pa"
         )
         phase = fluid_cfg.get("phase", "liquid")
         
@@ -205,12 +206,9 @@ class ConfigurationLoader:
             name=network_cfg.get("name", "network"),
             description=network_cfg.get("description"),
             fluid=fluid,
-            temperature=network_temperature,
-            pressure=network_pressure,
-            direction=direction,
+            boundary_temperature=boundary_temperature,
             boundary_pressure=boundary_pressure,
-            upstream_pressure=upstream_pressure,
-            downstream_pressure=downstream_pressure,
+            direction=direction,
             mass_flow_rate=mass_flow_rate_val,
             gas_flow_model=gas_flow_model,
             sections=sections,

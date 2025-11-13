@@ -1,24 +1,4 @@
-"""Fluid properties used across sections.
-
-Example:
-
-    from network_hydraulic.models.fluid import Fluid
-
-    fluid = Fluid(
-        name="nitrogen",
-        mass_flow_rate=1.0,
-        volumetric_flow_rate=None,
-        phase="gas",
-        temperature=300.0,
-        pressure=101325.0,
-        density=1.25,
-        molecular_weight=28.0,
-        z_factor=0.95,
-        specific_heat_ratio=1.33,
-        viscosity=1e-5,
-        standard_flow_rate=None,
-    )
-"""
+"""Physical fluid definition covering liquid or gas attributes."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -31,12 +11,12 @@ GAS_CONSTANT = 8.314462618  # J/(mol*K)
 class Fluid:
     name: Optional[str]
     phase: str
-    density: float
-    molecular_weight: float
-    z_factor: float
-    specific_heat_ratio: float
     viscosity: float
-    standard_flow_rate: Optional[float]
+    density: Optional[float] = None
+    molecular_weight: Optional[float] = None
+    z_factor: Optional[float] = None
+    specific_heat_ratio: Optional[float] = None
+    standard_flow_rate: Optional[float] = None
     vapor_pressure: Optional[float] = None
     critical_pressure: Optional[float] = None
 
