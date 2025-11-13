@@ -1,5 +1,5 @@
 network:
-  name: OSBL Butene -1 
+  name: OSBL Butene-1 
   description: 
   direction: forward
   boundary_pressure:
@@ -19,9 +19,18 @@ network:
   temperature:
     value: 42.0
     unit: degC
+  pressure:
+    value: 133.525
+    unit: kPa
   fluid:
     name: Butene-1
     phase: liquid
+    density:
+      value: 580.0
+      unit: kg/m^3
+    viscosity: 0.00013
+    vapor_pressure: null
+    critical_pressure: null
   sections:
     - id: "1"
       schedule: "40"
@@ -34,5 +43,17 @@ network:
       fitting_type: LR
       orifice:
         tag: FE
+        pressure_drop: 0.20
+    - id: "2"
+      schedule: "40"
+      pipe_NPD: 2.0
+      roughness: 4.57e-5
+      length:
+        value: 0.0
+        unit: m
+      erosional_constant: 100
+      fitting_type: LR
+      control_valve:
+        tag: CV
         pressure_drop: 0.20
         
