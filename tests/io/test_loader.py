@@ -205,6 +205,19 @@ def test_loader_requires_section_length():
         loader.build_network()
 
 
+def test_loader_allows_lengthless_component_section():
+    raw = liquid_network_cfg()
+    section = raw["network"]["sections"][0]
+    section.pop("length")
+    section["control_valve"] = {"pressure_drop": {"value": 10.0, "unit": "kPa"}}
+    loader = ConfigurationLoader(raw=raw)
+    network = loader.build_network()
+    loaded_section = network.sections[0]
+    assert loaded_section.length == 0.0
+    assert loaded_section.control_valve is not None
+    assert loaded_section.control_valve.pressure_drop == pytest.approx(convert(10.0, "kPa", "Pa"))
+
+
 def test_loader_aligns_adjacent_pipe_diameters():
     upstream = section_cfg(id="s1", pipe_diameter=0.1, fittings=[])
     upstream["output_ID"] = None

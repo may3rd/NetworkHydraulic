@@ -239,14 +239,18 @@ class ConfigurationLoader:
         outlet_diameter = self._diameter(cfg.get("outlet_diameter"), "outlet_diameter", default=outlet_d)
         fittings = self._build_fittings(cfg.get("fittings"), inlet_diameter, outlet_diameter, pipe_diameter)
         roughness = self._quantity(cfg.get("roughness"), "roughness", target_unit="m", default=0.0)
-        length = self._quantity(cfg.get("length"), "length", target_unit="m")
-        if length is None:
-            section_id = cfg.get("id", "<unknown>")
-            raise ValueError(f"section.length must be provided for section '{section_id}'")
+        length = self._quantity(cfg.get("length"), "length", target_unit="m", default=0.0) or 0.0
         elevation_change = self._quantity(
             cfg.get("elevation_change"), "elevation_change", target_unit="m", default=0.0
         )
         boundary_pressure = self._quantity(cfg.get("boundary_pressure"), "section.boundary_pressure", target_unit="Pa")
+        user_fixed_loss = self._quantity(
+            cfg.get("user_specified_fixed_loss"), "user_specified_fixed_loss", target_unit="Pa"
+        )
+        has_component = bool(control_valve or orifice or user_fixed_loss)
+        if length <= 0.0 and not has_component:
+            section_id = cfg.get("id", "<unknown>")
+            raise ValueError(f"section.length must be provided for section '{section_id}'")
         pipe_section = PipeSection(
             id=cfg["id"],
             schedule=schedule,
@@ -260,9 +264,7 @@ class ConfigurationLoader:
             user_K=cfg.get("user_K"),
             piping_and_fitting_safety_factor=cfg.get("piping_and_fitting_safety_factor"),
             total_K=cfg.get("total_K"),
-            user_specified_fixed_loss=self._quantity(
-                cfg.get("user_specified_fixed_loss"), "user_specified_fixed_loss", target_unit="Pa"
-            ),
+            user_specified_fixed_loss=user_fixed_loss,
             pipe_NPD=pipe_npd,
             description=cfg.get("description") or f"Line {cfg['id']}",
             design_margin=self._coerce_optional_float(cfg.get("design_margin"), "section.design_margin"),

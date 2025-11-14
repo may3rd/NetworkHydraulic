@@ -68,9 +68,9 @@ def make_summary(density: float) -> ResultSummary:
     return ResultSummary(inlet=inlet_state, outlet=outlet_state)
 
 
-def make_results(summary: ResultSummary) -> SectionResult:
+def make_results(summary: ResultSummary, section_id: str = "sec-1") -> SectionResult:
     calc = CalculationOutput(pressure_drop=PressureDropDetails())
-    return SectionResult(section_id="sec-1", calculation=calc, summary=summary)
+    return SectionResult(section_id=section_id, calculation=calc, summary=summary)
 
 
 def test_write_output_includes_flow_rates(tmp_path: Path):
@@ -88,6 +88,7 @@ def test_write_output_includes_flow_rates(tmp_path: Path):
         mass_flow_rate=2.0,
     )
     summary = make_summary(density=4.0)
+    section.mass_flow_rate = network.mass_flow_rate
     section_result = make_results(summary)
     network_result = NetworkResult(sections=[section_result], aggregate=CalculationOutput(), summary=summary)
 
@@ -119,6 +120,79 @@ def test_write_output_includes_flow_rates(tmp_path: Path):
     }
 
 
+def test_section_flow_uses_section_mass_flow(tmp_path: Path):
+    section = build_section()
+    fluid = build_fluid()
+    network = Network(
+        name="section-flow",
+        description=None,
+        fluid=fluid,
+        direction="forward",
+        boundary_pressure=150000.0,
+        gas_flow_model="isothermal",
+        sections=[section],
+        boundary_temperature=300.0,
+        mass_flow_rate=2.0,
+    )
+    summary = make_summary(density=4.0)
+    section.mass_flow_rate = 1.5
+    section_result = make_results(summary)
+    network_result = NetworkResult(sections=[section_result], aggregate=CalculationOutput(), summary=summary)
+
+    out_path = tmp_path / "section_flow.yaml"
+    results_io.write_output(out_path, network, network_result)
+
+    with out_path.open("r", encoding="utf-8") as handle:
+        data = yaml.safe_load(handle)
+
+    network_flow = data["network"]["summary"]["flow"]
+    section_flow = data["network"]["sections"][0]["calculation_result"]["flow"]
+    network_expected = network.mass_flow_rate / summary.inlet.density
+    section_expected = section.mass_flow_rate / summary.inlet.density
+    assert network_flow["volumetric_actual"] == pytest.approx(network_expected)
+    assert section_flow["volumetric_actual"] == pytest.approx(section_expected)
+
+
+def test_write_output_handles_multiple_sections_flow_rates(tmp_path: Path):
+    sec1 = build_section("sec-1")
+    sec2 = build_section("sec-2")
+    fluid = build_fluid()
+    network = Network(
+        name="multi",
+        description=None,
+        fluid=fluid,
+        direction="forward",
+        boundary_pressure=150000.0,
+        gas_flow_model="isothermal",
+        sections=[sec1, sec2],
+        boundary_temperature=300.0,
+        mass_flow_rate=3.0,
+    )
+    summary1 = make_summary(density=4.0)
+    summary2 = make_summary(density=5.0)
+    sec1.mass_flow_rate = 2.0
+    sec2.mass_flow_rate = 1.0
+    result1 = make_results(summary1, section_id="sec-1")
+    result2 = make_results(summary2, section_id="sec-2")
+    network_result = NetworkResult(
+        sections=[result1, result2],
+        aggregate=CalculationOutput(),
+        summary=summary1,
+    )
+
+    out_path = tmp_path / "multi_sections.yaml"
+    results_io.write_output(out_path, network, network_result)
+
+    with out_path.open("r", encoding="utf-8") as handle:
+        data = yaml.safe_load(handle)
+
+    sections_payload = data["network"]["sections"]
+    flow1 = sections_payload[0]["calculation_result"]["flow"]
+    flow2 = sections_payload[1]["calculation_result"]["flow"]
+    assert flow1["volumetric_actual"] == pytest.approx(sec1.mass_flow_rate / summary1.inlet.density)
+    assert flow2["volumetric_actual"] == pytest.approx(sec2.mass_flow_rate / summary2.inlet.density)
+
+
 def test_write_output_respects_custom_output_units(tmp_path: Path):
     section = build_section()
     fluid = build_fluid()
@@ -143,6 +217,7 @@ def test_write_output_respects_custom_output_units(tmp_path: Path):
         mass_flow_rate="kg/h",
     )
     summary = make_summary(density=4.0)
+    section.mass_flow_rate = network.mass_flow_rate
     section_result = make_results(summary)
     pd = section_result.calculation.pressure_drop
     pd.pipe_and_fittings = 5000.0
@@ -262,6 +337,8 @@ def test_print_summary_output(capfd):
     section_result.summary.outlet.temperature = 299.5
     section_result.summary.inlet.velocity = 10.0
     section_result.summary.outlet.velocity = 10.5
+    section_result.summary.inlet.pipe_velocity = 9.5
+    section_result.summary.outlet.pipe_velocity = 9.5
     section_result.summary.inlet.mach_number = 0.1
     section_result.summary.outlet.mach_number = 0.11
     section_result.summary.inlet.flow_momentum = 1000.0
@@ -280,6 +357,7 @@ def test_print_summary_output(capfd):
     assert "Section sec-1:" in out
     assert "Section ID: sec-1" in out
     assert "Description: A demo network for summary printing" in out
+    assert "Pipe Avg Velocity: 9.500 m/s" in out
 
     # Test with None values
     network.description = None
@@ -291,6 +369,8 @@ def test_print_summary_output(capfd):
     section_result.summary.outlet.mach_number = None
     section_result.summary.inlet.flow_momentum = None
     section_result.summary.outlet.flow_momentum = None
+    section_result.summary.inlet.pipe_velocity = None
+    section_result.summary.outlet.pipe_velocity = None
     section_result.summary.inlet.erosional_velocity = None
     section_result.summary.outlet.erosional_velocity = None
     section_result.summary.inlet.remarks = None
@@ -306,6 +386,7 @@ def test_print_summary_output(capfd):
     assert "Mach: —" in out
     assert "Flow Momentum (rho V^2): — Pa" in out
     assert "Flow Momentum (rho V^2): — Pa" in out
+    assert "Pipe Avg Velocity: — m/s" in out
     assert "Erosional Velocity: — m/s" in out
     assert "Erosional Velocity: — m/s" in out
 

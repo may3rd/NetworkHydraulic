@@ -12,7 +12,7 @@ from network_hydraulic.models.fluid import Fluid
 from network_hydraulic.models.pipe_section import Fitting, PipeSection
 from network_hydraulic.models.results import FittingBreakdown
 
-INCHES_PER_METER = 39.3700787402
+INCHES_PER_METER = 1 / 0.0254
 
 
 FITTING_COEFFICIENTS: Dict[str, object] = {
@@ -68,15 +68,19 @@ class FittingLossCalculator(LossCalculator):
     default_pipe_diameter: Optional[float] = None
 
     def calculate(self, section: PipeSection) -> None:
+        """Compute total fitting K for the section and capture a breakdown."""
         details = section.calculation_output.pressure_drop
         details.fitting_breakdown = []
+        if not section.has_pipeline_segment:
+            section.fitting_K = 0.0
+            return
         if not section.fittings:
             section.fitting_K = 0.0
             return
 
         diameter = self._pipe_diameter(section)
         velocity = self._velocity(section, diameter)
-        
+
         if section.temperature is None or section.temperature <= 0:
             raise ValueError("section.temperature must be set and positive for fittings calculations")
         if section.pressure is None or section.pressure <= 0:
@@ -107,12 +111,14 @@ class FittingLossCalculator(LossCalculator):
         details.fitting_breakdown = breakdown
 
     def _pipe_diameter(self, section: PipeSection) -> float:
+        """Return the first positive diameter defined on the section or calculator."""
         for candidate in (section.pipe_diameter, self.default_pipe_diameter):
             if candidate and candidate > 0:
                 return candidate
         raise ValueError("Pipe diameter is required to evaluate fittings with the 2-K method")
 
     def _velocity(self, section: PipeSection, diameter: float) -> float:
+        """Compute axial velocity from the current volumetric flow rate."""
         flow_rate = section.current_volumetric_flow_rate(self.fluid)
         area = 0.25 * pi * diameter * diameter
         if area <= 0:
@@ -124,29 +130,29 @@ class FittingLossCalculator(LossCalculator):
         fitting: Fitting,
         section: PipeSection,
         reynolds: float,
-        diameter: float,
+        pipe_diameter: float,
     ) -> float:
+        """Return the K value for one fitting, scaled by its count."""
         ftype = fitting.type
         coeffs = self._coefficients_for(ftype, section)
         if coeffs:
-            k_value = self._two_k(coeffs[0], coeffs[1], reynolds, diameter)
+            k_value = self._two_k(coeffs[0], coeffs[1], reynolds, pipe_diameter)
         elif ftype == "pipe_entrance_normal":
-            k_value = self._normal_entrance_k(section, reynolds)
+            k_value = self._entrance_k(section, reynolds, pipe_diameter, 0.5)
         elif ftype == "pipe_entrance_raise":
-            inlet = self._inlet_diameter(section) or diameter
-            ratio = diameter / inlet
-            k_value = (160.0 / reynolds + 1.0) * ratio**4
+            k_value = self._entrance_k(section, reynolds, pipe_diameter, 1.0)
         elif ftype == "pipe_exit":
-            k_value = self._normal_exit_k(section)
+            k_value = self._exit_k(section, pipe_diameter)
         elif ftype == "inlet_swage":
-            k_value = self._inlet_swage_k(section, reynolds)
+            k_value = self._inlet_swage_k(section, reynolds, pipe_diameter)
         elif ftype == "outlet_swage":
-            k_value = self._outlet_swage_k(section, reynolds)
+            k_value = self._outlet_swage_k(section, reynolds, pipe_diameter)
         else:
             raise ValueError(f"Unsupported fitting type '{ftype}' for 2-K calculation")
         return k_value * fitting.count
 
     def _coefficients_for(self, fitting_type: str, section: PipeSection) -> Optional[Tuple[float, float]]:
+        """Look up (k1, kinf) coefficients for the given fitting and style."""
         entry = FITTING_COEFFICIENTS.get(fitting_type)
         if entry is None:
             return None
@@ -159,6 +165,7 @@ class FittingLossCalculator(LossCalculator):
         return None
 
     def _normalized_style(self, section: PipeSection) -> str:
+        """Normalize the section fitting style string to a lookup key."""
         raw = (section.fitting_type or "").strip().lower()
         if raw in {"scrd", "sr", "lr"}:
             return raw
@@ -167,43 +174,49 @@ class FittingLossCalculator(LossCalculator):
         return "default"
 
     def _two_k(self, k1: float, kinf: float, reynolds: float, diameter: float) -> float:
+        """Compute the K value from the two-constant correlation."""
         diameter_in = diameter * INCHES_PER_METER
         return k1 / reynolds + kinf * (1.0 + 1.0 / diameter_in)
 
     @staticmethod
     def _diameter_ratio(numerator: Optional[float], denominator: Optional[float]) -> float:
+        """Return a positive diameter ratio, defaulting to 1 when data is missing."""
         if numerator is None or denominator is None or denominator <= 0:
             return 1.0
         return max(0.0, numerator / denominator)
 
-    def _normal_exit_k(self, section: PipeSection) -> float:
-        pipe = self._pipe_diameter(section)
-        outlet = self._outlet_diameter(section) or pipe
-        ratio = self._diameter_ratio(outlet, pipe)
-        base = 1.0
+    def _exit_k(self, section: PipeSection, pipe_diameter: float, base: float = 1.0) -> float:
+        """Losses due to exit expansion that dumps into a reservoir."""
+        outlet = self._outlet_diameter(section) or pipe_diameter
+        ratio = self._diameter_ratio(pipe_diameter, outlet)
         return base * ratio**4
 
-    def _normal_entrance_k(self, section: PipeSection, reynolds: float) -> float:
-        pipe = self._pipe_diameter(section)
-        inlet = self._inlet_diameter(section) or pipe
-        ratio = self._diameter_ratio(inlet, pipe)
-        base = 0.5
+    def _entrance_k(
+        self,
+        section: PipeSection,
+        reynolds: float,
+        pipe_diameter: float,
+        base: float = 1.0,
+    ) -> float:
+        """Losses at the pipe entrance, optionally applying additional base factors."""
+        inlet = self._inlet_diameter(section) or pipe_diameter
+        ratio = self._diameter_ratio(pipe_diameter, inlet)
         return (160.0 / reynolds + base) * ratio**4
 
-    def _inlet_swage_k(self, section: PipeSection, reynolds: float) -> float:
-        inlet = self._inlet_diameter(section) or self._pipe_diameter(section)
-        pipe = self._pipe_diameter(section)
-        corrected_re = reynolds * (pipe / inlet) if inlet else reynolds
-        reducer = self._reducer_k(corrected_re, inlet, pipe, section.roughness)
-        expander = self._expander_k(corrected_re, inlet, pipe, section.roughness)
+    def _inlet_swage_k(self, section: PipeSection, reynolds: float, pipe_diameter: float) -> float:
+        """Combined reducer + expander loss for the inlet swage."""
+        inlet = self._inlet_diameter(section) or pipe_diameter
+        corrected_re = reynolds * (pipe_diameter / inlet) if inlet else reynolds
+        reducer = self._reducer_k(corrected_re, inlet, pipe_diameter, section.roughness)
+        expander = self._expander_k(corrected_re, inlet, pipe_diameter, section.roughness)
         return reducer + expander
 
-    def _outlet_swage_k(self, section: PipeSection, reynolds: float) -> float:
-        pipe = self._pipe_diameter(section)
-        outlet = self._outlet_diameter(section) or pipe
-        reducer = self._reducer_k(reynolds, pipe, outlet, section.roughness)
-        expander = self._expander_k(reynolds, pipe, outlet, section.roughness)
-        ratio = pipe / outlet if outlet else 1.0
+    def _outlet_swage_k(self, section: PipeSection, reynolds: float, pipe_diameter: float) -> float:
+        """Combined reducer + expander loss for the outlet swage."""
+        outlet = self._outlet_diameter(section) or pipe_diameter
+        reducer = self._reducer_k(reynolds, pipe_diameter, outlet, section.roughness)
+        expander = self._expander_k(reynolds, pipe_diameter, outlet, section.roughness)
+        ratio = pipe_diameter / outlet if outlet else 1.0
         return (reducer + expander) * ratio**4
 
     def _reducer_k(
@@ -213,6 +226,7 @@ class FittingLossCalculator(LossCalculator):
         diameter_outlet: Optional[float],
         roughness: Optional[float],
     ) -> float:
+        """Loss coefficient for a reducer with the provided hydraulic data."""
         if (
             reynolds <= 0
             or not diameter_inlet
@@ -239,6 +253,7 @@ class FittingLossCalculator(LossCalculator):
         diameter_outlet: Optional[float],
         roughness: Optional[float],
     ) -> float:
+        """Loss coefficient for an expander with the provided hydraulic data."""
         if (
             reynolds <= 0
             or not diameter_inlet
@@ -261,18 +276,22 @@ class FittingLossCalculator(LossCalculator):
 
     @staticmethod
     def _relative_roughness(roughness: Optional[float], diameter: float) -> float:
+        """Return roughness divided by diameter, tolerating optional values."""
         if not roughness or roughness <= 0:
             return 0.0
         return roughness / diameter
 
     def _inlet_diameter(self, section: PipeSection) -> Optional[float]:
+        """Prefer the explicit inlet diameter, falling back to pipe/default."""
         return section.inlet_diameter or section.pipe_diameter or self.default_pipe_diameter
 
     def _outlet_diameter(self, section: PipeSection) -> Optional[float]:
+        """Prefer the explicit outlet diameter, falling back to pipe/default."""
         return section.outlet_diameter or section.pipe_diameter or self.default_pipe_diameter
 
     @staticmethod
     def _require_positive(value: Optional[float], name: str) -> float:  # pragma: no cover - defensive
+        """Validate that the given scalar is a positive float."""
         if value is None or value <= 0:
             raise ValueError(f"{name} must be positive for fittings calculations")
         return value

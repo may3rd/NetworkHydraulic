@@ -31,6 +31,7 @@ class OrificeCalculator(LossCalculator):
         section: PipeSection,
         *,
         inlet_pressure_override: Optional[float] = None,
+        mass_flow_override: Optional[float] = None,
     ) -> None:
         orifice = section.orifice
         if orifice is None:
@@ -47,6 +48,9 @@ class OrificeCalculator(LossCalculator):
                 "Orifice requires d_over_D_ratio, orifice_diameter, or pressure_drop to be specified"
             )
 
+        mass_flow = None
+        if not has_drop:
+            mass_flow = self._mass_flow_rate(section, mass_flow_override)
         if has_drop:
             pipe_diameter = self._maybe_pipe_diameter(section)
             drop = max(orifice.pressure_drop or 0.0, 0.0)
@@ -54,8 +58,15 @@ class OrificeCalculator(LossCalculator):
             orifice.calculation_note = (
                 f"Used specified pressure_drop ({self._format_drop(drop)})."
             )
+        elif mass_flow is None:
+            drop = 0.0
+            orifice.pressure_drop = drop
+            orifice.calculation_note = (
+                orifice.calculation_note
+                or "Skipped orifice calculation: mass_flow_rate unavailable"
+            )
         else:
-            drop = self._compute_drop(section, orifice, inlet_pressure_override)
+            drop = self._compute_drop(section, orifice, inlet_pressure_override, mass_flow)
             orifice.pressure_drop = drop
 
         pressure_drop.orifice_pressure_drop = drop
@@ -67,6 +78,7 @@ class OrificeCalculator(LossCalculator):
         section: PipeSection,
         orifice: Orifice,
         inlet_pressure_override: Optional[float],
+        mass_flow: float,
     ) -> float:
         pipe_diameter = self._pipe_diameter(section)
         orifice_diameter = self._orifice_diameter(orifice, pipe_diameter)
@@ -81,8 +93,6 @@ class OrificeCalculator(LossCalculator):
         )
         if inlet_pressure is None or inlet_pressure <= 0:
             raise ValueError("Orifice inlet pressure must be positive")
-        mass_flow = self._mass_flow_rate(section)
-        
         if section.temperature is None or section.temperature <= 0:
             raise ValueError("section.temperature must be set and positive for orifice calculations")
         if section.pressure is None or section.pressure <= 0:
@@ -223,12 +233,24 @@ class OrificeCalculator(LossCalculator):
             return self.fluid.specific_heat_ratio
         return 1.4
 
-    def _mass_flow_rate(self, section: PipeSection) -> float:
-        if section.mass_flow_rate and section.mass_flow_rate > 0:
+    def _mass_flow_rate(
+        self,
+        section: PipeSection,
+        mass_flow_override: Optional[float],
+    ) -> Optional[float]:
+        if mass_flow_override is not None:
+            if mass_flow_override <= 0:
+                raise ValueError("Mass flow rate is required for orifice calculations")
+            return mass_flow_override
+        if section.mass_flow_rate is not None:
+            if section.mass_flow_rate <= 0:
+                raise ValueError("Mass flow rate is required for orifice calculations")
             return section.mass_flow_rate
-        if self.mass_flow_rate and self.mass_flow_rate > 0:
+        if self.mass_flow_rate is not None:
+            if self.mass_flow_rate <= 0:
+                raise ValueError("Mass flow rate is required for orifice calculations")
             return self.mass_flow_rate
-        raise ValueError("Mass flow rate is required for orifice calculations")
+        return None
 
     @staticmethod
     def _format_drop(drop: float) -> str:

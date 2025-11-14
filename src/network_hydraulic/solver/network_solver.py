@@ -146,11 +146,21 @@ class NetworkSolver:
 
     def _validate_section_prerequisites(self, section: PipeSection) -> None:
         errors: list[str] = []
-        diameter = section.pipe_diameter or self.default_pipe_diameter
-        if diameter is None or diameter <= 0:
-            errors.append("pipe diameter is required")
-        if section.length is None:
-            errors.append("length must be provided")
+        has_pipeline = section.has_pipeline_segment
+        has_user_loss = (
+            section.user_specified_fixed_loss is not None and section.user_specified_fixed_loss > 0
+        )
+        has_component = (
+            section.control_valve is not None or section.orifice is not None or has_user_loss
+        )
+        if not has_pipeline and not has_component:
+            errors.append(
+                f"Section '{section.id}' must define either a pipeline segment or a control valve/orifice"
+            )
+        if has_pipeline:
+            diameter = section.pipe_diameter or self.default_pipe_diameter
+            if diameter is None or diameter <= 0:
+                errors.append("pipe diameter is required")
         if errors:
             raise ValueError(
                 f"Section '{section.id}' is invalid: {', '.join(errors)}"
@@ -209,7 +219,7 @@ class NetworkSolver:
         orifice_calculator = OrificeCalculator(
             fluid=network.fluid,
             default_pipe_diameter=self.default_pipe_diameter,
-            mass_flow_rate=mass_flow, # This will be updated per section
+            mass_flow_rate=mass_flow,
         )
 
         if network.fluid.is_gas():
@@ -226,18 +236,40 @@ class NetworkSolver:
                     section.temperature = current_temperature
                 section_start_temperature = section.temperature
                 section.pressure = section_start_pressure
-
-                # Update orifice calculator with section's mass flow rate
-                orifice_calculator.mass_flow_rate = section.mass_flow_rate
+                has_pipeline = section.has_pipeline_segment
 
                 self._apply_pressure_dependent_losses(
                     section,
                     inlet_pressure=section_start_pressure,
                     control_valve_calculator=control_valve_calculator,
                     orifice_calculator=orifice_calculator,
+                    mass_flow_override=section.mass_flow_rate,
                 )
 
                 loss = section.calculation_output.pressure_drop.total_segment_loss or 0.0
+
+                if not has_pipeline:
+                    if forward:
+                        summary.inlet.pressure = section_start_pressure
+                        summary.outlet.pressure = self._safe_subtract(section_start_pressure, loss)
+                        current = summary.outlet.pressure
+                    else:
+                        summary.outlet.pressure = section_start_pressure
+                        summary.inlet.pressure = self._safe_add(section_start_pressure, loss)
+                        current = summary.inlet.pressure
+
+                    NormalizedLossCalculator().calculate(section)
+
+                    entry_state = summary.inlet if forward else summary.outlet
+                    exit_state = summary.outlet if forward else summary.inlet
+                    self._apply_section_entry_state(section, entry_state, section_start_temperature)
+                    exit_pressure = exit_state.pressure
+                    if exit_pressure is not None:
+                        current = exit_pressure
+                    exit_temperature = exit_state.temperature
+                    if exit_temperature is not None and exit_temperature > 0:
+                        current_temperature = exit_temperature
+                    continue
 
                 # Gather parameters for gas flow solvers
                 temperature = section.temperature
@@ -245,7 +277,7 @@ class NetworkSolver:
                 molar_mass = network.fluid.molecular_weight
                 z_factor = network.fluid.z_factor
                 gamma = network.fluid.specific_heat_ratio
-                length = section.length
+                length = section.length or 0.0
                 friction_factor = section.calculation_output.pressure_drop.frictional_factor
                 k_total = section.total_K
                 pipe_k = section.pipe_length_K or 0.0
@@ -510,14 +542,12 @@ class NetworkSolver:
                 section_start_temperature = section.temperature
                 section.pressure = section_start_pressure
 
-                # Update orifice calculator with section's mass flow rate
-                orifice_calculator.mass_flow_rate = section.mass_flow_rate
-
                 self._apply_pressure_dependent_losses(
                     section,
                     inlet_pressure=section_start_pressure,
                     control_valve_calculator=control_valve_calculator,
                     orifice_calculator=orifice_calculator,
+                    mass_flow_override=section.mass_flow_rate,
                 )
                 loss = section.calculation_output.pressure_drop.total_segment_loss or 0.0
                 if forward:
@@ -553,6 +583,7 @@ class NetworkSolver:
         inlet_pressure: Optional[float],
         control_valve_calculator: ControlValveCalculator,
         orifice_calculator: OrificeCalculator,
+        mass_flow_override: Optional[float] = None,
     ) -> None:
         if inlet_pressure is None or inlet_pressure <= 0:
             if section.control_valve or section.orifice:
@@ -561,16 +592,40 @@ class NetworkSolver:
                 )
             return
 
+        pressure_drop = section.calculation_output.pressure_drop
+        ignored = section.calculation_output.ignored_components
+
+        if section.has_pipeline_segment:
+            if section.control_valve:
+                ignored.append("Control valve ignored because section includes a pipeline segment.")
+            if section.orifice:
+                ignored.append("Orifice ignored because section includes a pipeline segment.")
+            if section.user_specified_fixed_loss:
+                ignored.append("User-defined fixed loss ignored because section includes a pipeline segment.")
+            pressure_drop.control_valve_pressure_drop = 0.0
+            pressure_drop.orifice_pressure_drop = 0.0
+            return
+
         if section.control_valve:
             control_valve_calculator.calculate(
                 section,
                 inlet_pressure_override=inlet_pressure,
             )
+            if section.orifice:
+                ignored.append("Orifice ignored because control valve takes precedence in this section.")
+            if section.user_specified_fixed_loss:
+                ignored.append("User-defined fixed loss ignored because control valve takes precedence in this section.")
+            pressure_drop.orifice_pressure_drop = 0.0
+            return
+
         if section.orifice:
             orifice_calculator.calculate(
                 section,
                 inlet_pressure_override=inlet_pressure,
+                mass_flow_override=mass_flow_override,
             )
+            if section.user_specified_fixed_loss:
+                ignored.append("User-defined fixed loss ignored because orifice takes precedence in this section.")
 
     @staticmethod
     def _apply_section_entry_state(
@@ -648,10 +703,23 @@ class NetworkSolver:
         pressure: Optional[float],
     ) -> None:
         summary = section.result_summary
-        diameter = section.pipe_diameter or self.default_pipe_diameter
-        if not diameter or diameter <= 0:
+        pipe_diameter = section.pipe_diameter or self.default_pipe_diameter
+        if not pipe_diameter or pipe_diameter <= 0:
             return
-        area = pi * diameter * diameter * 0.25
+        pipe_area = pi * pipe_diameter * pipe_diameter * 0.25
+        inlet_diameter = section.inlet_diameter or pipe_diameter
+        outlet_diameter = section.outlet_diameter or pipe_diameter
+
+        inlet_area = (
+            pi * inlet_diameter * inlet_diameter * 0.25
+            if inlet_diameter and inlet_diameter > 0
+            else pipe_area
+        )
+        outlet_area = (
+            pi * outlet_diameter * outlet_diameter * 0.25
+            if outlet_diameter and outlet_diameter > 0
+            else pipe_area
+        )
         
         if temperature is None or temperature <= 0:
             raise ValueError("temperature must be set and positive for section state calculations")
@@ -666,8 +734,15 @@ class NetworkSolver:
                 vol_flow = None
 
         velocity = None
-        if vol_flow and vol_flow > 0 and area > 0:
-            velocity = vol_flow / area
+        velocity_in = None
+        velocity_out = None
+        if vol_flow and vol_flow > 0:
+            if pipe_area and pipe_area > 0:
+                velocity = vol_flow / pipe_area
+            if inlet_area and inlet_area > 0:
+                velocity_in = vol_flow / inlet_area
+            if outlet_area and outlet_area > 0:
+                velocity_out = vol_flow / outlet_area
         
         base_density = fluid.current_density(temperature, pressure)
         reference_pressure = pressure
@@ -704,14 +779,28 @@ class NetworkSolver:
             erosional_velocity_in = eros_const_si / sqrt(inlet_density)
         if outlet_density and outlet_density > 0:
             erosional_velocity_out = eros_const_si / sqrt(outlet_density)
-        flow_momentum_in = inlet_density * velocity * velocity if inlet_density and velocity is not None else None
-        flow_momentum_out = outlet_density * velocity * velocity if outlet_density and velocity is not None else None
+        flow_momentum_in = (
+            inlet_density * velocity_in * velocity_in if inlet_density and velocity_in is not None else None
+        )
+        flow_momentum_out = (
+            outlet_density * velocity_out * velocity_out if outlet_density and velocity_out is not None else None
+        )
         section.mach_number = mach
-        remarks = self._build_remarks(section, summary, mach, velocity, erosional_velocity_in)
+        extra_warnings = list(section.calculation_output.ignored_components)
+        remarks = self._build_remarks(
+            section,
+            summary,
+            mach,
+            velocity,
+            erosional_velocity_in,
+            extra_warnings=extra_warnings,
+        )
+        section.calculation_output.ignored_components.clear()
         self._assign_state(
             summary.inlet,
             fluid,
             inlet_density,
+            velocity_in or velocity,
             velocity,
             erosional_velocity_in,
             flow_momentum_in,
@@ -724,6 +813,7 @@ class NetworkSolver:
             summary.outlet,
             fluid,
             outlet_density,
+            velocity_out or velocity,
             velocity,
             erosional_velocity_out,
             flow_momentum_out,
@@ -739,6 +829,7 @@ class NetworkSolver:
         fluid, # fluid is not used here, but kept for compatibility
         density: Optional[float],
         velocity: Optional[float],
+        pipe_velocity: Optional[float],
         erosional_velocity: Optional[float],
         flow_momentum: Optional[float],
         mach: Optional[float],
@@ -754,6 +845,8 @@ class NetworkSolver:
             state.density = density
         if state.velocity is None and velocity is not None:
             state.velocity = velocity
+        if state.pipe_velocity is None and pipe_velocity is not None:
+            state.pipe_velocity = pipe_velocity
         if state.erosional_velocity is None and erosional_velocity is not None:
             state.erosional_velocity = erosional_velocity
         if state.flow_momentum is None and flow_momentum is not None:
@@ -769,6 +862,8 @@ class NetworkSolver:
         mach: Optional[float],
         velocity: Optional[float],
         erosional_velocity: Optional[float],
+        *,
+        extra_warnings: Optional[list[str]] = None,
     ) -> str:
         warnings: list[str] = []
         drop = section.calculation_output.pressure_drop.total_segment_loss or 0.0
@@ -781,6 +876,8 @@ class NetworkSolver:
             warnings.append(f"Mach {mach:.2f} exceeds sonic conditions")
         elif mach and mach > 0.7:
             warnings.append(f"Mach {mach:.2f} exceeds 0.7 threshold")
+        if extra_warnings:
+            warnings.extend(extra_warnings)
         return "; ".join(warnings) if warnings else "OK"
 
     @staticmethod
@@ -831,6 +928,7 @@ class NetworkSolver:
         target.temperature = gas_state.temperature
         target.density = gas_state.density
         target.velocity = gas_state.velocity
+        target.pipe_velocity = gas_state.velocity
         target.mach_number = gas_state.mach
 
     @staticmethod

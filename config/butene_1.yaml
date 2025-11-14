@@ -34,7 +34,7 @@ network:
       pipe_NPD: 2.0
       roughness: 4.57e-5
       length:
-        value: 0.0
+        value: 10.0
         unit: m
       erosional_constant: 100
       fitting_type: LR

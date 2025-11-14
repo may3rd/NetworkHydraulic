@@ -201,6 +201,20 @@ Frontend State Update
 UI Re-render with Results
 ```
 
+### 2.4 Section Calculation Semantics
+
+The frontend must mirror the solver’s “single component per section” rules so users understand how data will be interpreted:
+
+- **Pipeline-first**: If a section includes a non-zero pipe length, the solver treats it as a pipeline span. All fittings, friction, and elevation losses are computed, and any configured control valve or orifice in that section is ignored for pressure-drop purposes (still retained for documentation/metadata).
+- **Component-only sections**: If length is omitted or zero, the UI should require exactly one component. The solver will select a single drop source using the priority below:
+  1. **Control valve** – takes precedence when present; the orifice configuration is ignored.
+  2. **Orifice** – used only when no control valve exists and a valid flow rate is available.
+  3. **User-defined fixed loss** – treated as its own component when no valve or orifice is configured; otherwise ignored. This lets engineers model vendor data or miscellaneous losses without inventing fittings.
+- **Pipeline sections**: Any section with non-zero length automatically behaves as a pipeline span. All components (control valve, orifice, user-defined loss) entered in that section are considered documentation-only; their drops are ignored in the calculation.
+- **Validation guidance**: Form validation should surface these priorities (e.g., warning banners when both valve and orifice are present, tooltips explaining that the section acts as a pipeline vs. device). This avoids confusion when the results view shows only one loss contributor.
+
+Surfacing these rules in the React state/schema layer keeps the UI consistent with the current Python calculation engine and reduces support questions about “missing” component drops.
+
 ## 3. User Interface Design
 
 ### 3.1 Main Layout Design
@@ -253,18 +267,19 @@ UI Re-render with Results
 
 #### Pipe Section Editor
 - **Section List**: Tabular view with add/edit/delete actions
-- **Section Properties**:
-  - Basic geometry (NPS/schedule or direct diameter)
-  - Length and elevation change
-  - Roughness (with typical values)
-- **Fittings Selector**: (add/edit/delete)
-  - Visual fitting library
-  - K-factor lookup table
-  - Drag-and-drop interface
-- **Component Integration**:
-  - Control valve configuration (Optional)
-  - Orifice setup (Optional)
-  - User-defined losses (Optional)
+- **Section Component**: (only one per section)
+  - **Pipeline**: (add/edit/delete)
+    - Basic geometry (NPS/schedule or direct diameter)
+    - Length and elevation change
+    - Roughness (with typical values)
+    - **Fittings Selector**: (add/edit/delete)
+    - Visual fitting library
+    - K-factor lookup table
+    - Drag-and-drop interface
+  - **Control Valve**: (add/edit/delete)
+   
+  - **Orifice**: (add/edit/delete)
+  - **User-Defined Losses**: (add/edit/delete)
 
 ### 3.3 Results Display Design
 

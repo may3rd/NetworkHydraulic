@@ -229,6 +229,7 @@ def _state_dict(state: "StatePoint", converter: _OutputUnitConverter) -> Dict[st
         "density": converter.density(state.density),
         "mach_number": state.mach_number,
         "velocity": converter.velocity(state.velocity),
+        "pipe_velocity": converter.velocity(state.pipe_velocity),
         "erosional_velocity": converter.velocity(state.erosional_velocity),
         "flow_momentum": converter.flow_momentum(state.flow_momentum),
         "remarks": state.remarks,
@@ -267,6 +268,9 @@ def _print_state_table(
     print(f"{prefix}  Mach: {fmt(inlet.mach_number)}")
     print(f"{prefix}  Velocity: {fmt(converter.velocity(inlet.velocity))} {units.velocity}")
     print(
+        f"{prefix}  Pipe Avg Velocity: {fmt(converter.velocity(inlet.pipe_velocity))} {units.velocity}"
+    )
+    print(
         f"{prefix}  Erosional Velocity: {fmt(converter.velocity(inlet.erosional_velocity))} {units.velocity}"
     )
     print(
@@ -280,6 +284,9 @@ def _print_state_table(
     print(f"{prefix}  Density: {fmt(converter.density(outlet.density))} {units.density}")
     print(f"{prefix}  Mach: {fmt(outlet.mach_number)}")
     print(f"{prefix}  Velocity: {fmt(converter.velocity(outlet.velocity))} {units.velocity}")
+    print(
+        f"{prefix}  Pipe Avg Velocity: {fmt(converter.velocity(outlet.pipe_velocity))} {units.velocity}"
+    )
     print(
         f"{prefix}  Erosional Velocity: {fmt(converter.velocity(outlet.erosional_velocity))} {units.velocity}"
     )
@@ -431,7 +438,13 @@ def _section_result_payload(
     return {
         "pressure_drop": pressure_drop_dict,
         "summary": _summary_dict(section_result.summary, converter),
-        "flow": _flow_dict(section_result.summary, mass_flow_rate, standard_density, converter),
+        "flow": _flow_dict(
+            section_result.summary,
+            mass_flow_rate,
+            standard_density,
+            converter,
+            section_mass_flow=section.mass_flow_rate,
+        ),
     }
 
 
@@ -440,15 +453,17 @@ def _flow_dict(
     mass_flow_rate: Optional[float],
     standard_density: Optional[float],
     converter: _OutputUnitConverter,
+    section_mass_flow: Optional[float] = None,
 ) -> Dict[str, Optional[float]]:
     volumetric_actual = None
-    if mass_flow_rate is not None:
+    effective_mass_flow = section_mass_flow if section_mass_flow is not None else mass_flow_rate
+    if effective_mass_flow is not None:
         inlet_density = getattr(summary.inlet, "density", None)
         if inlet_density and inlet_density > 0:
-            volumetric_actual = mass_flow_rate / inlet_density
+            volumetric_actual = effective_mass_flow / inlet_density
     volumetric_standard = None
-    if mass_flow_rate is not None and standard_density:
-        volumetric_standard = mass_flow_rate / standard_density
+    if effective_mass_flow is not None and standard_density:
+        volumetric_standard = effective_mass_flow / standard_density
     return {
         "volumetric_actual": converter.volumetric_flow(volumetric_actual),
         "volumetric_standard": converter.volumetric_flow(volumetric_standard),
@@ -498,8 +513,15 @@ def _print_section_overview(
     )
     flow_type = network.gas_flow_model if fluid.is_gas() else "N/A"
 
-    actual_mass_flow = network.mass_flow_rate
-    actual_vol_flow = network.current_volumetric_flow_rate()
+    actual_mass_flow = section.mass_flow_rate if section and section.mass_flow_rate is not None else network.mass_flow_rate
+    actual_vol_flow = None
+    reference_density = None
+    if section:
+        reference_density = section.result_summary.inlet.density
+    if not (reference_density and reference_density > 0):
+        reference_density = fluid.current_density(network.boundary_temperature, network.boundary_pressure)
+    if actual_mass_flow is not None and reference_density and reference_density > 0:
+        actual_vol_flow = actual_mass_flow / reference_density
 
     standard_flow = fluid.standard_flow_rate if fluid.is_gas() else None
     temperature = network.boundary_temperature

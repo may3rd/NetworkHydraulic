@@ -22,6 +22,11 @@ class FrictionCalculator(LossCalculator):
     friction_factor_type: str = "darcy"
 
     def calculate(self, section: PipeSection) -> None:
+        pressure_drop = section.calculation_output.pressure_drop
+        if not section.has_pipeline_segment:
+            section.pipe_length_K = 0.0
+            pressure_drop.pipe_and_fittings = 0.0
+            return
         diameter = self._pipe_diameter(section)
         area = 0.25 * pi * diameter * diameter
 
@@ -54,7 +59,6 @@ class FrictionCalculator(LossCalculator):
         else:
             delta_p = total_k * density * velocity * velocity / 2.0
 
-        pressure_drop = section.calculation_output.pressure_drop
         pressure_drop.pipe_and_fittings = delta_p
         total = pressure_drop.total_segment_loss or 0.0
         pressure_drop.total_segment_loss = total + delta_p

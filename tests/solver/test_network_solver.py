@@ -97,8 +97,8 @@ def test_network_solver_runs_all_calculations():
     assert len(result.sections) == 1
     calc = section.calculation_output.pressure_drop
     assert calc.pipe_and_fittings is not None and calc.pipe_and_fittings > 0
-    assert calc.control_valve_pressure_drop == 2000.0
-    assert calc.orifice_pressure_drop == 800.0
+    assert calc.control_valve_pressure_drop == 0.0
+    assert calc.orifice_pressure_drop == 0.0
     assert calc.total_segment_loss is not None and calc.total_segment_loss > 0
     assert section.calculation_output.pressure_drop.normalized_friction_loss is not None
 
@@ -182,7 +182,7 @@ def _capture_component_pressures():
         pressure_drop.control_valve_pressure_drop = delta
         pressure_drop.total_segment_loss = (pressure_drop.total_segment_loss or 0.0) + delta
 
-    def _fake_orifice_calculate(self, section, *, inlet_pressure_override=None):
+    def _fake_orifice_calculate(self, section, *, inlet_pressure_override=None, mass_flow_override=None):
         orifice_pressures.append(inlet_pressure_override)
         delta = section.orifice.pressure_drop or 0.0
         pressure_drop = section.calculation_output.pressure_drop
@@ -218,7 +218,7 @@ def test_solver_uses_section_pressures_for_components_forward():
         solver.run(network)
 
     assert valve_pressures == [260000.0, 220000.0]
-    assert orifice_pressures == [260000.0, 220000.0]
+    assert orifice_pressures == []
 
 
 def test_solver_uses_section_pressures_for_components_backward():
@@ -248,7 +248,7 @@ def test_solver_uses_section_pressures_for_components_backward():
         solver.run(network)
 
     assert valve_pressures == [200000.0, 140000.0]
-    assert orifice_pressures == [200000.0, 140000.0]
+    assert orifice_pressures == []
 
 
 def test_component_drops_match_total_loss_when_no_pipe_losses():
@@ -311,9 +311,102 @@ def test_component_drops_match_total_loss_when_no_pipe_losses():
 
     drop = section.calculation_output.pressure_drop
     assert drop.pipe_and_fittings == 0.0
-    assert drop.total_segment_loss == pytest.approx(6200.0)
+    assert drop.control_valve_pressure_drop == pytest.approx(5000.0)
+    assert drop.orifice_pressure_drop == 0.0
+    assert drop.total_segment_loss == pytest.approx(5000.0)
     assert section.result_summary.inlet.pressure == pytest.approx(250000.0)
-    assert section.result_summary.outlet.pressure == pytest.approx(250000.0 - 6200.0)
+    assert section.result_summary.outlet.pressure == pytest.approx(250000.0 - 5000.0)
+
+
+def test_orifice_used_when_no_control_valve():
+    fluid = make_fluid()
+    orifice = Orifice(
+        tag="FE-ONLY",
+        d_over_D_ratio=0.5,
+        pressure_drop=900.0,
+        pipe_diameter=0.2,
+    )
+    section = PipeSection(
+        id="orifice-only",
+        schedule="40",
+        roughness=4.6e-5,
+        length=0.0,
+        elevation_change=0.0,
+        fitting_type="LR",
+        fittings=[],
+        fitting_K=None,
+        pipe_length_K=None,
+        user_K=None,
+        piping_and_fitting_safety_factor=None,
+        total_K=None,
+        user_specified_fixed_loss=None,
+        pipe_NPD=None,
+        pipe_diameter=0.2,
+        inlet_diameter=0.2,
+        outlet_diameter=0.2,
+        control_valve=None,
+        orifice=orifice,
+    )
+    network = Network(
+        name="orifice-only",
+        description=None,
+        fluid=fluid,
+        direction="forward",
+        boundary_pressure=200000.0,
+        sections=[section],
+        mass_flow_rate=5.0,
+        boundary_temperature=298.15,
+    )
+    solver = NetworkSolver()
+    solver.run(network)
+
+    drop = section.calculation_output.pressure_drop
+    assert drop.control_valve_pressure_drop == 0.0 or drop.control_valve_pressure_drop is None
+    assert drop.orifice_pressure_drop == pytest.approx(900.0)
+    assert drop.total_segment_loss == pytest.approx(900.0)
+
+
+def test_user_defined_loss_component_only():
+    fluid = make_fluid()
+    section = PipeSection(
+        id="user-loss",
+        schedule="40",
+        roughness=4.6e-5,
+        length=0.0,
+        elevation_change=0.0,
+        fitting_type="LR",
+        fittings=[],
+        fitting_K=None,
+        pipe_length_K=None,
+        user_K=None,
+        piping_and_fitting_safety_factor=None,
+        total_K=None,
+        user_specified_fixed_loss=1500.0,
+        pipe_NPD=None,
+        pipe_diameter=0.2,
+        inlet_diameter=0.2,
+        outlet_diameter=0.2,
+        control_valve=None,
+        orifice=None,
+    )
+    network = Network(
+        name="user-loss",
+        description=None,
+        fluid=fluid,
+        direction="forward",
+        boundary_pressure=180000.0,
+        sections=[section],
+        mass_flow_rate=5.0,
+        boundary_temperature=298.15,
+    )
+    solver = NetworkSolver()
+    solver.run(network)
+
+    drop = section.calculation_output.pressure_drop
+    assert drop.control_valve_pressure_drop in (0.0, None)
+    assert drop.orifice_pressure_drop in (0.0, None)
+    assert drop.user_specified_fixed_loss == pytest.approx(1500.0)
+    assert drop.total_segment_loss == pytest.approx(1500.0)
 
 
 def test_solver_errors_for_missing_gas_parameters():

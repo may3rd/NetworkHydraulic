@@ -144,6 +144,23 @@ def test_orifice_calculator_raises_on_invalid_fluid_properties(
         calc.calculate(section)
         assert orifice.pressure_drop is not None
 
+
+def test_orifice_sets_zero_drop_when_mass_flow_missing():
+    fluid = reference_fluid()
+    orifice = Orifice(tag="FE-no-flow", d_over_D_ratio=0.5, pressure_drop=None)
+    section = make_section(orifice, mass_flow_rate=None)
+    section.result_summary.inlet.pressure = 200_000.0
+    calc = OrificeCalculator(fluid=fluid)
+    calc.calculate(section)
+
+    assert orifice.pressure_drop == 0.0
+    assert (
+        orifice.calculation_note
+        and "mass_flow_rate unavailable" in orifice.calculation_note
+    )
+    assert section.calculation_output.pressure_drop.orifice_pressure_drop == 0.0
+
+
 def test_orifice_raises_if_pipe_diameter_is_missing_when_needed():
     """Test that a ValueError is raised if pipe diameter is not available when required."""
     fluid = reference_fluid()

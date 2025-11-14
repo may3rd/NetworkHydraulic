@@ -146,6 +146,10 @@ class PipeSection:
         if errors:
             raise ValueError("; ".join(errors))
 
+    @property
+    def has_pipeline_segment(self) -> bool:
+        return self.length is not None and self.length > 0
+
     def current_volumetric_flow_rate(self, fluid: Fluid) -> float:
         if self.mass_flow_rate is None:
             raise ValueError("mass_flow_rate must be set for the pipe section to calculate volumetric flow rate")

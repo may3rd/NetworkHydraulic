@@ -44,6 +44,7 @@ class PressureDropDetails:
 @dataclass(slots=True)
 class CalculationOutput:
     pressure_drop: PressureDropDetails = field(default_factory=PressureDropDetails)
+    ignored_components: List[str] = field(default_factory=list)
 
 
 @dataclass(slots=True)
@@ -53,6 +54,7 @@ class StatePoint:
     density: Optional[float] = None
     mach_number: Optional[float] = None
     velocity: Optional[float] = None
+    pipe_velocity: Optional[float] = None
     erosional_velocity: Optional[float] = None
     flow_momentum: Optional[float] = None
     remarks: Optional[str] = None
