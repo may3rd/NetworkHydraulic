@@ -55,7 +55,7 @@
  | --- | --- | --- |
  | `id` | **Yes** | Unique identifier. |
  | `schedule` | **Yes** | Pipe schedule (string). |
- | `pipe_NPD` or `main_ID` | **Yes** | Nominal pipe diameter (inches) or main internal diameter (m). |
+| `pipe_NPD` or `pipe_diameter` | **Yes** | Nominal pipe diameter (inches) or internal diameter (m) when `pipe_diameter` is provided. |
  | `roughness` | **Yes** | Absolute roughness (m). |
  | `length` | **Yes** | Straight length (m). Can be `{value, unit}`. |
  | `elevation_change` | No (defaults to 0) | Positive for elevation gain. |

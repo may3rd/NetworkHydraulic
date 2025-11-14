@@ -16,6 +16,7 @@ import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from xml.etree import ElementTree as ET
 
 from ruamel.yaml import YAML
 
@@ -52,9 +53,6 @@ NETWORK_ALLOWED_KEYS = {
 SECTION_ALLOWED_KEYS = {
     "id",
     "description",
-    "main_ID",
-    "input_ID",
-    "output_ID",
     "schedule",
     "roughness",
     "length",
@@ -90,6 +88,55 @@ def _yaml_loader() -> YAML:
     return yaml
 
 
+def _element_to_dict(element: ET.Element) -> Any:
+    children = list(element)
+    # Leaf node: return text value or merged attributes/text.
+    if not children:
+        text = (element.text or "").strip()
+        if element.attrib:
+            attributes = dict(element.attrib)
+            if text:
+                attributes["value"] = text
+            return attributes
+        return text
+
+    data: Dict[str, Any] = {}
+    counts: Dict[str, int] = {}
+    for child in children:
+        child_value = _element_to_dict(child)
+        tag = child.tag
+        counts[tag] = counts.get(tag, 0) + 1
+        existing = data.get(tag)
+        if existing is None:
+            data[tag] = child_value
+        elif isinstance(existing, list):
+            existing.append(child_value)
+        else:
+            data[tag] = [existing, child_value]
+
+    if len(data) == 1:
+        (only_value,) = data.values()
+        if isinstance(only_value, list):
+            return only_value
+    return data
+
+
+def _normalize_xml_collections(value: Any) -> Any:
+    if isinstance(value, dict):
+        normalized: Dict[str, Any] = {}
+        for key, sub_value in value.items():
+            child = _normalize_xml_collections(sub_value)
+            if key.endswith("s") and isinstance(child, dict) and len(child) == 1:
+                (inner_value,) = child.values()
+                normalized[key] = inner_value if isinstance(inner_value, list) else [inner_value]
+            else:
+                normalized[key] = child
+        return normalized
+    if isinstance(value, list):
+        return [_normalize_xml_collections(item) for item in value]
+    return value
+
+
 @dataclass(slots=True)
 class ConfigurationLoader:
     raw: Dict[str, Any]
@@ -116,78 +163,64 @@ class ConfigurationLoader:
             data = json.load(handle) or {}
         return cls(raw=data)
 
+    @classmethod
+    def from_xml_path(cls, path: Path) -> "ConfigurationLoader":
+        tree = ET.parse(path)
+        root = tree.getroot()
+        raw_data = _element_to_dict(root)
+        raw_data = _normalize_xml_collections(raw_data)
+        if root.tag == "network":
+            raw = {"network": raw_data}
+        elif isinstance(raw_data, dict) and "network" in raw_data:
+            raw = {"network": raw_data["network"]}
+        else:
+            raw = {root.tag: raw_data}
+        return cls(raw=raw)
+
     def build_network(self) -> Network:
         network_cfg = self.raw.get("network", {})
         logger.info("Building network configuration from loader data")
-        self._validate_keys(network_cfg, NETWORK_ALLOWED_KEYS, context="network")
-        fluid_cfg = network_cfg.get("fluid", {})
+        
+        # self._validate_keys(network_cfg, NETWORK_ALLOWED_KEYS, context="network")
+        logger.info("'%s' is loaded successfully.", network_cfg.get("name", "network"))
         
         raw_boundary_temperature = (
             network_cfg.get("boundary_temperature")
             if network_cfg.get("boundary_temperature") is not None
             else network_cfg.get("temperature")
         )
-        raw_boundary_pressure = (
-            network_cfg.get("boundary_pressure")
-            if network_cfg.get("boundary_pressure") is not None
-            else network_cfg.get("pressure")
-        )
         boundary_temperature = self._require_positive_quantity(
             raw_boundary_temperature,
             "network.boundary_temperature",
             target_unit="K",
+        )
+        logger.info(f"{boundary_temperature} is loaded successfully.")
+        
+        raw_boundary_pressure = (
+            network_cfg.get("boundary_pressure")
+            if network_cfg.get("boundary_pressure") is not None
+            else network_cfg.get("pressure")
         )
         boundary_pressure = self._require_positive_quantity(
             raw_boundary_pressure,
             "network.boundary_pressure",
             target_unit="Pa",
         )
-        phase = fluid_cfg.get("phase", "liquid")
+        logger.info(f"{boundary_pressure} is loaded successfully.")
+
+        mass_flow_rate_val = self._require_positive_quantity(
+            network_cfg.get("mass_flow_rate"),
+            "network.mass_flow_rate",
+            target_unit="kg/s"
+        )
+        logger.info(f"{mass_flow_rate_val} is loaded successfully.")
         
-        density_value = self._quantity(
-            fluid_cfg.get("density"),
-            "fluid.density",
-            target_unit="kg/m^3",
-        )
-        viscosity = self._require_positive_quantity(
-            fluid_cfg.get("viscosity"),
-            "fluid.viscosity",
-            target_unit="Pa*s",
-        )
-        molecular_weight = self._coerce_optional_float(
-            fluid_cfg.get("molecular_weight"),
-            "fluid.molecular_weight",
-        )
-        z_factor = self._coerce_optional_float(
-            fluid_cfg.get("z_factor", 1.0),
-            "fluid.z_factor",
-        )
-        specific_heat_ratio = self._coerce_optional_float(
-            fluid_cfg.get("specific_heat_ratio", 1.0),
-            "fluid.specific_heat_ratio",
-        )
-
-        mass_flow_rate_val = self._quantity(network_cfg.get("mass_flow_rate"), "network.mass_flow_rate", target_unit="kg/s")
-
-        if mass_flow_rate_val is None:
-            raise ValueError("network.mass_flow_rate must be provided")
-
-        fluid = Fluid(
-            name=fluid_cfg.get("name"),
-            phase=phase,
-            density=density_value if density_value is not None else 0.0,
-            molecular_weight=molecular_weight if molecular_weight is not None else 0.0,
-            z_factor=z_factor if z_factor is not None else 1.0,
-            specific_heat_ratio=specific_heat_ratio if specific_heat_ratio is not None else 1.0,
-            viscosity=viscosity,
-            standard_flow_rate=self._quantity(
-                fluid_cfg.get("standard_flow_rate"), "fluid.standard_flow_rate", target_unit="m^3/s"
-            ),
-            vapor_pressure=self._quantity(fluid_cfg.get("vapor_pressure"), "fluid.vapor_pressure", target_unit="Pa"),
-            critical_pressure=self._quantity(
-                fluid_cfg.get("critical_pressure"), "fluid.critical_pressure", target_unit="Pa"
-            ),
-        )
+        # Load Fluid configuration
+        fluid_cfg = network_cfg.get("fluid", {})
+        if fluid_cfg is None or fluid_cfg == {}:
+            raise ValueError("network.fluid must be provided")
+        fluid = self._build_fluid(fluid_cfg)
+        
         sections_cfg: List[Dict[str, Any]] = network_cfg.get("sections", [])
         sections = [self._build_section(cfg) for cfg in sections_cfg]
         self._align_adjacent_diameters(sections)
@@ -223,20 +256,83 @@ class ConfigurationLoader:
         )
         return network
 
+    def _build_fluid(self, fluid_cfg: Dict[str, Any]) -> Fluid:
+        # self._validate_keys(fluid_cfg, {"name", "phase", "viscosity"}, context="fluid")
+        logger.info(f"{fluid_cfg.get('name')} is loaded successfully.")
+        
+        phase = fluid_cfg.get("phase", "liquid")
+        logger.info(f"{fluid_cfg.get('name')} has phase {phase}.")
+        
+        viscosity = self._require_positive_quantity(
+            fluid_cfg.get("viscosity"),
+            "fluid.viscosity",
+            target_unit="Pa*s",
+        )
+        logger.info(f"viscosity is {viscosity} is loaded successfully.")
+        
+        if phase == "liquid":
+            # self._validate_keys(fluid_cfg, {"density"}, context="liquid")
+            molecular_weight = None
+            z_factor = None
+            specific_heat_ratio = None
+            density_value = self._quantity(
+                fluid_cfg.get("density"),
+                "fluid.density",
+                target_unit="kg/m^3",
+            )
+            logger.info(f"density is {density_value} is loaded successfully.")
+        else:
+            density_value = None
+            molecular_weight = self._coerce_optional_float(
+                fluid_cfg.get("molecular_weight"),
+                "fluid.molecular_weight",
+            )
+            logger.info(f"molecular_weight is {molecular_weight} is loaded successfully.")
+            z_factor = self._coerce_optional_float(
+                fluid_cfg.get("z_factor", 1.0),
+                "fluid.z_factor",
+            )
+            logger.info(f"z_factor is {z_factor} is loaded successfully.")
+            specific_heat_ratio = self._coerce_optional_float(
+                fluid_cfg.get("specific_heat_ratio", 1.0),
+                "fluid.specific_heat_ratio",
+            )
+            logger.info(f"specific_heat_ratio is {specific_heat_ratio} is loaded successfully.")
+
+        fluid = Fluid(
+            name=fluid_cfg.get("name"),
+            phase=phase,
+            density=density_value if density_value is not None else 0.0,
+            molecular_weight=molecular_weight if molecular_weight is not None else 0.0,
+            z_factor=z_factor if z_factor is not None else 1.0,
+            specific_heat_ratio=specific_heat_ratio if specific_heat_ratio is not None else 1.0,
+            viscosity=viscosity,
+            standard_flow_rate=self._quantity(
+                fluid_cfg.get("standard_flow_rate"), "fluid.standard_flow_rate", target_unit="m^3/s"
+            ),
+            vapor_pressure=self._quantity(fluid_cfg.get("vapor_pressure"), "fluid.vapor_pressure", target_unit="Pa"),
+            critical_pressure=self._quantity(
+                fluid_cfg.get("critical_pressure"), "fluid.critical_pressure", target_unit="Pa"
+            ),
+        )
+        return fluid
+
     def _build_section(self, cfg: Dict[str, Any]) -> PipeSection:
-        self._validate_keys(cfg, SECTION_ALLOWED_KEYS, context=f"section '{cfg.get('id', '<unknown>')}'")
+        # Build the pipe_section from read network config
+        # self._validate_keys(cfg, SECTION_ALLOWED_KEYS, context=f"section '{cfg.get('id', '<unknown>')}'")
         control_valve = self._build_control_valve(cfg.get("control_valve"))
         orifice = self._build_orifice(cfg.get("orifice"))
         schedule = str(cfg.get("schedule", "40"))
         pipe_npd = self._quantity(cfg.get("pipe_NPD"), "pipe_NPD")
-        main_d = self._resolve_main_diameter(cfg.get("main_ID"), pipe_npd, schedule)
-        inlet_d = self._diameter(cfg.get("input_ID"), "input_ID", default=main_d)
-        outlet_d = self._diameter(cfg.get("output_ID"), "output_ID", default=main_d)
-        pipe_diameter = self._diameter(cfg.get("pipe_diameter"), "pipe_diameter", default=main_d)
-        inlet_specified = cfg.get("inlet_diameter") is not None or cfg.get("input_ID") is not None
-        outlet_specified = cfg.get("outlet_diameter") is not None or cfg.get("output_ID") is not None
-        inlet_diameter = self._diameter(cfg.get("inlet_diameter"), "inlet_diameter", default=inlet_d)
-        outlet_diameter = self._diameter(cfg.get("outlet_diameter"), "outlet_diameter", default=outlet_d)
+        pipe_diameter = self._quantity(cfg.get("pipe_diameter"), "pipe_diameter", target_unit="m")
+        if pipe_diameter is None:
+            if pipe_npd is None or schedule is None:
+                raise ValueError("Either pipe_diameter or pipe_NPD must be provided")
+            pipe_diameter = inner_diameter_from_nps(pipe_npd, schedule)
+        inlet_specified = cfg.get("inlet_diameter") is not None
+        outlet_specified = cfg.get("outlet_diameter") is not None
+        inlet_diameter = self._diameter(cfg.get("inlet_diameter"), "inlet_diameter", default=pipe_diameter)
+        outlet_diameter = self._diameter(cfg.get("outlet_diameter"), "outlet_diameter", default=pipe_diameter)
         fittings = self._build_fittings(cfg.get("fittings"), inlet_diameter, outlet_diameter, pipe_diameter)
         roughness = self._quantity(cfg.get("roughness"), "roughness", target_unit="m", default=0.0)
         length = self._quantity(cfg.get("length"), "length", target_unit="m", default=0.0) or 0.0
@@ -422,13 +518,6 @@ class ConfigurationLoader:
         tolerance = max(SWAGE_ABSOLUTE_TOLERANCE, SWAGE_RELATIVE_TOLERANCE * scale)
         return diff <= tolerance
 
-    def _resolve_main_diameter(self, explicit: Optional[Any], pipe_npd: Optional[float], schedule: str) -> float:
-        if explicit is not None:
-            return self._diameter(explicit, "main_ID")
-        if pipe_npd is None:
-            raise ValueError("Either main_ID or pipe_NPD must be provided")
-        return inner_diameter_from_nps(pipe_npd, schedule)
-
     def _diameter(self, value: Optional[Any], name: str, default: Optional[float] = None) -> float:
         diameter = self._quantity(value, name, target_unit="m")
         if diameter is None:
@@ -461,7 +550,7 @@ class ConfigurationLoader:
             stripped = raw.strip()
             if not stripped:
                 return None
-            if target_unit:
+            if target_unit and any(char.isspace() for char in stripped):
                 converted = self._convert_from_string(stripped, target_unit)
                 if converted is not None:
                     return converted

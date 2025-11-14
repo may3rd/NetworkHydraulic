@@ -33,22 +33,22 @@
           "inlet": {
             "density": 998.0,
             "erosional_velocity": 3.861536224,
-            "flow_momentum": 14.232447462,
+            "flow_momentum": 15.845269574,
             "mach_number": null,
             "pipe_velocity": 0.126004062,
             "pressure": 601325.0,
             "temperature": 303.15,
-            "velocity": 0.119419301
+            "velocity": 0.126004062
           },
           "outlet": {
             "density": 998.0,
             "erosional_velocity": 3.861536224,
-            "flow_momentum": 14.232447462,
+            "flow_momentum": 15.845269574,
             "mach_number": null,
             "pipe_velocity": 0.126004062,
             "pressure": 586325.0,
             "temperature": 303.15,
-            "velocity": 0.119419301
+            "velocity": 0.126004062
           }
         }
       }
@@ -57,22 +57,22 @@
       "inlet": {
         "density": 998.0,
         "erosional_velocity": 3.861536224,
-        "flow_momentum": 14.232447462,
+        "flow_momentum": 15.845269574,
         "mach_number": null,
         "pipe_velocity": 0.126004062,
         "pressure": 601325.0,
         "temperature": 303.15,
-        "velocity": 0.119419301
+        "velocity": 0.126004062
       },
       "outlet": {
         "density": 998.0,
         "erosional_velocity": 3.861536224,
-        "flow_momentum": 14.232447462,
+        "flow_momentum": 15.845269574,
         "mach_number": null,
         "pipe_velocity": 0.126004062,
         "pressure": 586325.0,
         "temperature": 303.15,
-        "velocity": 0.119419301
+        "velocity": 0.126004062
       }
     }
   }

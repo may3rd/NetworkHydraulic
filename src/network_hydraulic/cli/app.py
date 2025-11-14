@@ -37,7 +37,7 @@ def _execute_run(
     logger.info("Starting network-hydraulic run for config '%s'", config)
 
     try:
-        loader = ConfigurationLoader.from_yaml_path(config)
+        loader = _load_configuration(config)
         network = loader.build_network()
         logger.info("Loaded network '%s' with %d section(s)", network.name, len(network.sections))
 
@@ -70,9 +70,20 @@ def _execute_run(
     logger.info("Completed run for network '%s'", network.name)
 
 
+def _load_configuration(config: Path) -> ConfigurationLoader:
+    extension = config.suffix.lower()
+    if extension in {".yaml", ".yml"}:
+        return ConfigurationLoader.from_yaml_path(config)
+    if extension == ".json":
+        return ConfigurationLoader.from_json_path(config)
+    if extension == ".xml":
+        return ConfigurationLoader.from_xml_path(config)
+    return ConfigurationLoader.from_yaml_path(config)
+
+
 @app.command()
 def run(
-    config: Path = typer.Argument(..., help="Path to the YAML/JSON network configuration."),
+    config: Path = typer.Argument(..., help="Path to the YAML/JSON/XML network configuration."),
     output: Path | None = typer.Option(
         None,
         "--output",
@@ -97,7 +108,7 @@ def run(
         help="Print per-fitting K-factor breakdowns in the CLI summary.",
     ),
 ) -> None:
-    """Run a network calculation from a YAML config file."""
+    """Run a network calculation from a YAML/JSON/XML config file."""
     _execute_run(
         config=config,
         output=output,

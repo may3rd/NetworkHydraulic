@@ -36,6 +36,7 @@ network-hydraulic run config/sample_network.yaml \
                       --debug-fittings
 ```
 - Result files include each section’s `calculation_result.flow` plus matching network-level `fluid.volumetric_flow_rate` and `fluid.standard_flow_rate` derived from solver outputs (0 °C & 1 atm for gas).
+- The CLI accepts YAML, JSON, or XML configs; XML files must follow the same schema (e.g., wrap repeating `<section>` blocks inside `<sections>`).
 
 ### Library
 ```python
@@ -48,6 +49,7 @@ print(result.summary())
 
 ## Configuration Hints
 - Numeric fields accept either bare SI values or `{value, unit}` mappings and are normalized by the loader.
+- The loader understands YAML, JSON, and XML network definitions; mirror the YAML hierarchy when authoring XML files (e.g., `<sections>` containing one or more `<section>` blocks).
 - Add optional `output_units` inside the `network` block to control how result writers/printouts are labeled (pressure vs pressure_drop, temperature, density, velocity, volumetric & mass flow). Defaults remain SI.
 - Use `design_margin` (percent) on `network` or individual `sections` to document design flows; section values override the network margin when present.
 - Example:
@@ -76,6 +78,7 @@ print(result.summary())
 - Sample network definition: `config/sample_network.yaml`.
 - Expected results skeleton: `config/sample_results.yaml`.
 - Example fittings metadata: `config/fittings_skeleton.yaml`.
+- Skeleton configs (JSON + XML): `config/sample_network_skeleton.json`, `config/sample_network_skeleton.xml`.
 - Architecture overview: `docs/architecture.md`.
 - Fanno flow overview (basis for the adiabatic solver): [Flows with friction (Fanno flows)](https://kyleniemeyer.github.io/gas-dynamics-notes/compressible-flows/friction.html).
 

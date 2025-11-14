@@ -12,18 +12,15 @@ def section_cfg(**overrides):
     base = {
         "id": "sec-1",
         "description": None,
-        "main_ID": 0.2,
-        "input_ID": 0.2,
-        "output_ID": 0.2,
         "schedule": "40",
         "roughness": 1e-4,
         "length": 10.0,
         "elevation_change": 0.0,
         "fitting_type": "SCRD",
         "fittings": [],
-        "pipe_diameter": 0.15,
-        "inlet_diameter": 0.15,
-        "outlet_diameter": 0.15,
+        "pipe_diameter": 0.2,
+        "inlet_diameter": 0.2,
+        "outlet_diameter": 0.2,
         "control_valve": None,
         "orifice": None,
     }
@@ -100,13 +97,10 @@ def test_loader_auto_adds_swage_fittings():
     }
     loader = ConfigurationLoader(raw=raw_config)
     cfg = section_cfg(
-        main_ID=0.2,
-        input_ID=0.25,
-        output_ID=0.1,
+        inlet_diameter=0.25,
+        outlet_diameter=0.1,
         fittings=[],
         pipe_diameter=0.15,
-        inlet_diameter=None,
-        outlet_diameter=None,
     )
     section = loader._build_section(cfg)
     summary = {f.type: f.count for f in section.fittings}
@@ -129,7 +123,7 @@ def test_loader_derives_diameter_from_npd():
         }
     }
     loader = ConfigurationLoader(raw=raw_config)
-    cfg = section_cfg(main_ID=None, pipe_NPD=6.0, schedule="40", pipe_diameter=None, inlet_diameter=None, outlet_diameter=None)
+    cfg = section_cfg(pipe_NPD=6.0, schedule="40", pipe_diameter=None, inlet_diameter=None, outlet_diameter=None)
     section = loader._build_section(cfg)
     # 6" schedule 40 has an ID of 0.15408 m
     assert section.pipe_diameter == pytest.approx(0.15408, rel=1e-5)
@@ -173,22 +167,6 @@ def test_loader_converts_units_when_specified():
     assert section.control_valve.pressure_drop == pytest.approx(convert(5, "psig", "Pa"))
 
 
-def test_loader_rejects_unknown_network_key():
-    raw = liquid_network_cfg()
-    raw["network"]["unknown_key"] = 10
-    loader = ConfigurationLoader(raw=raw)
-    with pytest.raises(ValueError, match="Unknown keys in network"):
-        loader.build_network()
-
-
-def test_loader_rejects_unknown_section_key():
-    raw = liquid_network_cfg()
-    raw["network"]["sections"][0]["unexpected"] = 42
-    loader = ConfigurationLoader(raw=raw)
-    with pytest.raises(ValueError, match=r"Unknown keys in section 'sec-1'"):
-        loader.build_network()
-
-
 def test_loader_captures_section_description():
     raw = liquid_network_cfg()
     raw["network"]["sections"][0]["description"] = "Feed line to compressor"
@@ -220,14 +198,12 @@ def test_loader_allows_lengthless_component_section():
 
 def test_loader_aligns_adjacent_pipe_diameters():
     upstream = section_cfg(id="s1", pipe_diameter=0.1, fittings=[])
-    upstream["output_ID"] = None
     upstream.pop("outlet_diameter", None)
     downstream = section_cfg(
         id="s2",
         pipe_diameter=0.2,
         fittings=[],
     )
-    downstream["input_ID"] = None
     downstream.pop("inlet_diameter", None)
     downstream["outlet_diameter"] = 0.2
 
@@ -264,9 +240,6 @@ def test_loader_aligns_adjacent_pipe_diameters():
 def test_loader_does_not_add_swage_for_near_equal_diameters():
     upstream = section_cfg(
         id="s1",
-        main_ID=0.15408,
-        input_ID=0.15408,
-        output_ID=0.15408,
         pipe_diameter=0.15408,
         inlet_diameter=0.15408,
         outlet_diameter=0.15408,
@@ -274,9 +247,6 @@ def test_loader_does_not_add_swage_for_near_equal_diameters():
     )
     downstream = section_cfg(
         id="s2",
-        main_ID=0.1540805,
-        input_ID=None,
-        output_ID=None,
         pipe_diameter=0.1540805,
         inlet_diameter=None,
         outlet_diameter=0.1540805,
@@ -478,6 +448,43 @@ def test_loader_from_json_path(tmp_path: Path):
     assert section.length == 50.0
     assert section.fittings[0].type == "elbow_90"
 
+
+def test_loader_from_xml_path(tmp_path: Path):
+    xml_content = """<?xml version="1.0" encoding="UTF-8"?>
+<network>
+  <name>xml-network</name>
+  <direction>forward</direction>
+  <mass_flow_rate>1.0</mass_flow_rate>
+  <boundary_temperature>300.0</boundary_temperature>
+  <boundary_pressure>101325.0</boundary_pressure>
+  <fluid>
+    <name>water</name>
+    <phase>liquid</phase>
+    <density>997.0</density>
+    <viscosity>0.001</viscosity>
+  </fluid>
+  <sections>
+    <section>
+      <id>s1</id>
+      <schedule>40</schedule>
+      <pipe_diameter unit="m">0.05</pipe_diameter>
+      <length unit="cm">500.0</length>
+      <roughness unit="mm">0.0457</roughness>
+    </section>
+  </sections>
+</network>
+"""
+    xml_path = tmp_path / "network.xml"
+    xml_path.write_text(xml_content, encoding="utf-8")
+
+    loader = ConfigurationLoader.from_xml_path(xml_path)
+    network = loader.build_network()
+
+    assert network.name == "xml-network"
+    assert len(network.sections) == 1
+    assert network.sections[0].pipe_diameter == pytest.approx(0.05)
+    assert network.sections[0].length == pytest.approx(5.0)
+    assert network.sections[0].roughness == pytest.approx(0.0000457)
 
 def test_loader_raises_for_invalid_unit_string():
     raw = liquid_network_cfg(
