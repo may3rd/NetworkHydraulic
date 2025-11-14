@@ -387,21 +387,7 @@ class NetworkSolver:
                         current = inlet_pressure
                     
                     # Update pipe_and_fittings and total_segment_loss for gas flow
-                    if summary.inlet.pressure is not None and summary.outlet.pressure is not None:
-                        total_pressure_drop = abs(summary.inlet.pressure - summary.outlet.pressure)
-                        other_losses = (section.calculation_output.pressure_drop.elevation_change or 0.0) + \
-                                       (section.calculation_output.pressure_drop.control_valve_pressure_drop or 0.0) + \
-                                       (section.calculation_output.pressure_drop.orifice_pressure_drop or 0.0) + \
-                                       (section.calculation_output.pressure_drop.user_specified_fixed_loss or 0.0)
-                        
-                        # Ensure frictional_loss is not negative
-                        frictional_loss = max(0.0, total_pressure_drop - other_losses)
-                        
-                        section.calculation_output.pressure_drop.pipe_and_fittings = frictional_loss
-                        section.calculation_output.pressure_drop.total_segment_loss = total_pressure_drop
-                    
-                    # Recalculate normalized loss after pipe_and_fittings is updated
-                    NormalizedLossCalculator().calculate(section)
+                    self._update_gas_friction_losses(section)
 
                     entry_state = summary.inlet if forward else summary.outlet
                     exit_state = summary.outlet if forward else summary.inlet
@@ -478,21 +464,7 @@ class NetworkSolver:
                         current = inlet_pressure
 
                     # Update pipe_and_fittings and total_segment_loss for gas flow
-                    if summary.inlet.pressure is not None and summary.outlet.pressure is not None:
-                        total_pressure_drop = abs(summary.inlet.pressure - summary.outlet.pressure)
-                        other_losses = (section.calculation_output.pressure_drop.elevation_change or 0.0) + \
-                                       (section.calculation_output.pressure_drop.control_valve_pressure_drop or 0.0) + \
-                                       (section.calculation_output.pressure_drop.orifice_pressure_drop or 0.0) + \
-                                       (section.calculation_output.pressure_drop.user_specified_fixed_loss or 0.0)
-                        
-                        # Ensure frictional_loss is not negative
-                        frictional_loss = max(0.0, total_pressure_drop - other_losses)
-                        
-                        section.calculation_output.pressure_drop.pipe_and_fittings = frictional_loss
-                        section.calculation_output.pressure_drop.total_segment_loss = total_pressure_drop
-                    
-                    # Recalculate normalized loss after pipe_and_fittings is updated
-                    NormalizedLossCalculator().calculate(section)
+                    self._update_gas_friction_losses(section)
                     entry_state = summary.inlet if forward else summary.outlet
                     exit_state = summary.outlet if forward else summary.inlet
                     self._apply_section_entry_state(section, entry_state, section_start_temperature)
@@ -626,6 +598,40 @@ class NetworkSolver:
             )
             if section.user_specified_fixed_loss:
                 ignored.append("User-defined fixed loss ignored because orifice takes precedence in this section.")
+
+    def _update_gas_friction_losses(self, section: PipeSection) -> None:
+        """Derive friction + normalized losses directly from gas solver pressures."""
+        pd = section.calculation_output.pressure_drop
+        summary = section.result_summary
+        inlet_pressure = summary.inlet.pressure
+        outlet_pressure = summary.outlet.pressure
+        if inlet_pressure is None or outlet_pressure is None:
+            return
+
+        total_drop = abs(inlet_pressure - outlet_pressure)
+        pd.total_segment_loss = total_drop
+
+        other_losses = (
+            (pd.elevation_change or 0.0)
+            + (pd.control_valve_pressure_drop or 0.0)
+            + (pd.orifice_pressure_drop or 0.0)
+            + (pd.user_specified_fixed_loss or 0.0)
+        )
+        frictional_loss = max(0.0, total_drop - other_losses)
+        pd.pipe_and_fittings = frictional_loss
+
+        pipe_k = section.pipe_length_K or 0.0
+        total_k = pipe_k + (section.fitting_K or 0.0)
+        pipe_only_drop = None
+        if pipe_k > 0 and total_k > 0:
+            pipe_only_drop = frictional_loss * (pipe_k / total_k)
+
+        length = section.length or 0.0
+        if pipe_only_drop is not None and length > 0:
+            # Report pipe-only drop scaled to a 100 m reference length.
+            pd.normalized_friction_loss = pipe_only_drop / length * 100.0
+        else:
+            pd.normalized_friction_loss = None
 
     @staticmethod
     def _apply_section_entry_state(

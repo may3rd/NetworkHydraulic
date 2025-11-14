@@ -27,8 +27,8 @@ network:  # Top-level network metadata
       erosional_constant: 100.0  # API erosional constant C, fps*(lb/ft^3)^0.5 (default 100 continuous, 125 intermittent)
       fitting_type: LR  # Bend radius family (LR, SR, SCRD), unitless text
       fittings:  # List of fittings counted individually
-        - {type: elbow_90, count: 0}  # 90° standard elbow, count in ea
         - {type: elbow_45, count: 0}  # 45° elbow, count in ea
+        - {type: elbow_90, count: 0}  # 90° standard elbow, count in ea
         - {type: u_bend, count: 0}  # 180° return bend, count in ea
         - {type: stub_in_elbow, count: 0}  # Stub-in elbow, count in ea
         - {type: tee_elbow, count: 0}  # Flow through run, branch 90° tee elbow, count in ea
@@ -45,8 +45,6 @@ network:  # Top-level network metadata
         - {type: pipe_entrance_normal, count: 0}  # Sharp-edged pipe entrance, count in ea
         - {type: pipe_entrance_raise, count: 0}  # Raised-face entrance, count in ea
         - {type: pipe_exit, count: 0}  # Pipe discharge to vessel, count in ea
-        - {type: inlet_swage, count: 0}  # Automatic inlet swage placeholder, count in ea
-        - {type: outlet_swage, count: 0}  # Automatic outlet swage placeholder, count in ea
       pipe_diameter: null  # Manual override straight-pipe diameter, m
       inlet_diameter: null  # Manual override inlet diameter, m
       outlet_diameter: null  # Manual override outlet diameter, m
