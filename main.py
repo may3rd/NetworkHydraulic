@@ -31,12 +31,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--default-diameter",
         type=float,
-        help="Fallback pipe diameter (m) when not specified in a section",
-    )
-    parser.add_argument(
-        "--flow-rate",
-        type=float,
-        help="Override volumetric flow rate (m^3/s) for calculators",
+        default=0.1,
+        help="Default pipe diameter to use if not specified in section configs",
     )
     parser.add_argument(
         "--debug-fittings",
@@ -50,10 +46,7 @@ def main() -> None:
     args = parse_args()
     loader = ConfigurationLoader.from_yaml_path(args.config)
     network = loader.build_network()
-    solver = NetworkSolver(
-        default_pipe_diameter=args.default_diameter,
-        volumetric_flow_rate=args.flow_rate,
-    )
+    solver = NetworkSolver()
     try:
         result = solver.run(network)
     except ValueError as exc:

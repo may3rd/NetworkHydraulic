@@ -61,14 +61,14 @@ print(result.summary())
         unit: ft
   ```
 - Gauge units (e.g., `barg`, `psig`) and temperature aliases (`degC`, `degF`) are resolved automatically.
-- **Fluid requirements** (enforced during load):
-  - Always provide positive `temperature`, `pressure`, and `viscosity`.
+- **Network requirements** (enforced during load):
+  - Provide positive `boundary_pressure`, `boundary_temperature`, and `viscosity`.
   - Liquids must include `density`.
   - Gases/vapors must include `molecular_weight`, `z_factor`, and `specific_heat_ratio`.
   - When optional flow rates are omitted, the solver derives them from the provided properties.
-- **Boundary pressures**:
-  - Prefer setting `upstream_pressure` / `downstream_pressure` on the network block and leave `direction: auto`; the solver infers flow direction from whichever boundary is provided.
-- If both boundaries and a component-only section (valve/orifice) are defined, the solver automatically assigns the component’s pressure drop from those constraints.
+- **Flow direction**:
+  - Set `direction` explicitly (`forward`, `backward`, or `auto` which defaults to `forward`).
+  - Per-section `boundary_pressure` overrides are still honored, enabling constrained control-valve/orifice segments even in a sequential solve.
 
 ## Documentation & References
 - [User Manual](docs/user_manual.md): step-by-step instructions for installing, running, logging, and troubleshooting.

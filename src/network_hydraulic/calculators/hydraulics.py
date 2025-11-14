@@ -18,16 +18,27 @@ class FrictionCalculator(LossCalculator):
 
     fluid: Fluid
     default_pipe_diameter: Optional[float] = None
-    volumetric_flow_rate: Optional[float] = None
     friction_factor_override: Optional[float] = None
     friction_factor_type: str = "darcy"
 
     def calculate(self, section: PipeSection) -> None:
+        pressure_drop = section.calculation_output.pressure_drop
+        if not section.has_pipeline_segment:
+            section.pipe_length_K = 0.0
+            pressure_drop.pipe_and_fittings = 0.0
+            return
         diameter = self._pipe_diameter(section)
         area = 0.25 * pi * diameter * diameter
+
+        if section.temperature is None or section.temperature <= 0:
+            raise ValueError("section.temperature must be set and positive for friction calculations")
+        if section.pressure is None or section.pressure <= 0:
+            raise ValueError("section.pressure must be set and positive for friction calculations")
+
         flow_rate = self._determine_flow_rate(section)
         velocity = flow_rate / area
-        density = self.fluid.current_density()
+
+        density = self.fluid.current_density(section.temperature, section.pressure)
         viscosity = self._require_positive(self.fluid.viscosity, "viscosity")
         reynolds = density * abs(velocity) * diameter / viscosity
         if reynolds <= 0:
@@ -48,7 +59,6 @@ class FrictionCalculator(LossCalculator):
         else:
             delta_p = total_k * density * velocity * velocity / 2.0
 
-        pressure_drop = section.calculation_output.pressure_drop
         pressure_drop.pipe_and_fittings = delta_p
         total = pressure_drop.total_segment_loss or 0.0
         pressure_drop.total_segment_loss = total + delta_p
@@ -65,14 +75,11 @@ class FrictionCalculator(LossCalculator):
             return "transition"
 
     def _determine_flow_rate(self, section: PipeSection) -> float:
-        flow_rate = section.design_volumetric_flow_rate
-        if flow_rate and flow_rate > 0:
-            return flow_rate
-        if self.volumetric_flow_rate and self.volumetric_flow_rate > 0:
-            return self.volumetric_flow_rate
-        raise ValueError(
-            f"Section '{section.id}' is missing a design volumetric flow rate for friction calculations"
-        )
+        try:
+            flow_rate = section.current_volumetric_flow_rate(self.fluid)
+        except ValueError as e:
+            raise ValueError(f"Volumetric flow rate is required for friction calculations: {e}")
+        return flow_rate
 
     def _pipe_diameter(self, section: PipeSection) -> float:
         for candidate in (section.pipe_diameter, self.default_pipe_diameter):

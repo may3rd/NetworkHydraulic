@@ -41,10 +41,25 @@ class GasState:
 
 
 def _fanno_fL_D(mach: float, gamma: float) -> float:
-    """Calculates the Darcy-based Fanno friction parameter (f_D * L*/D)."""
+    """
+    Calculates the Darcy-based Fanno friction parameter (f_D * L*/D).
+
+    This parameter represents the dimensionless length required for a flow to reach sonic conditions
+    (Mach 1) from a given initial Mach number, considering friction. It's a key component
+    in Fanno flow equations for adiabatic flow in constant-area ducts with friction.
+
+    Args:
+        mach (float): The current Mach number of the flow.
+        gamma (float): The ratio of specific heats (Cp/Cv) for the gas.
+
+    Returns:
+        float: The Fanno friction parameter (f_D * L*/D).
+    """
     if mach <= 0:
         return float('inf') # Or handle as an error
+    # Term 1: Contribution from Mach number change
     term1 = (1 - mach**2) / (gamma * mach**2)
+    # Term 2: Contribution from entropy change due to friction (logarithmic term)
     term2 = ((gamma + 1) / (2 * gamma)) * log(((gamma + 1) * mach**2) / (2 * (1 + ((gamma - 1) / 2) * mach**2)))
     return term1 + term2
 
@@ -71,12 +86,36 @@ def _fanno_mach_from_fL_D(fL_D: float, gamma: float, initial_guess_mach: float, 
 
 
 def _fanno_pressure_ratio(mach: float, gamma: float) -> float:
-    """Calculates P/P* (pressure to critical pressure ratio)."""
+    """
+    Calculates P/P* (pressure to critical pressure ratio) for Fanno flow.
+
+    This ratio relates the static pressure at a given Mach number to the static pressure
+    at the sonic (critical) condition (Mach 1) in Fanno flow.
+
+    Args:
+        mach (float): The current Mach number of the flow.
+        gamma (float): The ratio of specific heats (Cp/Cv) for the gas.
+
+    Returns:
+        float: The ratio of static pressure to critical static pressure (P/P*).
+    """
     return (1 / mach) * sqrt((gamma + 1) / (2 * (1 + ((gamma - 1) / 2) * mach**2)))
 
 
 def _fanno_temperature_ratio(mach: float, gamma: float) -> float:
-    """Calculates T/T* (temperature to critical temperature ratio)."""
+    """
+    Calculates T/T* (temperature to critical temperature ratio) for Fanno flow.
+
+    This ratio relates the static temperature at a given Mach number to the static temperature
+    at the sonic (critical) condition (Mach 1) in Fanno flow.
+
+    Args:
+        mach (float): The current Mach number of the flow.
+        gamma (float): The ratio of specific heats (Cp/Cv) for the gas.
+
+    Returns:
+        float: The ratio of static temperature to critical static temperature (T/T*).
+    """
     return (gamma + 1) / (2 * (1 + ((gamma - 1) / 2) * mach**2))
 
 
@@ -250,29 +289,34 @@ def solve_adiabatic(
     return final_pressure, final_state
 
 
-def find_ma(mach1: float, gamma: float, k_total: float, factor: int) -> float:
-    """Translate VB FindMa."""
-    tol = 1e-8
-    y1 = 1.0 + 0.5 * (gamma - 1.0) * mach1 * mach1
-    mach2 = max(1.01 * mach1, 1e-6)
-    prev = -mach1
-    while abs(mach2 - prev) > tol:
-        prev = mach2
-        y2 = 1.0 + 0.5 * (gamma - 1.0) * mach2 * mach2
-        aval = 0.5 * (gamma - 1.0) * log((mach2 * mach2 * y1) / (mach1 * mach1 * y2)) + k_total * gamma
-        denom = 1.0 - aval * mach1 * mach1 * factor
-        if denom <= 0:
-            return -1.0
-        mach2 = sqrt(abs(mach1 * mach1 / denom))
-    return mach2
-
 
 def _gas_state(pressure: float, temperature: float, mass_flow: float, diameter: float, molar_mass: float, z_factor: float, gamma: float) -> GasState:
+    """
+    Calculates the state properties of a gas at a given point in the pipe.
+
+    This function computes density, velocity, and Mach number based on the provided
+    thermodynamic and flow parameters.
+
+    Args:
+        pressure (float): Absolute pressure of the gas.
+        temperature (float): Absolute temperature of the gas.
+        mass_flow (float): Mass flow rate of the gas.
+        diameter (float): Inner diameter of the pipe.
+        molar_mass (float): Molar mass of the gas.
+        z_factor (float): Compressibility factor of the gas.
+        gamma (float): Ratio of specific heats (Cp/Cv) for the gas.
+
+    Returns:
+        GasState: A dataclass containing the calculated gas properties.
+    """
+    # Calculate gas density using the real gas law (considering compressibility factor Z)
     density = (pressure * molar_mass) / (z_factor * UNIVERSAL_GAS_CONSTANT * temperature)
     area = pi * diameter * diameter / 4.0
     try:
+        # Calculate flow velocity from mass flow rate, density, and pipe area
         velocity = mass_flow / (density * area)
     except ZeroDivisionError:
         raise ValueError("Diameter and mass flow must be positive for gas state calculation.")
+    # Calculate the speed of sound (sonic speed) for a real gas
     sonic = sqrt(gamma * z_factor * UNIVERSAL_GAS_CONSTANT * temperature / molar_mass) # Corrected sonic speed calculation
     return GasState(pressure=pressure, temperature=temperature, density=density, velocity=velocity, mach=velocity / sonic)

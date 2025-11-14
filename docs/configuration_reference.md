@@ -12,10 +12,10 @@
    description: Optional human-readable label
    direction: auto | forward | backward
    boundary_pressure: {value: 101.3, unit: kPag}
-   upstream_pressure: {value: …, unit: …}        # optional
-   downstream_pressure: {value: …, unit: …}      # optional
+   boundary_temperature: {value: 25, unit: degC}  # K, required
    gas_flow_model: isothermal | adiabatic        # required for gas, ignored for liquid
    design_margin: 10.0                           # percent, optional
+   mass_flow_rate: 1.0                           # kg/s, required
    output_units:                                 # optional (see §4)
      pressure: kPag
      …
@@ -26,30 +26,23 @@
      - …
  ```
 
-- All numeric fields accept bare SI numbers, `{value, unit}` objects, or strings with units (e.g., `"100 ft"`). Units are converted via `network_hydraulic.utils.units`.
-- Unknown keys anywhere in `network` or `sections[]` raise `ValueError`.
+ - All numeric fields accept bare SI numbers, `{value, unit}` objects, or strings with units (e.g., `"100 ft"`). Units are converted via `network_hydraulic.utils.units`.
+ - Unknown keys anywhere in `network` or `sections[]` raise `ValueError`.
 
-### Network Flow Rates
+ ---
 
-- `mass_flow_rate`, `volumetric_flow_rate`: at least one is required at the network level and defines the base design flow (kg/s or m³/s). When only one is provided the solver derives the other using fluid density.
-- `standard_flow_rate`: optional standard volumetric flow (Sm³/s) used for reporting gas/vapor systems.
-- Section entries may override these via local `mass_flow_rate` / `volumetric_flow_rate`; unspecified sections inherit the network baseline scaled by `design_margin`.
-
----
-
-## 2. `fluid` Block
+ ## 2. `fluid` Block
 
  | Field | Required | Description |
  | --- | --- | --- |
  | `name` | No | Identifier for summaries. |
  | `phase` | **Yes** | `liquid`, `gas`, or `vapor`. Dictates density logic and gas-model requirements. |
- | `temperature` | **Yes** | Absolute temperature; specify units (K, degC, degF). |
- | `pressure` | Yes* | Absolute pressure; can be omitted if `network.boundary_pressure` is provided. |
  | `density` | Required for liquids | kg/m³ in SI or convertible units. |
  | `molecular_weight` | Required for gas/vapor | kg/mol or g/mol. |
  | `z_factor` | Required for gas/vapor | Compressibility factor (dimensionless). |
  | `specific_heat_ratio` | Required for gas/vapor | γ = Cp/Cv. |
  | `viscosity` | **Yes** | Dynamic viscosity (Pa·s). |
+ | `standard_flow_rate` | Optional | Desired standard volumetric flow for output. |
  | `vapor_pressure`, `critical_pressure` | Optional; required for liquid valve calcs. |
 
  ---
@@ -79,7 +72,9 @@
  - `direction` – overrides network direction for that section.
  - `design_margin` – percent overriding network-level margin.
  - `erosional_constant` – used for erosional velocity checks.
- - `mass_flow_rate`, `volumetric_flow_rate` – optional per-section overrides (kg/s or m³/s); inherit from the network when omitted.
+ - `flow_splitting_factor` – multiplier for network mass flow rate (defaults to 1.0).
+ - `from_pipe_id` – reference to another pipe section ID for flow splitting.
+ - `to_pipe_id` – reference to another pipe section ID for flow splitting.
 
  ### 3.1 Auto-Swage
 
@@ -110,7 +105,7 @@
  | `C1`, `FL`, `Fd`, `xT` | Vendor constants. |
  | `inlet_diameter`, `outlet_diameter`, `valve_diameter` | Defaults to section diameters. |
 
- The calculator requires either a specified pressure drop or a Cv/Cg. Liquid valves use ISA/IEC flashing / cavitation limits (`F_F`, `F_L`) and benefit from `fluid.vapor_pressure`/`fluid.critical_pressure`, but those values are now optional. Compressible valves follow the ISA expansion-factor correlation (`x_T`, `Y`) and reuse the same geometry factors (`F_P`) as liquids.
+ The calculator requires either a specified pressure drop or a Cv/Cg. Liquid valves also need `fluid.vapor_pressure` and `fluid.critical_pressure`.
 
  #### Orifice (`orifice`)
 
@@ -148,17 +143,16 @@
  network:
    name: demo
    direction: auto
-   boundary_pressure: {value: 300, unit: kPa}
+ boundary_pressure: {value: 300, unit: kPa}
+ mass_flow_rate: 2.5
+  boundary_temperature: {value: 35, unit: degC}
    fluid:
      name: nitrogen
      phase: gas
-     temperature: {value: 35, unit: degC}
-     pressure: {value: 300, unit: kPa}
      molecular_weight: 28
      z_factor: 0.98
      specific_heat_ratio: 1.32
      viscosity: 1.8e-5
-     mass_flow_rate: 2.5
    sections:
      - id: inlet
        schedule: 40

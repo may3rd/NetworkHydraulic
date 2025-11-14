@@ -1,21 +1,4 @@
-"""Fluid properties used across sections.
-
-Example:
-
-    from network_hydraulic.models.fluid import Fluid
-
-    fluid = Fluid(
-        phase="gas",
-        temperature=300.0,
-        pressure=101325.0,
-        viscosity=1e-5,
-        density=1.25,
-        name="nitrogen",
-        molecular_weight=28.0,
-        z_factor=0.95,
-        specific_heat_ratio=1.33,
-    )
-"""
+"""Physical fluid definition covering liquid or gas attributes."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -26,15 +9,14 @@ GAS_CONSTANT = 8.314462618  # J/(mol*K)
 
 @dataclass(slots=True)
 class Fluid:
+    name: Optional[str]
     phase: str
-    temperature: float
-    pressure: float
     viscosity: float
     density: Optional[float] = None
-    name: Optional[str] = None
     molecular_weight: Optional[float] = None
     z_factor: Optional[float] = None
     specific_heat_ratio: Optional[float] = None
+    standard_flow_rate: Optional[float] = None
     vapor_pressure: Optional[float] = None
     critical_pressure: Optional[float] = None
 
@@ -42,10 +24,6 @@ class Fluid:
         errors: list[str] = []
 
         # From _validate_fluid_inputs in ConfigurationLoader
-        if self.temperature <= 0:
-            errors.append("fluid.temperature must be positive")
-        if self.pressure <= 0:
-            errors.append("fluid.pressure must be positive")
         if self.viscosity <= 0:
             errors.append("fluid.viscosity must be positive")
 
@@ -75,14 +53,14 @@ class Fluid:
     def is_gas(self) -> bool:
         return self.phase_key() in {"gas", "vapor"}
 
-    def current_density(self) -> float:
+    def current_density(self, temperature: float, pressure: float) -> float:
         if self.is_gas():
-            return self._gas_density()
+            return self._gas_density(temperature, pressure)
         return self._require_positive(self.density, "density")
 
-    def _gas_density(self) -> float:
-        pressure = self._require_positive(self.pressure, "pressure")
-        temperature = self._require_positive(self.temperature, "temperature")
+    def _gas_density(self, temperature: float, pressure: float) -> float:
+        pressure = self._require_positive(pressure, "pressure")
+        temperature = self._require_positive(temperature, "temperature")
         molecular_weight = self._require_positive(self.molecular_weight, "molecular_weight")
         z_factor = self._require_positive(self.z_factor or 1.0, "z_factor")
         mw_kg_per_mol = molecular_weight if molecular_weight <= 0.5 else molecular_weight / 1000.0

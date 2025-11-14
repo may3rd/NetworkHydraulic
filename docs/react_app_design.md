@@ -36,7 +36,7 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    React Web Application                     │
+│                    React Web Application                    │
 ├─────────────────────────────────────────────────────────────┤
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
 │  │  Config UI  │  │ Results UI  │  │   Visualization     │  │
@@ -50,7 +50,7 @@
 │  │  Handler    │  │   (Axios)   │  │   Error Handling    │  │
 │  └─────────────┘  └─────────────┘  └─────────────────────┘  │
 ├─────────────────────────────────────────────────────────────┤
-│                Backend Integration Layer                     │
+│                Backend Integration Layer                    │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
 │  │   FastAPI   │  │   Python    │  │   JSON/YAML         │  │
 │  │   Server    │  │   Bridge    │  │   Serialization     │  │
@@ -76,24 +76,25 @@ App
 │   ├── MainContent
 │   └── Footer
 ├── Configuration
-│   ├── FluidProperties
-│   │   ├── BasicProperties
-│   │   ├── PhaseSelection
-│   │   └── FlowConditions
 │   ├── NetworkSettings
-│   │   ├── BoundaryConditions
+│   │   ├── BoundaryConditions (Pressure, Temperature)
 │   │   ├── FlowDirection
+│   │   ├── MassFlowRate
 │   │   └── OutputUnits
-│   ├── PipeSections
-│   │   ├── SectionList
-│   │   ├── SectionEditor
-│   │   ├── PipeProperties
-│   │   ├── FittingsSelector
-│   │   └── ElevationProfile
-│   └── Components
-│       ├── ControlValve
-│       ├── Orifice
-│       └── UserDefinedLosses
+│   ├── FluidProperties
+│   │   ├── PhaseSelection
+│   │   ├── Properties
+│   │   └── Others
+│   └── PipeSections
+│       ├── SectionList
+│       ├── SectionEditor
+│       ├── PipeProperties
+│       ├── FittingsSelector
+│       ├── ElevationProfile
+│       └── Components
+│           ├── ControlValve
+│           ├── Orifice
+│           └── UserDefinedLosses
 ├── Calculation
 │   ├── SolverControls
 │   ├── ProgressIndicator
@@ -126,7 +127,6 @@ interface ConfigurationStore {
   network: NetworkConfig;
   fluid: FluidConfig;
   sections: PipeSection[];
-  components: ComponentConfig[];
   validation: ValidationState;
   actions: {
     updateNetwork: (network: Partial<NetworkConfig>) => void;
@@ -201,6 +201,20 @@ Frontend State Update
 UI Re-render with Results
 ```
 
+### 2.4 Section Calculation Semantics
+
+The frontend must mirror the solver’s “single component per section” rules so users understand how data will be interpreted:
+
+- **Pipeline-first**: If a section includes a non-zero pipe length, the solver treats it as a pipeline span. All fittings, friction, and elevation losses are computed, and any configured control valve or orifice in that section is ignored for pressure-drop purposes (still retained for documentation/metadata).
+- **Component-only sections**: If length is omitted or zero, the UI should require exactly one component. The solver will select a single drop source using the priority below:
+  1. **Control valve** – takes precedence when present; the orifice configuration is ignored.
+  2. **Orifice** – used only when no control valve exists and a valid flow rate is available.
+  3. **User-defined fixed loss** – treated as its own component when no valve or orifice is configured; otherwise ignored. This lets engineers model vendor data or miscellaneous losses without inventing fittings.
+- **Pipeline sections**: Any section with non-zero length automatically behaves as a pipeline span. All components (control valve, orifice, user-defined loss) entered in that section are considered documentation-only; their drops are ignored in the calculation.
+- **Validation guidance**: Form validation should surface these priorities (e.g., warning banners when both valve and orifice are present, tooltips explaining that the section acts as a pipeline vs. device). This avoids confusion when the results view shows only one loss contributor.
+
+Surfacing these rules in the React state/schema layer keeps the UI consistent with the current Python calculation engine and reduces support questions about “missing” component drops.
+
 ## 3. User Interface Design
 
 ### 3.1 Main Layout Design
@@ -216,58 +230,56 @@ UI Re-render with Results
 ┌─────────────────────────────────────────┐
 │ Header: [Logo] [Save] [Load] [Theme] [] │
 ├─────────────────────────────────────────┤
-│ │                                   │   │
-│ │                                   │   │
-│ S│  Main Content Area              │   │
-│ i│  - Configuration Forms          │ R │
-│ d│  - Results Dashboard            │ i │
-│ e│  - Network Visualization        │ g │
-│ b│  - Reports & Export            │ h │
-│ a│                                  │ t │
-│ r│                                  │   │
-│   │                                  │   │
+│   │                                 │   │
+│   │                                 │   │
+│ S │  Main Content Area              │   │
+│ i │  - Configuration Forms          │ R │
+│ d │  - Results Dashboard            │ i │
+│ e │  - Network Visualization        │ g │
+│ b │  - Reports & Export             │ h │
+│ a │                                 │ t │
+│ r │                                 │   │
+│   │                                 │   │
 └─────────────────────────────────────────┘
 ```
 
 ### 3.2 Configuration Interface Design
 
-#### Fluid Properties Panel
-- **Phase Selection**: Radio buttons for liquid/gas/vapor
-- **Basic Properties**: 
-  - Temperature (with unit selector)
-  - Pressure (gauge/absolute toggle)
-  - Density (auto-calculated for gases)
-- **Flow Conditions**:
-  - Mass flow rate OR volumetric flow rate
-  - Design margin percentage
-- **Advanced Properties** (shown when needed):
-  - Molecular weight (for gases)
-  - Z-factor (for gases)
-  - Viscosity
-  - Specific heat ratio (for gases)
-
 #### Network Settings Panel
 - **Boundary Conditions**:
-  - Upstream/Downstream pressure
   - Boundary pressure
-- **Flow Direction**: Auto/Forward/Backward
+  - Boundary Temperature
+- **Flow Conditions**:
+  - Mass flow rate
+  - Design margin percentage
+- **Flow Direction**: Forward/Backward
 - **Gas Flow Model**: Isothermal/Adiabatic (for gas phases)
 - **Output Units**: Dropdown selectors for each unit type
 
+#### Fluid Properties Panel
+- **Phase Selection**: Radio buttons for liquid/gas
+- **Properties** (shown when needed):
+  - Density (fixed for liquid, auto-calculated for gases)
+  - Molecular weight (for gases)
+  - Z-factor (for gases)
+  - Specific heat ratio (for gases)
+  - Viscosity
+
 #### Pipe Section Editor
 - **Section List**: Tabular view with add/edit/delete actions
-- **Section Properties**:
-  - Basic geometry (NPS/schedule or direct diameter)
-  - Length and elevation change
-  - Roughness (with typical values)
-- **Fittings Selector**:
-  - Visual fitting library
-  - K-factor lookup table
-  - Drag-and-drop interface
-- **Component Integration**:
-  - Control valve configuration
-  - Orifice setup
-  - User-defined losses
+- **Section Component**: (only one per section)
+  - **Pipeline**: (add/edit/delete)
+    - Basic geometry (NPS/schedule or direct diameter)
+    - Length and elevation change
+    - Roughness (with typical values)
+    - **Fittings Selector**: (add/edit/delete)
+    - Visual fitting library
+    - K-factor lookup table
+    - Drag-and-drop interface
+  - **Control Valve**: (add/edit/delete)
+   
+  - **Orifice**: (add/edit/delete)
+  - **User-Defined Losses**: (add/edit/delete)
 
 ### 3.3 Results Display Design
 
@@ -276,16 +288,16 @@ UI Re-render with Results
 ┌─────────────────────────────────────────────────────────┐
 │                    RESULTS SUMMARY                      │
 ├─────────────────────────────────────────────────────────┤
-│ Total Pressure Drop:    199.7 kPa                      │
-│ Maximum Velocity:       4.30 m/s                       │
-│ Design Margin Applied:  0.0%                           │
-│ Critical Conditions:    None Detected                  │
+│ Total Pressure Drop:    199.7 kPa                       │
+│ Maximum Velocity:       4.30 m/s                        │
+│ Design Margin Applied:  0.0%                            │
+│ Critical Conditions:    None Detected                   │
 ├─────────────────────────────────────────────────────────┤
-│ INLET                    │ OUTLET                      │
-│ Pressure: 101.0 kPa     │ Pressure: 300.7 kPa         │
-│ Temperature: 103.4°C    │ Temperature: 103.4°C        │
-│ Density: 783.4 kg/m³    │ Density: 783.4 kg/m³        │
-│ Velocity: 1.09 m/s      │ Velocity: 4.30 m/s          │
+│ INLET                   │ OUTLET                        │
+│ Pressure: 101.0 kPa     │ Pressure: 300.7 kPa           │
+│ Temperature: 103.4°C    │ Temperature: 103.4°C          │
+│ Density: 783.4 kg/m³    │ Density: 783.4 kg/m³          │
+│ Velocity: 1.09 m/s      │ Velocity: 4.30 m/s            │
 └─────────────────────────────────────────────────────────┘
 ```
 

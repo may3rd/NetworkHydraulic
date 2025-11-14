@@ -7,17 +7,16 @@ from network_hydraulic.models.fluid import Fluid
 from network_hydraulic.models.pipe_section import Fitting, PipeSection
 
 
-def make_fluid(**overrides) -> Fluid:
+def make_fluid(temperature: float = 298.0, pressure: float = 101325.0, **overrides) -> Fluid:
     base = dict(
         name="water",
         phase="liquid",
-        temperature=298.0,
-        pressure=101325.0,
         density=998.2,
         molecular_weight=18.0,
         z_factor=1.0,
         specific_heat_ratio=1.0,
         viscosity=8.9e-4,
+        standard_flow_rate=None,
         vapor_pressure=None,
         critical_pressure=None,
     )
@@ -25,7 +24,14 @@ def make_fluid(**overrides) -> Fluid:
     return Fluid(**base)
 
 
-def make_section(fittings, fitting_type="LR", **overrides) -> PipeSection:
+def make_section(
+    fittings,
+    fitting_type="LR",
+    mass_flow_rate: float = 1.0,
+    temperature: float = 298.0,
+    pressure: float = 101325.0,
+    **overrides,
+) -> PipeSection:
     base = dict(
         id="sec",
         schedule="40",
@@ -49,17 +55,20 @@ def make_section(fittings, fitting_type="LR", **overrides) -> PipeSection:
         boundary_pressure=None,
         control_valve=None,
         orifice=None,
-        base_volumetric_flow_rate=0.08,
+        mass_flow_rate=mass_flow_rate,
+        temperature=temperature,
+        pressure=pressure,
     )
     base.update(overrides)
     return PipeSection(**base)
 
 
-def reynolds(fluid: Fluid, section: PipeSection, diameter: float) -> float:
-    q = section.design_volumetric_flow_rate or 0.0
+def reynolds(fluid: Fluid, diameter: float, mass_flow_rate: float, temperature: float, pressure: float) -> float:
+    density = fluid.current_density(temperature, pressure)
+    volumetric_flow_rate = mass_flow_rate / density
     area = 0.25 * math.pi * diameter * diameter
-    velocity = q / area
-    return fluid.current_density() * velocity * diameter / fluid.viscosity
+    velocity = volumetric_flow_rate / area
+    return density * velocity * diameter / fluid.viscosity
 
 
 def two_k(k1: float, kinf: float, re: float, diameter: float) -> float:
@@ -70,12 +79,14 @@ def two_k(k1: float, kinf: float, re: float, diameter: float) -> float:
 def test_standard_fitting_k_sum():
     fluid = make_fluid()
     fittings = [Fitting("elbow_90", 2), Fitting("tee_through", 1)]
-    section = make_section(fittings)
-    section.design_volumetric_flow_rate = section.base_volumetric_flow_rate
+    mass_flow_rate = 1.0
+    temperature = 298.0
+    pressure = 101325.0
+    section = make_section(fittings, mass_flow_rate=mass_flow_rate, temperature=temperature, pressure=pressure)
     calculator = FittingLossCalculator(fluid=fluid)
     calculator.calculate(section)
 
-    re = reynolds(fluid, section, section.pipe_diameter)
+    re = reynolds(fluid, section.pipe_diameter, mass_flow_rate, temperature, pressure)
     expected = 2 * two_k(800.0, 0.2, re, section.pipe_diameter)
     expected += two_k(150.0, 0.05, re, section.pipe_diameter)
     assert section.fitting_K == pytest.approx(expected, rel=1e-6)
@@ -84,8 +95,10 @@ def test_standard_fitting_k_sum():
 def test_swage_contributions_positive():
     fluid = make_fluid()
     fittings = [Fitting("inlet_swage", 1), Fitting("outlet_swage", 1)]
-    section = make_section(fittings, base_volumetric_flow_rate=0.05)
-    section.design_volumetric_flow_rate = section.base_volumetric_flow_rate
+    mass_flow_rate = 0.5 # Example mass flow rate
+    temperature = 298.0
+    pressure = 101325.0
+    section = make_section(fittings, mass_flow_rate=mass_flow_rate, temperature=temperature, pressure=pressure)
     calculator = FittingLossCalculator(fluid=fluid)
     calculator.calculate(section)
     assert section.fitting_K > 0.0
@@ -94,7 +107,10 @@ def test_swage_contributions_positive():
 def test_missing_pipe_diameter_raises():
     fluid = make_fluid()
     fittings = [Fitting("elbow_90", 1)]
-    section = make_section(fittings, pipe_diameter=None)
+    mass_flow_rate = 1.0
+    temperature = 298.0
+    pressure = 101325.0
+    section = make_section(fittings, pipe_diameter=None, mass_flow_rate=mass_flow_rate, temperature=temperature, pressure=pressure)
     calculator = FittingLossCalculator(fluid=fluid)
     with pytest.raises(ValueError):
         calculator.calculate(section)
@@ -103,8 +119,10 @@ def test_missing_pipe_diameter_raises():
 def test_fitting_breakdown_captures_each_component():
     fluid = make_fluid()
     fittings = [Fitting("elbow_90", 2), Fitting("tee_elbow", 1)]
-    section = make_section(fittings)
-    section.design_volumetric_flow_rate = section.base_volumetric_flow_rate
+    mass_flow_rate = 1.0
+    temperature = 298.0
+    pressure = 101325.0
+    section = make_section(fittings, mass_flow_rate=mass_flow_rate, temperature=temperature, pressure=pressure)
     calculator = FittingLossCalculator(fluid=fluid)
     calculator.calculate(section)
 

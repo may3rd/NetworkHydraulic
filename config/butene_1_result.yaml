@@ -3,8 +3,7 @@ network:
   description: null
   direction: forward
   boundary_pressure: 32.2
-  upstream_pressure: null
-  downstream_pressure: null
+  boundary_temperature: 42.0
   gas_flow_model: null
   mass_flow_rate: 1000.0000000000001
   volumetric_flow_rate: 1.7241379310344829

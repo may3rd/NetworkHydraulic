@@ -23,6 +23,7 @@ from typing import List, Optional
 
 from network_hydraulic.models.components import ControlValve, Orifice
 from network_hydraulic.models.results import CalculationOutput, ResultSummary
+from network_hydraulic.models.fluid import Fluid
 
 ALLOWED_FITTING_TYPES = [
     "elbow_90",
@@ -101,10 +102,13 @@ class PipeSection:
     calculation_output: CalculationOutput = field(default_factory=CalculationOutput)
     result_summary: ResultSummary = field(default_factory=ResultSummary)
     design_flow_multiplier: float = 1.0
-    base_mass_flow_rate: Optional[float] = None
-    base_volumetric_flow_rate: Optional[float] = None
     design_mass_flow_rate: Optional[float] = None
-    design_volumetric_flow_rate: Optional[float] = None
+    mass_flow_rate: Optional[float] = None
+    temperature: Optional[float] = None
+    pressure: Optional[float] = None
+    flow_splitting_factor: float = 1.0
+    from_pipe_id: Optional[str] = None
+    to_pipe_id: Optional[str] = None
 
     def __post_init__(self) -> None:
         errors: list[str] = []
@@ -136,10 +140,24 @@ class PipeSection:
         if not self.fitting_type:
             errors.append("PipeSection fitting_type must be a non-empty string")
 
-        if self.base_mass_flow_rate is not None and self.base_mass_flow_rate <= 0:
-            errors.append("PipeSection mass_flow_rate must be positive if provided")
-        if self.base_volumetric_flow_rate is not None and self.base_volumetric_flow_rate <= 0:
-            errors.append("PipeSection volumetric_flow_rate must be positive if provided")
+        if self.flow_splitting_factor <= 0:
+            errors.append("PipeSection flow_splitting_factor must be positive")
 
         if errors:
             raise ValueError("; ".join(errors))
+
+    @property
+    def has_pipeline_segment(self) -> bool:
+        return self.length is not None and self.length > 0
+
+    def current_volumetric_flow_rate(self, fluid: Fluid) -> float:
+        if self.mass_flow_rate is None:
+            raise ValueError("mass_flow_rate must be set for the pipe section to calculate volumetric flow rate")
+        if self.temperature is None or self.temperature <= 0:
+            raise ValueError("temperature must be set and positive for the pipe section to calculate volumetric flow rate")
+        if self.pressure is None or self.pressure <= 0:
+            raise ValueError("pressure must be set and positive for the pipe section to calculate volumetric flow rate")
+        density = fluid.current_density(self.temperature, self.pressure)
+        if density == 0:
+            raise ValueError("Cannot calculate volumetric flow rate with zero density")
+        return self.mass_flow_rate / density

@@ -5,8 +5,6 @@ def test_fluid_defaults() -> None:
     fluid = Fluid(
         name=None,
         phase="gas",
-        temperature=300.0,
-        pressure=1.0e5,
         density=1.2,
         molecular_weight=18.0,
         z_factor=1.0,

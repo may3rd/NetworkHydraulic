@@ -43,8 +43,19 @@ def _execute_run(
 
         solver = NetworkSolver(
             default_pipe_diameter=default_diameter,
-            volumetric_flow_rate=flow_rate,
         )
+        if flow_rate is not None:
+            try:
+                density = network.fluid.current_density(network.boundary_temperature, network.boundary_pressure)
+                network.mass_flow_rate = flow_rate * density
+                logger.info(
+                    "Overriding network mass_flow_rate to %.2f kg/s (from %.2f m^3/s)",
+                    network.mass_flow_rate,
+                    flow_rate,
+                )
+            except ValueError as exc:
+                typer.secho(f"Fluid property error: {exc}", fg=typer.colors.RED)
+                raise typer.Exit(code=1) from exc
         result = solver.run(network)
     except ValueError as exc:
         typer.secho(f"Configuration error: {exc}", fg=typer.colors.RED)

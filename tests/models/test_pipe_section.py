@@ -2,6 +2,7 @@ import pytest
 
 from network_hydraulic.models.pipe_section import PipeSection, Fitting
 from network_hydraulic.models.components import ControlValve, Orifice
+from network_hydraulic.models.fluid import Fluid
 
 
 def make_pipe_section(**overrides) -> PipeSection:
@@ -31,9 +32,29 @@ def make_pipe_section(**overrides) -> PipeSection:
         outlet_diameter_specified=False,
         control_valve=None,
         orifice=None,
+        mass_flow_rate=1.0, # Add a default mass_flow_rate for testing
+        temperature=300.0,
+        pressure=101325.0,
     )
     defaults.update(overrides)
     return PipeSection(**defaults)
+
+
+def make_fluid(**overrides) -> Fluid:
+    defaults = dict(
+        name="test",
+        phase="liquid",
+        density=1000.0,
+        molecular_weight=18.0,
+        z_factor=1.0,
+        specific_heat_ratio=1.0,
+        viscosity=1e-3,
+        standard_flow_rate=None,
+        vapor_pressure=None,
+        critical_pressure=None,
+    )
+    defaults.update(overrides)
+    return Fluid(**defaults)
 
 
 def test_pipe_section_post_init_valid_inputs():
@@ -108,3 +129,47 @@ def test_fitting_post_init_raises_for_non_positive_count():
         Fitting(type="elbow_90", count=0)
     with pytest.raises(ValueError, match="Fitting count must be positive"):
         Fitting(type="elbow_90", count=-1)
+
+
+def test_pipe_section_current_volumetric_flow_rate():
+    fluid = make_fluid(density=998.2)
+    section = make_pipe_section(mass_flow_rate=5.0, temperature=300.0, pressure=101325.0)
+    expected_volumetric_flow_rate = 5.0 / fluid.current_density(section.temperature, section.pressure)
+    assert section.current_volumetric_flow_rate(fluid) == pytest.approx(expected_volumetric_flow_rate)
+
+def test_pipe_section_current_volumetric_flow_rate_raises_if_no_mass_flow():
+    fluid = make_fluid(density=998.2)
+    section = make_pipe_section(mass_flow_rate=None, temperature=300.0, pressure=101325.0)
+    with pytest.raises(ValueError, match="mass_flow_rate must be set for the pipe section to calculate volumetric flow rate"):
+        section.current_volumetric_flow_rate(fluid)
+
+def test_pipe_section_current_volumetric_flow_rate_raises_if_no_temperature():
+    fluid = make_fluid(density=998.2)
+    section = make_pipe_section(mass_flow_rate=5.0, temperature=None, pressure=101325.0)
+    with pytest.raises(ValueError, match="temperature must be set and positive for the pipe section to calculate volumetric flow rate"):
+        section.current_volumetric_flow_rate(fluid)
+
+def test_pipe_section_current_volumetric_flow_rate_raises_for_non_positive_temperature():
+    fluid = make_fluid(density=998.2)
+    section = make_pipe_section(mass_flow_rate=5.0, temperature=0.0, pressure=101325.0)
+    with pytest.raises(ValueError, match="temperature must be set and positive for the pipe section to calculate volumetric flow rate"):
+        section.current_volumetric_flow_rate(fluid)
+
+def test_pipe_section_current_volumetric_flow_rate_raises_if_no_pressure():
+    fluid = make_fluid(density=998.2)
+    section = make_pipe_section(mass_flow_rate=5.0, temperature=300.0, pressure=None)
+    with pytest.raises(ValueError, match="pressure must be set and positive for the pipe section to calculate volumetric flow rate"):
+        section.current_volumetric_flow_rate(fluid)
+
+def test_pipe_section_current_volumetric_flow_rate_raises_for_non_positive_pressure():
+    fluid = make_fluid(density=998.2)
+    section = make_pipe_section(mass_flow_rate=5.0, temperature=300.0, pressure=0.0)
+    with pytest.raises(ValueError, match="pressure must be set and positive for the pipe section to calculate volumetric flow rate"):
+        section.current_volumetric_flow_rate(fluid)
+
+def test_pipe_section_current_volumetric_flow_rate_raises_if_zero_density():
+    fluid = make_fluid(density=1.0) # Create a valid fluid first
+    section = make_pipe_section(mass_flow_rate=5.0, temperature=300.0, pressure=101325.0)
+    fluid.density = 0.0 # Then set density to 0.0 for the test
+    with pytest.raises(ValueError, match="density must be positive to determine flow parameters"):
+        section.current_volumetric_flow_rate(fluid)

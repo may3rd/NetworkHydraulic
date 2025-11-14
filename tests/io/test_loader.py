@@ -31,12 +31,10 @@ def section_cfg(**overrides):
     return base
 
 
-def liquid_network_cfg(fluid_overrides=None, **network_overrides):
+def liquid_network_cfg(fluid_overrides=None, **kwargs):
     fluid = {
         "name": "water",
         "phase": "liquid",
-        "temperature": 300.0,
-        "pressure": 101325.0,
         "density": 1000.0,
         "viscosity": 1e-3,
     }
@@ -46,14 +44,14 @@ def liquid_network_cfg(fluid_overrides=None, **network_overrides):
     network = {
         "name": "net",
         "direction": "forward",
+        "mass_flow_rate": 1.0, 
+        "boundary_temperature": 300.0,
+        "boundary_pressure": 101325.0,
         "fluid": fluid,
         "sections": [section_cfg()],
-        "mass_flow_rate": 1.0,
-        "volumetric_flow_rate": None,
-        "standard_flow_rate": None,
     }
-    if network_overrides:
-        network.update(network_overrides)
+    if kwargs:
+        network.update(kwargs)
     return {"network": network}
 
 
@@ -61,13 +59,11 @@ def test_loader_builds_structured_fittings():
     raw_config = {
         "network": {
             "mass_flow_rate": 1.0,
-            "volumetric_flow_rate": None,
-            "standard_flow_rate": None,
+            "boundary_temperature": 300.0,
+            "boundary_pressure": 101325.0,
             "fluid": {
                 "name": "water",
                 "phase": "liquid",
-                "temperature": 300.0,
-                "pressure": 101325.0,
                 "density": 1000.0,
                 "viscosity": 1e-3,
             }
@@ -92,13 +88,11 @@ def test_loader_auto_adds_swage_fittings():
     raw_config = {
         "network": {
             "mass_flow_rate": 1.0,
-            "volumetric_flow_rate": None,
-            "standard_flow_rate": None,
+            "boundary_temperature": 300.0,
+            "boundary_pressure": 101325.0,
             "fluid": {
                 "name": "water",
                 "phase": "liquid",
-                "temperature": 300.0,
-                "pressure": 101325.0,
                 "density": 1000.0,
                 "viscosity": 1e-3,
             }
@@ -124,13 +118,11 @@ def test_loader_derives_diameter_from_npd():
     raw_config = {
         "network": {
             "mass_flow_rate": 1.0,
-            "volumetric_flow_rate": None,
-            "standard_flow_rate": None,
+            "boundary_temperature": 300.0,
+            "boundary_pressure": 101325.0,
             "fluid": {
                 "name": "water",
                 "phase": "liquid",
-                "temperature": 300.0,
-                "pressure": 101325.0,
                 "density": 1000.0,
                 "viscosity": 1e-3,
             }
@@ -150,13 +142,10 @@ def test_loader_converts_units_when_specified():
                 "boundary_pressure": {"value": 50, "unit": "barg"},
                 "direction": "forward",
                 "mass_flow_rate": 2.0,
-                "volumetric_flow_rate": None,
-                "standard_flow_rate": None,
+                "boundary_temperature": 300.0,
                 "fluid": {
                     "name": "gas",
                     "phase": "gas",
-                    "temperature": 300.0,
-                    "pressure": 101325.0,
                     "density": 15.0,
                     "molecular_weight": 18.0,
                     "z_factor": 1.0,
@@ -182,49 +171,6 @@ def test_loader_converts_units_when_specified():
     assert section.roughness == pytest.approx(convert(1.5, "mm", "m"))
     assert section.control_valve is not None
     assert section.control_valve.pressure_drop == pytest.approx(convert(5, "psig", "Pa"))
-
-
-def test_loader_accepts_negative_celsius_temperature():
-    raw = liquid_network_cfg(
-        fluid_overrides={
-            "temperature": {
-                "value": -100.0,
-                "unit": "degC",
-            }
-        }
-    )
-    loader = ConfigurationLoader(raw=raw)
-    network = loader.build_network()
-    expected = convert(-100.0, "degC", "K")
-    assert network.fluid.temperature == pytest.approx(expected, rel=1e-9)
-
-
-def test_loader_accepts_negative_gauge_pressure():
-    raw = liquid_network_cfg(
-        fluid_overrides={
-            "pressure": {
-                "value": -0.5,
-                "unit": "kPag",
-            }
-        }
-    )
-    loader = ConfigurationLoader(raw=raw)
-    network = loader.build_network()
-    expected = convert(-0.5, "kPag", "Pa")
-    assert expected > 0
-    assert network.fluid.pressure == pytest.approx(expected, rel=1e-9)
-
-
-def test_loader_defaults_pressure_to_boundary_when_missing():
-    raw = liquid_network_cfg(
-        fluid_overrides={"pressure": None},
-        boundary_pressure={"value": 50.0, "unit": "psig"},
-    )
-    loader = ConfigurationLoader(raw=raw)
-    network = loader.build_network()
-    expected = convert(50.0, "psig", "Pa")
-    assert network.boundary_pressure == pytest.approx(expected, rel=1e-9)
-    assert network.fluid.pressure == pytest.approx(expected, rel=1e-9)
 
 
 def test_loader_rejects_unknown_network_key():
@@ -259,6 +205,19 @@ def test_loader_requires_section_length():
         loader.build_network()
 
 
+def test_loader_allows_lengthless_component_section():
+    raw = liquid_network_cfg()
+    section = raw["network"]["sections"][0]
+    section.pop("length")
+    section["control_valve"] = {"pressure_drop": {"value": 10.0, "unit": "kPa"}}
+    loader = ConfigurationLoader(raw=raw)
+    network = loader.build_network()
+    loaded_section = network.sections[0]
+    assert loaded_section.length == 0.0
+    assert loaded_section.control_valve is not None
+    assert loaded_section.control_valve.pressure_drop == pytest.approx(convert(10.0, "kPa", "Pa"))
+
+
 def test_loader_aligns_adjacent_pipe_diameters():
     upstream = section_cfg(id="s1", pipe_diameter=0.1, fittings=[])
     upstream["output_ID"] = None
@@ -277,13 +236,11 @@ def test_loader_aligns_adjacent_pipe_diameters():
             "name": "adjacent",
             "direction": "forward",
             "mass_flow_rate": 1.0,
-            "volumetric_flow_rate": None,
-            "standard_flow_rate": None,
+            "boundary_temperature": 300.0,
+            "boundary_pressure": 101325.0,
             "fluid": {
                 "name": "water",
                 "phase": "liquid",
-                "temperature": 300.0,
-                "pressure": 101325.0,
                 "density": 1000.0,
                 "viscosity": 1e-3,
             },
@@ -329,16 +286,15 @@ def test_loader_does_not_add_swage_for_near_equal_diameters():
         "network": {
             "name": "tolerance",
             "direction": "forward",
+            "mass_flow_rate": 1.0,
+            "boundary_temperature": 300.0,
+            "boundary_pressure": 101325.0,
             "fluid": {
                 "name": "water",
                 "phase": "liquid",
-                "temperature": 300.0,
-                "pressure": 101325.0,
                 "density": 1000.0,
                 "viscosity": 1e-3,
-                "mass_flow_rate": 1.0,
             },
-            "mass_flow_rate": 1.0,
             "sections": [
                 upstream,
                 downstream,
@@ -356,15 +312,15 @@ def test_loader_respects_user_defined_diameters_between_sections():
         "network": {
             "name": "adjacent",
             "direction": "forward",
+            "mass_flow_rate": 1.0,
+            "boundary_temperature": 300.0,
+            "boundary_pressure": 101325.0,
             "fluid": {
                 "name": "water",
                 "phase": "liquid",
-                "temperature": 300.0,
-                "pressure": 101325.0,
                 "density": 1000.0,
                 "viscosity": 1e-3,
             },
-            "mass_flow_rate": 1.0,
             "sections": [
                 section_cfg(
                     id="s1",
@@ -392,14 +348,14 @@ def test_loader_respects_user_defined_diameters_between_sections():
 def test_loader_defaults_elevation_change_to_zero_when_missing():
     raw_config = {
         "network": {
+            "mass_flow_rate": 1.0,
+            "boundary_temperature": 300.0,
+            "boundary_pressure": 101325.0,
             "fluid": {
                 "name": "water",
                 "phase": "liquid",
-                "temperature": 300.0,
-                "pressure": 101325.0,
                 "density": 1000.0,
                 "viscosity": 1e-3,
-                "mass_flow_rate": 1.0,
             }
         }
     }
@@ -415,6 +371,9 @@ def test_loader_parses_output_units_block():
         "network": {
             "name": "units",
             "direction": "forward",
+            "mass_flow_rate": 1.0,
+            "boundary_temperature": 300.0,
+            "boundary_pressure": 101325.0,
             "output_units": {
                 "pressure": "kPag",
                 "pressure_drop": "kPa",
@@ -423,12 +382,9 @@ def test_loader_parses_output_units_block():
             "fluid": {
                 "name": "water",
                 "phase": "liquid",
-                "temperature": 300.0,
-                "pressure": 101325.0,
                 "density": 1000.0,
                 "viscosity": 1e-3,
             },
-            "mass_flow_rate": 1.0,
             "sections": [
                 section_cfg(),
             ],
@@ -443,7 +399,10 @@ def test_loader_parses_output_units_block():
 
 
 def test_loader_normalizes_fitting_aliases():
-    raw = liquid_network_cfg()
+    raw = liquid_network_cfg(
+        boundary_temperature=300.0,
+        boundary_pressure=101325.0,
+    )
     raw["network"]["sections"][0]["fittings"] = [
         {"type": "check_valve_tilting", "count": 2},
     ]
@@ -460,15 +419,15 @@ def test_loader_design_margin_honors_section_override():
             "name": "margin",
             "direction": "forward",
             "design_margin": 8.0,
+            "mass_flow_rate": 1.0,
+            "boundary_temperature": 300.0,
+            "boundary_pressure": 101325.0,
             "fluid": {
                 "name": "water",
                 "phase": "liquid",
-                "temperature": 300.0,
-                "pressure": 101325.0,
                 "density": 1000.0,
                 "viscosity": 1e-3,
             },
-            "mass_flow_rate": 1.0,
             "sections": [
                 section_cfg(id="s1", design_margin=12.0),
                 section_cfg(id="s2"),
@@ -489,15 +448,15 @@ def test_loader_from_json_path(tmp_path: Path):
             "name": "json-network",
             "direction": "forward",
             "boundary_pressure": 101325.0,
+            "mass_flow_rate": 1.0, 
+                "boundary_temperature": {"value": 25.0, "unit": "degC"},
+                "boundary_pressure": 250000.0,
             "fluid": {
                 "name": "water",
                 "phase": "liquid",
-                "temperature": {"value": 25.0, "unit": "degC"},
-                "pressure": 250000.0,
                 "density": 997.0,
                 "viscosity": 1.0e-3,
             },
-            "mass_flow_rate": 1.0, # Added default mass_flow_rate
             "sections": [
                 section_cfg(
                     length=50.0,
@@ -522,12 +481,11 @@ def test_loader_from_json_path(tmp_path: Path):
 
 def test_loader_raises_for_invalid_unit_string():
     raw = liquid_network_cfg(
-        fluid_overrides={
-            "temperature": {
-                "value": 100.0,
-                "unit": "invalid_unit",
-            }
-        }
+        boundary_temperature={
+            "value": 100.0,
+            "unit": "invalid_unit",
+        },
+        boundary_pressure=101325.0,
     )
     loader = ConfigurationLoader(raw=raw)
     with pytest.raises(ValueError, match="Unit \\('invalid',\\) doesn't exist !"):
@@ -536,37 +494,34 @@ def test_loader_raises_for_invalid_unit_string():
 
 def test_loader_raises_for_non_numeric_quantity_string():
     raw = liquid_network_cfg(
-        fluid_overrides={
-            "temperature": "not_a_number K",
-        }
+        boundary_temperature="not_a_number K",
+        boundary_pressure=101325.0,
     )
     loader = ConfigurationLoader(raw=raw)
-    with pytest.raises(ValueError, match="fluid.temperature must be numeric"):
+    with pytest.raises(ValueError, match="network.boundary_temperature must be numeric"):
         loader.build_network()
 
 
 def test_loader_raises_for_non_numeric_quantity_value_in_map():
     raw = liquid_network_cfg(
-        fluid_overrides={
-            "temperature": {
-                "value": "not_a_number",
-                "unit": "K",
-            }
-        }
+        boundary_temperature={
+            "value": "not_a_number",
+            "unit": "K",
+        },
+        boundary_pressure=101325.0,
     )
     loader = ConfigurationLoader(raw=raw)
-    with pytest.raises(ValueError, match="fluid.temperature value must be numeric"):
+    with pytest.raises(ValueError, match="network.boundary_temperature value must be numeric"):
         loader.build_network()
 
 
 def test_loader_raises_for_missing_unit_in_map():
     raw = liquid_network_cfg(
-        fluid_overrides={
-            "temperature": {
-                "value": 100.0,
-                "unit": None,
-            }
-        }
+        boundary_temperature={
+            "value": 100.0,
+            "unit": None,
+        },
+        boundary_pressure=101325.0,
     )
     loader = ConfigurationLoader(raw=raw)
     with pytest.raises(ValueError, match="Unit \\('None',\\) doesn't exist !"):
@@ -575,12 +530,11 @@ def test_loader_raises_for_missing_unit_in_map():
 
 def test_loader_raises_for_missing_required_positive_quantity():
     raw = liquid_network_cfg(
-        fluid_overrides={
-            "temperature": None,
-        }
+        boundary_temperature=None,
+        boundary_pressure=101325.0,
     )
     loader = ConfigurationLoader(raw=raw)
-    with pytest.raises(ValueError, match="fluid.temperature must be provided"):
+    with pytest.raises(ValueError, match="network.boundary_temperature must be provided"):
         loader.build_network()
 
 

@@ -15,6 +15,19 @@ class UserFixedLossCalculator(LossCalculator):
         if section.user_specified_fixed_loss is None:
             return
 
+        ignored = section.calculation_output.ignored_components
+
+        # User-defined losses behave like a dedicated component: only one per section.
+        if section.has_pipeline_segment:
+            ignored.append("User-defined fixed loss ignored because section includes a pipeline segment.")
+            return
+        if section.control_valve:
+            ignored.append("User-defined fixed loss ignored because control valve takes precedence in this section.")
+            return
+        if section.orifice:
+            ignored.append("User-defined fixed loss ignored because orifice takes precedence in this section.")
+            return
+
         pressure_drop = section.calculation_output.pressure_drop
         delta_p = section.user_specified_fixed_loss
         pressure_drop.user_specified_fixed_loss = delta_p

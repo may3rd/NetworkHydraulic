@@ -1,3 +1,4 @@
+
 """Network grouping of pipe sections and result summaries.
 
 Example:
@@ -27,22 +28,29 @@ class Network:
     name: str
     description: Optional[str]
     fluid: Fluid
+    boundary_temperature: float
+    boundary_pressure: float
     direction: str = "auto"
-    boundary_pressure: Optional[float] = None
-    upstream_pressure: Optional[float] = None
-    downstream_pressure: Optional[float] = None
+    mass_flow_rate: Optional[float] = None
     gas_flow_model: Optional[str] = None
     sections: List[PipeSection] = field(default_factory=list)
     calculation_output: CalculationOutput = field(default_factory=CalculationOutput)
     result_summary: ResultSummary = field(default_factory=ResultSummary)
     output_units: OutputUnits = field(default_factory=OutputUnits)
-    design_margin: Optional[float] = None
-    mass_flow_rate: Optional[float] = None
-    volumetric_flow_rate: Optional[float] = None
-    standard_flow_rate: Optional[float] = None
+    design_margin: float = 0.0 # For design rate 110% set design_margin = 0.1
 
     def __post_init__(self) -> None:
         errors: list[str] = []
+
+        if self.boundary_temperature is None or self.boundary_temperature <= 0:
+            errors.append("network.boundary_temperature must be positive")
+        if self.boundary_pressure is None or self.boundary_pressure <= 0:
+            errors.append("network.boundary_pressure must be positive")
+
+        if self.mass_flow_rate is None:
+            errors.append("mass_flow_rate must be provided for the network")
+        if self.mass_flow_rate is not None and self.mass_flow_rate < 0:
+            errors.append("Network mass_flow_rate cannot be negative")
 
         normalized_direction = (self.direction or "").strip().lower()
         if normalized_direction not in {"auto", "forward", "backward"}:
@@ -82,13 +90,16 @@ class Network:
         if self.design_margin is not None and self.design_margin < 0:
             errors.append("Network design_margin must be non-negative")
 
-        for attr_name in ("mass_flow_rate", "volumetric_flow_rate", "standard_flow_rate"):
-            value = getattr(self, attr_name)
-            if value is not None and value <= 0:
-                errors.append(f"Network {attr_name} must be positive if provided")
-
         if errors:
             raise ValueError("; ".join(errors))
 
     def add_section(self, section: PipeSection) -> None:
         self.sections.append(section)
+
+    def current_volumetric_flow_rate(self) -> float:
+        if self.mass_flow_rate is None:
+            raise ValueError("mass_flow_rate must be set to calculate volumetric flow rate")
+        density = self.fluid.current_density(self.boundary_temperature, self.boundary_pressure)
+        if density == 0:
+            raise ValueError("Cannot calculate volumetric flow rate with zero density")
+        return self.mass_flow_rate / density

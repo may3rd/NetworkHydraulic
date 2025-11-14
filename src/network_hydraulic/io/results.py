@@ -152,22 +152,17 @@ def write_output(
     converter = _OutputUnitConverter(network.output_units)
     network_cfg = _network_config(network, converter)
     section_results = {section.section_id: section for section in result.sections}
-    mass_flow_rate = _resolve_network_mass_flow(network)
-    standard_density = _standard_gas_density(network.fluid)
+    mass_flow_rate = network.mass_flow_rate
+    standard_density = _standard_gas_density(network.fluid, STANDARD_TEMPERATURE, STANDARD_PRESSURE)
 
     for section in network.sections:
-        section_cfg = _section_config(section, converter)
+        section_cfg = _section_config(section)
         section_result = section_results.get(section.id)
         if section_result:
-            section_mass_flow = (
-                section.design_mass_flow_rate
-                if section.design_mass_flow_rate and section.design_mass_flow_rate > 0
-                else mass_flow_rate
-            )
             section_cfg["calculation_result"] = _section_result_payload(
                 section_result,
                 section_cfg.get("length"),
-                section_mass_flow,
+                mass_flow_rate,
                 standard_density,
                 section,
                 converter,
@@ -180,14 +175,7 @@ def write_output(
         "pressure_drop": _pressure_drop_dict(result.aggregate.pressure_drop, None, converter),
         "flow": flow_summary,
     }
-    if mass_flow_rate is not None:
-        network_cfg["mass_flow_rate"] = converter.mass_flow(mass_flow_rate)
-    volumetric_flow = flow_summary["volumetric_actual"]
-    if volumetric_flow is not None:
-        network_cfg["volumetric_flow_rate"] = volumetric_flow
-    if flow_summary["volumetric_standard"] is not None:
-        network_cfg["standard_flow_rate"] = flow_summary["volumetric_standard"]
-
+    
     data = {"network": network_cfg}
     suffix = path.suffix.lower()
     with path.open("w", encoding="utf-8") as handle:
@@ -241,6 +229,7 @@ def _state_dict(state: "StatePoint", converter: _OutputUnitConverter) -> Dict[st
         "density": converter.density(state.density),
         "mach_number": state.mach_number,
         "velocity": converter.velocity(state.velocity),
+        "pipe_velocity": converter.velocity(state.pipe_velocity),
         "erosional_velocity": converter.velocity(state.erosional_velocity),
         "flow_momentum": converter.flow_momentum(state.flow_momentum),
         "remarks": state.remarks,
@@ -279,6 +268,9 @@ def _print_state_table(
     print(f"{prefix}  Mach: {fmt(inlet.mach_number)}")
     print(f"{prefix}  Velocity: {fmt(converter.velocity(inlet.velocity))} {units.velocity}")
     print(
+        f"{prefix}  Pipe Avg Velocity: {fmt(converter.velocity(inlet.pipe_velocity))} {units.velocity}"
+    )
+    print(
         f"{prefix}  Erosional Velocity: {fmt(converter.velocity(inlet.erosional_velocity))} {units.velocity}"
     )
     print(
@@ -292,6 +284,9 @@ def _print_state_table(
     print(f"{prefix}  Density: {fmt(converter.density(outlet.density))} {units.density}")
     print(f"{prefix}  Mach: {fmt(outlet.mach_number)}")
     print(f"{prefix}  Velocity: {fmt(converter.velocity(outlet.velocity))} {units.velocity}")
+    print(
+        f"{prefix}  Pipe Avg Velocity: {fmt(converter.velocity(outlet.pipe_velocity))} {units.velocity}"
+    )
     print(
         f"{prefix}  Erosional Velocity: {fmt(converter.velocity(outlet.erosional_velocity))} {units.velocity}"
     )
@@ -333,12 +328,9 @@ def _network_config(network: "Network", converter: _OutputUnitConverter) -> Dict
         "description": network.description,
         "direction": network.direction,
         "boundary_pressure": converter.pressure(network.boundary_pressure),
-        "upstream_pressure": converter.pressure(network.upstream_pressure),
-        "downstream_pressure": converter.pressure(network.downstream_pressure),
         "gas_flow_model": network.gas_flow_model,
+        "boundary_temperature": converter.temperature(network.boundary_temperature),
         "mass_flow_rate": converter.mass_flow(network.mass_flow_rate),
-        "volumetric_flow_rate": converter.volumetric_flow(network.volumetric_flow_rate),
-        "standard_flow_rate": converter.volumetric_flow(network.standard_flow_rate),
         "fluid": _fluid_dict(network.fluid, converter),
         "sections": [],
         "output_units": network.output_units.as_dict(),
@@ -349,19 +341,18 @@ def _fluid_dict(fluid: "Fluid", converter: _OutputUnitConverter) -> Dict[str, An
     return {
         "name": fluid.name,
         "phase": fluid.phase,
-        "temperature": converter.temperature(fluid.temperature),
-        "pressure": converter.pressure(fluid.pressure),
         "density": converter.density(fluid.density),
         "viscosity": converter.viscosity(fluid.viscosity),
         "molecular_weight": fluid.molecular_weight,
         "z_factor": fluid.z_factor,
         "specific_heat_ratio": fluid.specific_heat_ratio,
+        "standard_flow_rate": converter.volumetric_flow(fluid.standard_flow_rate),
         "vapor_pressure": converter.pressure(fluid.vapor_pressure),
         "critical_pressure": converter.pressure(fluid.critical_pressure),
     }
 
 
-def _section_config(section: "PipeSection", converter: _OutputUnitConverter) -> Dict[str, Any]:
+def _section_config(section: "PipeSection") -> Dict[str, Any]:
     base = {
         "id": section.id,
         "description": section.description,
@@ -384,8 +375,6 @@ def _section_config(section: "PipeSection", converter: _OutputUnitConverter) -> 
         "pipe_NPD": section.pipe_NPD,
         "erosional_constant": section.erosional_constant,
         "mach_number": section.mach_number,
-        "mass_flow_rate": converter.mass_flow(section.base_mass_flow_rate),
-        "volumetric_flow_rate": converter.volumetric_flow(section.base_volumetric_flow_rate),
     }
     if section.control_valve:
         base["control_valve"] = _control_valve_dict(section.control_valve)
@@ -449,7 +438,13 @@ def _section_result_payload(
     return {
         "pressure_drop": pressure_drop_dict,
         "summary": _summary_dict(section_result.summary, converter),
-        "flow": _flow_dict(section_result.summary, mass_flow_rate, standard_density, converter),
+        "flow": _flow_dict(
+            section_result.summary,
+            mass_flow_rate,
+            standard_density,
+            converter,
+            section_mass_flow=section.mass_flow_rate,
+        ),
     }
 
 
@@ -458,52 +453,24 @@ def _flow_dict(
     mass_flow_rate: Optional[float],
     standard_density: Optional[float],
     converter: _OutputUnitConverter,
+    section_mass_flow: Optional[float] = None,
 ) -> Dict[str, Optional[float]]:
     volumetric_actual = None
-    if mass_flow_rate is not None:
+    effective_mass_flow = section_mass_flow if section_mass_flow is not None else mass_flow_rate
+    if effective_mass_flow is not None:
         inlet_density = getattr(summary.inlet, "density", None)
         if inlet_density and inlet_density > 0:
-            volumetric_actual = mass_flow_rate / inlet_density
+            volumetric_actual = effective_mass_flow / inlet_density
     volumetric_standard = None
-    if mass_flow_rate is not None and standard_density:
-        volumetric_standard = mass_flow_rate / standard_density
+    if effective_mass_flow is not None and standard_density:
+        volumetric_standard = effective_mass_flow / standard_density
     return {
         "volumetric_actual": converter.volumetric_flow(volumetric_actual),
         "volumetric_standard": converter.volumetric_flow(volumetric_standard),
     }
 
 
-def _fluid_density(fluid: "Fluid") -> Optional[float]:
-    try:
-        density = fluid.current_density()
-        if density and density > 0:
-            return density
-    except Exception:  # pragma: no cover - defensive fallback
-        pass
-    if fluid.density and fluid.density > 0:
-        return fluid.density
-    return None
-
-
-def _resolve_network_mass_flow(network: "Network") -> Optional[float]:
-    if network.mass_flow_rate and network.mass_flow_rate > 0:
-        return network.mass_flow_rate
-    density = _fluid_density(network.fluid)
-    if density and density > 0 and network.volumetric_flow_rate and network.volumetric_flow_rate > 0:
-        return network.volumetric_flow_rate * density
-    return None
-
-
-def _resolve_network_volumetric_flow(network: "Network") -> Optional[float]:
-    if network.volumetric_flow_rate and network.volumetric_flow_rate > 0:
-        return network.volumetric_flow_rate
-    density = _fluid_density(network.fluid)
-    if density and density > 0 and network.mass_flow_rate and network.mass_flow_rate > 0:
-        return network.mass_flow_rate / density
-    return None
-
-
-def _standard_gas_density(fluid: "Fluid") -> Optional[float]:
+def _standard_gas_density(fluid: "Fluid", temperature: float, pressure: float) -> Optional[float]:
     if not fluid.is_gas():
         return None
     molecular_weight = getattr(fluid, "molecular_weight", None)
@@ -511,7 +478,7 @@ def _standard_gas_density(fluid: "Fluid") -> Optional[float]:
         return None
     mw = molecular_weight if molecular_weight <= 0.5 else molecular_weight / 1000.0
     z_factor = fluid.z_factor if fluid.z_factor and fluid.z_factor > 0 else 1.0
-    return STANDARD_PRESSURE * mw / (GAS_CONSTANT * STANDARD_TEMPERATURE * z_factor)
+    return pressure * mw / (GAS_CONSTANT * temperature * z_factor)
 
 
 def _convert_value(value: Optional[float], from_unit: str, to_unit: str) -> Optional[float]:
@@ -546,15 +513,19 @@ def _print_section_overview(
     )
     flow_type = network.gas_flow_model if fluid.is_gas() else "N/A"
 
-    actual_mass_flow = _resolve_network_mass_flow(network)
-    actual_vol_flow = _resolve_network_volumetric_flow(network)
-    standard_flow = network.standard_flow_rate if network.standard_flow_rate and network.standard_flow_rate > 0 else None
-    if standard_flow is None and fluid.is_gas():
-        std_density = _standard_gas_density(fluid)
-        if std_density and std_density > 0 and actual_mass_flow and actual_mass_flow > 0:
-            standard_flow = actual_mass_flow / std_density
-    temperature = fluid.temperature
-    density = _fluid_density(fluid)
+    actual_mass_flow = section.mass_flow_rate if section and section.mass_flow_rate is not None else network.mass_flow_rate
+    actual_vol_flow = None
+    reference_density = None
+    if section:
+        reference_density = section.result_summary.inlet.density
+    if not (reference_density and reference_density > 0):
+        reference_density = fluid.current_density(network.boundary_temperature, network.boundary_pressure)
+    if actual_mass_flow is not None and reference_density and reference_density > 0:
+        actual_vol_flow = actual_mass_flow / reference_density
+
+    standard_flow = fluid.standard_flow_rate if fluid.is_gas() else None
+    temperature = network.boundary_temperature
+    density = fluid.current_density(network.boundary_temperature, network.boundary_pressure)
 
     def pipe_value(value: Optional[float], unit: Optional[str] = None) -> str:
         if value is None:
@@ -596,10 +567,8 @@ def _print_section_overview(
     )
     if design_mass_flow is None and actual_mass_flow is not None and margin_percent is not None:
         design_mass_flow = actual_mass_flow * margin_multiplier
-    design_vol_flow = (
-        section.design_volumetric_flow_rate if section else None
-    )
-    if design_vol_flow is None and actual_vol_flow is not None and margin_percent is not None:
+    design_vol_flow = None
+    if actual_vol_flow is not None and margin_percent is not None:
         design_vol_flow = actual_vol_flow * margin_multiplier
     print(
         f"  Design Mass Flow Rate: {format_measure(design_mass_flow, converter.mass_flow, network.output_units.mass_flow_rate)}"
@@ -613,7 +582,7 @@ def _print_section_overview(
         else "—"
     )
     print("  Standard Flow Rate (@15 degC, 1 ATM):", standard_flow_text)
-    print(f"  Temperature: {format_measure(temperature, converter.temperature, network.output_units.temperature)}")
+    print(f"  Boundary Temperature: {format_measure(temperature, converter.temperature, network.output_units.temperature)}")
     print(f"  Density: {format_measure(density, converter.density, network.output_units.density)}")
     print(f"  Viscosity: {format_measure(fluid.viscosity, converter.viscosity, 'cP')}")
     if fluid.is_gas():

@@ -7,11 +7,6 @@ network:
     unit: kPag
   gas_flow_model: null
   design_margin: 0.0
-  mass_flow_rate:
-    value: 90513.6
-    unit: kg/h
-  volumetric_flow_rate: null
-  standard_flow_rate: null
   output_units:
     pressure: kPag
     pressure_drop: kPa
@@ -21,21 +16,19 @@ network:
     volumetric_flow_rate: m^3/h
     mass_flow_rate: kg/h
     flow_momentum: Pa
+  mass_flow_rate:
+    value: 90513.6
+    unit: kg/h
+  boundary_temperature:
+    value: 103.42
+    unit: degC
   fluid:
     name: liquid
     phase: liquid
-    temperature:
-      value: 103.42
-      unit: degC
-    pressure:
-      value: 101.008
-      unit: kPag
     density:
       value: 783.4
       unit: kg/m^3
-    viscosity:
-      value: 0.247
-      unit: cP
+    viscosity: 2.47e-4
   sections:
     - id: "1"
       description: Line 1

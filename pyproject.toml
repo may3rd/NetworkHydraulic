@@ -23,7 +23,8 @@ dependencies = [
 dev = [
     "pytest>=8.1",
     "ruff>=0.4",
-    "mypy>=1.9"
+    "mypy>=1.9",
+    "numba"
 ]
 
 [project.scripts]

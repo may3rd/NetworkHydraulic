@@ -3,8 +3,7 @@ network:
   description: Test
   direction: forward
   boundary_pressure: 101.008
-  upstream_pressure: null
-  downstream_pressure: null
+  boundary_temperature: 103.42
   gas_flow_model: null
   fluid:
     name: liquid
