@@ -1,6 +1,6 @@
 import pytest
 
-from network_hydraulic.utils import gas_flow
+from network_hydraulic.calculators import gas_flow
 
 
 def test_solve_adiabatic_zero_length_returns_boundary():
@@ -135,7 +135,7 @@ def test_solve_isothermal_accepts_fanning_factor():
 
 
 def test_solve_adiabatic_choking_condition(caplog):
-    with caplog.at_level("WARNING", logger="network_hydraulic.utils.gas_flow"):
+    with caplog.at_level("WARNING", logger="network_hydraulic.calculators.gas_flow"):
         boundary = 350000.0
         outlet_pressure, state = gas_flow.solve_adiabatic(
             boundary_pressure=boundary,
@@ -192,8 +192,8 @@ def test_solve_isothermal_raises_for_invalid_inputs():
 import unittest.mock
 
 def test_solve_adiabatic_brentq_failure(caplog):
-    with caplog.at_level("WARNING", logger="network_hydraulic.utils.gas_flow"):
-        with unittest.mock.patch("network_hydraulic.utils.gas_flow._fanno_mach_from_fL_D", side_effect=ValueError("Mocked _fanno_mach_from_fL_D failure")):
+    with caplog.at_level("WARNING", logger="network_hydraulic.calculators.gas_flow"):
+        with unittest.mock.patch("network_hydraulic.calculators.gas_flow._fanno_mach_from_fL_D", side_effect=ValueError("Mocked _fanno_mach_from_fL_D failure")):
             _, state = gas_flow.solve_adiabatic(
                 boundary_pressure=100000.0,
                 temperature=300.0,

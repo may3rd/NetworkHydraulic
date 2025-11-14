@@ -37,7 +37,7 @@ from network_hydraulic.models.results import (
     SectionResult,
     StatePoint,
 )
-from network_hydraulic.utils.gas_flow import (
+from network_hydraulic.calculators.gas_flow import (
     UNIVERSAL_GAS_CONSTANT,
     GasState,
     solve_adiabatic,
