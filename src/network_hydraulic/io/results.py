@@ -104,18 +104,18 @@ def print_summary(network: "Network", result: "NetworkResult", *, debug: bool = 
             format_measure=format_measure,
         )
         print(f"FITTINGS SUMMARY")
-        print(f"  Fitting K: {pd.fitting_K or 0:.3f}")
-        print(f"  Pipe Length K: {pd.pipe_length_K or 0:.3f}")
-        print(f"  User Supply K: {pd.user_K or 0:.3f}")
-        print(f"  Piping and Fitting Factor: {pd.piping_and_fitting_safety_factor or 0:.3f}")
-        print(f"  Total K: {pd.total_K or 0:.3f}")
+        print(f"  Fitting K: {pd.fitting_K or 0:.5f}")
+        print(f"  Pipe Length K: {pd.pipe_length_K or 0:.5f}")
+        print(f"  User Supply K: {pd.user_K or 0:.5f}")
+        print(f"  Piping and Fitting Factor: {pd.piping_and_fitting_safety_factor or 0:.5f}")
+        print(f"  Total K: {pd.total_K or 0:.5f}")
         if debug:
             _print_fitting_breakdown("    ", pd.fitting_breakdown)
         _print_control_elements(section)
         print(f"CHARACTERISTIC SUMMARY")
         print(f"  Reynolds Number: {pd.reynolds_number or 0:.3f}")
         print(f"  Flow Regime: {pd.flow_scheme or 'N/A'}")
-        print(f"  Friction Factor: {pd.frictional_factor or 0:.3f}")
+        print(f"  Friction Factor: {pd.frictional_factor or 0:.6f}")
         velocity_head = _velocity_head(section_result.summary.inlet)
         print(
             f"  Velocity Head (Inlet): {format_measure(velocity_head, converter.flow_momentum, network.output_units.flow_momentum)}"

@@ -2,10 +2,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from math import pi
+from math import pi, log10
 from typing import Optional
 
-from fluids.friction import friction_factor as colebrook_friction_factor
+# from fluids.friction import friction_factor as colebrook_friction_factor
 
 from network_hydraulic.calculators.base import LossCalculator
 from network_hydraulic.models.fluid import Fluid
@@ -97,7 +97,9 @@ class FrictionCalculator(LossCalculator):
         if self.friction_factor_override and self.friction_factor_override > 0:
             return self._to_darcy(self.friction_factor_override)
         rel_roughness = roughness / diameter if diameter > 0 and roughness > 0 else 0.0
-        return colebrook_friction_factor(Re=reynolds, eD=rel_roughness)
+        # ff = colebrook_friction_factor(Re=reynolds, eD=rel_roughness, Method="Serghides_2")
+        ff = self._calculate_friction_factor(reynolds, diameter, roughness)
+        return ff
 
     def _to_darcy(self, value: float) -> float:
         kind = (self.friction_factor_type or "darcy").strip().lower()
@@ -120,3 +122,71 @@ class FrictionCalculator(LossCalculator):
         if value is None or value <= 0:
             raise ValueError(f"{name} must be positive for friction calculations")
         return value
+
+    def _calculate_friction_factor(self, reynolds_number, pipe_diameter, absolute_roughness):
+        """
+        Calculates the Darcy-Weisbach friction factor (f) based on flow regime.
+
+        This function implements the logic from the provided Excel formula:
+        =IF(Re > 2100, [Serghide/Explicit Eq.], 64/Re)
+
+        Args:
+            reynolds_number (float): The Reynolds Number (Re) for the flow (dimensionless).
+            pipe_diameter (float): The internal diameter of the pipe (D) (in any unit, e.g., meters).
+            absolute_roughness (float): The absolute roughness of the pipe (epsilon) 
+                                        (in the *same unit* as pipe_diameter).
+
+        Returns:
+            float: The Darcy-Weisbach friction factor (f) (dimensionless).
+                Returns float('inf') or raises an exception if math domain errors occur
+                (e.g., negative log input due to invalid parameters).
+        """
+        
+        # --- Input Validation ---
+        if reynolds_number <= 0:
+            raise ValueError("Reynolds number must be positive.")
+        if pipe_diameter <= 0:
+            raise ValueError("Pipe diameter must be positive.")
+        if absolute_roughness < 0:
+            raise ValueError("Absolute roughness cannot be negative.")
+        
+        # --- Laminar Flow (Re <= 2100) ---
+        if reynolds_number <= 2100:
+            # Simple exact formula for laminar flow
+            return 64 / reynolds_number
+        
+        # --- Turbulent Flow (Re > 2100) ---
+        else:
+            # This is the Serghide equation from your Excel file,
+            # an explicit approximation of the Colebrook-White equation.
+            
+            try:
+                # Calculate relative roughness
+                relative_roughness = absolute_roughness / pipe_diameter
+                
+                # Break down the equation for clarity
+                
+                # Term 1: (epsilon/D) / 3.7
+                term1 = relative_roughness / 3.7
+                
+                # Term 2: (14.5 / Re)
+                term2 = 14.5 / reynolds_number
+                
+                # Inner log: LOG( (epsilon/D)/3.7 + (14.5/Re) )
+                inner_log = log10(term1 + term2)
+                
+                # Term 3: 5.02 / Re * (Inner Log)
+                term3 = (5.02 / reynolds_number) * inner_log
+                
+                # Outer log: LOG( (epsilon/D)/3.7 - Term 3 )
+                outer_log = log10(term1 - term3)
+                
+                # Final calculation: 1 / (-2 * Outer Log)^2
+                friction_factor = 1 / ((-2 * outer_log) ** 2)
+                
+                return friction_factor
+                
+            except ValueError as e:
+                # This can happen if the arguments to log10 are non-positive
+                print(f"Error during calculation (check inputs): {e}")
+                raise
