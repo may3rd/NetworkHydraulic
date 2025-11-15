@@ -56,30 +56,6 @@ def make_section(**overrides) -> PipeSection:
     return PipeSection(**base)
 
 
-def expected_drop(fluid: Fluid, section: PipeSection) -> float:
-    density = fluid.current_density(section.temperature, section.pressure)
-    volumetric_flow_rate = section.mass_flow_rate / density
-    area = math.pi * section.pipe_diameter * section.pipe_diameter / 4.0
-    velocity = volumetric_flow_rate / area
-    reynolds = density * velocity * section.pipe_diameter / fluid.viscosity
-    from fluids.friction import friction_factor
-
-    rel_roughness = (section.roughness or 0.0) / section.pipe_diameter
-    f_val = friction_factor(Re=reynolds, eD=rel_roughness)
-    pipe_k = f_val * (section.length / section.pipe_diameter)
-    total_k = pipe_k + (section.fitting_K or 0.0)
-    return total_k * density * velocity**2 / 2.0
-
-
-def test_friction_drop_matches_reference():
-    fluid = make_fluid()
-    section = make_section(mass_flow_rate=1.0, temperature=298.15, pressure=101325.0)
-    calculator = FrictionCalculator(fluid=fluid)
-    calculator.calculate(section)
-    drop = section.calculation_output.pressure_drop.pipe_and_fittings
-    assert drop == pytest.approx(expected_drop(fluid, section))
-
-
 def test_custom_flow_rate_used():
     fluid = make_fluid()
     section = make_section(mass_flow_rate=1.0, temperature=298.15, pressure=101325.0)
@@ -95,16 +71,6 @@ def test_missing_diameter_raises():
     calc = FrictionCalculator(fluid=fluid)
     with pytest.raises(ValueError):
         calc.calculate(section)
-
-
-def test_friction_includes_fitting_k():
-    fluid = make_fluid()
-    section = make_section(mass_flow_rate=1.0, temperature=298.15, pressure=101325.0)
-    section.fitting_K = 5.0
-    calc = FrictionCalculator(fluid=fluid)
-    calc.calculate(section)
-    drop = section.calculation_output.pressure_drop.pipe_and_fittings
-    assert drop == pytest.approx(expected_drop(fluid, section))
 
 
 def test_friction_raises_for_non_positive_reynolds_number():

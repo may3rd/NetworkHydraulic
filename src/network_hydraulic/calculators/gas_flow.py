@@ -8,7 +8,7 @@ from typing import Optional, Tuple
 
 from fluids.compressible import isothermal_gas
 from fluids.friction import Shacham_1980 as shacham_friction_factor
-from scipy.optimize import brentq # Import brentq
+from scipy.optimize import brentq  # Import brentq
 
 UNIVERSAL_GAS_CONSTANT = 8314.462618  # J/(kmol*K)
 MIN_FANNO_TARGET = 1e-9
@@ -21,6 +21,7 @@ MAX_ADIABATIC_ITER = 25
 ISOTHERMAL_TOL = 1e-6
 ADIABATIC_TOL = 1e-9
 
+
 def _normalize_friction_factor(value: float, factor_type: str) -> float:
     """Return Darcy friction factor regardless of the provided convention."""
     if value <= 0:
@@ -30,7 +31,8 @@ def _normalize_friction_factor(value: float, factor_type: str) -> float:
         return value
     if normalized in {"fanning", "f"}:
         return 4.0 * value
-    raise ValueError(f"Unknown friction_factor_type '{factor_type}'. Expected 'darcy' or 'fanning'.")
+    raise ValueError(
+        f"Unknown friction_factor_type '{factor_type}'. Expected 'darcy' or 'fanning'.")
 
 
 @dataclass
@@ -62,12 +64,14 @@ def _fanno_fL_D(mach: float, gamma: float) -> float:
         float: The Fanno friction parameter (f_D * L*/D).
     """
     if mach <= 0:
-        return float('inf') # Or handle as an error
+        return float('inf')  # Or handle as an error
     # Term 1: Contribution from Mach number change
     term1 = (1 - mach**2) / (gamma * mach**2)
     # Term 2: Contribution from entropy change due to friction (logarithmic term)
-    term2 = ((gamma + 1) / (2 * gamma)) * log(((gamma + 1) * mach**2) / (2 * (1 + ((gamma - 1) / 2) * mach**2)))
+    term2 = ((gamma + 1) / (2 * gamma)) * log(((gamma + 1) *
+                                               mach**2) / (2 * (1 + ((gamma - 1) / 2) * mach**2)))
     return term1 + term2
+
 
 def _fanno_target_function(mach: float, fL_D_target: float, gamma: float) -> float:
     """Target function for root-finding: _fanno_fL_D(mach, gamma) - fL_D_target."""
@@ -77,18 +81,22 @@ def _fanno_target_function(mach: float, fL_D_target: float, gamma: float) -> flo
 def _fanno_mach_from_fL_D(fL_D: float, gamma: float, initial_guess_mach: float, tol: float = 1e-9) -> float:
     """Iteratively solves for Mach number M given Fanno friction parameter 4fL*/D using brentq."""
     # Define search bounds based on initial guess
-    if initial_guess_mach < 1.0: # Subsonic flow
-        a = 1e-6 # Lower bound for Mach number (cannot be zero)
-        b = 1.0 - 1e-6 # Upper bound for subsonic Mach number (cannot reach 1.0)
-    else: # Supersonic flow
-        a = 1.0 + 1e-6 # Lower bound for supersonic Mach number (cannot reach 1.0)
-        b = 10.0 # Arbitrary high upper bound for Mach number
+    if initial_guess_mach < 1.0:  # Subsonic flow
+        a = 1e-6  # Lower bound for Mach number (cannot be zero)
+        # Upper bound for subsonic Mach number (cannot reach 1.0)
+        b = 1.0 - 1e-6
+    else:  # Supersonic flow
+        # Lower bound for supersonic Mach number (cannot reach 1.0)
+        a = 1.0 + 1e-6
+        b = 10.0  # Arbitrary high upper bound for Mach number
 
     try:
-        mach = brentq(_fanno_target_function, a, b, args=(fL_D, gamma), xtol=tol)
+        mach = brentq(_fanno_target_function, a, b,
+                      args=(fL_D, gamma), xtol=tol)
         return mach
     except ValueError as e:
-        raise ValueError(f"Brentq failed to find Mach number for fL_D={fL_D}, gamma={gamma}, initial_guess_mach={initial_guess_mach}. Error: {e}")
+        raise ValueError(
+            f"Brentq failed to find Mach number for fL_D={fL_D}, gamma={gamma}, initial_guess_mach={initial_guess_mach}. Error: {e}")
 
 
 def _fanno_pressure_ratio(mach: float, gamma: float) -> float:
@@ -145,32 +153,31 @@ def solve_isothermal(
     """"""
     if length is None or length <= 0:
         return inlet_pressure, _gas_state(inlet_pressure, temperature, mass_flow, diameter, molar_mass, z_factor, gamma)
-    equiv_length = max(length + max(k_additional, 0.0) * diameter / max(friction_factor, MIN_DARCY_F), 0.0)
-    fd = max(_normalize_friction_factor(friction_factor, friction_factor_type), MIN_DARCY_F)
 
-    mu = max(viscosity or 0.0, MIN_VISCOSITY)
+    k_total = k_total + k_additional
+
+    if k_total == 0.0:
+        return inlet_pressure, _gas_state(inlet_pressure, temperature, mass_flow, diameter, molar_mass, z_factor, gamma)
+
     area = pi * diameter * diameter * 0.25
-    rel_roughness = (roughness or 0.0) / diameter if diameter > 0 else 0.0
 
     # Helper functions
-    def density_from_pressure(pressure: float) -> float:
-        return (pressure * molar_mass) / (z_factor * UNIVERSAL_GAS_CONSTANT * temperature)
-    
     def _k_total_term(k_total: float, P1: float, P2: float):
         return k_total + 2 * log(P1 / P2)
-    
+
     upstream_pressure = inlet_pressure
     downstream_pressure: Optional[float] = None
-    rho_guess = density_from_pressure(upstream_pressure)
-    
+
     if is_forward:
         downstream_pressure_guess = 0.9 * upstream_pressure
         for _ in range(MAX_ISOTHERMAL_ITER):
             downstream_pressure = downstream_pressure_guess
-            term_1 = _k_total_term(k_total, upstream_pressure, downstream_pressure)
-            P2_2 = (upstream_pressure ** 2 ) - term_1 * ((mass_flow / area) ** 2) * z_factor * UNIVERSAL_GAS_CONSTANT * temperature / molar_mass
+            term_1 = _k_total_term(
+                k_total, upstream_pressure, downstream_pressure)
+            P2_2 = (upstream_pressure ** 2) - term_1 * ((mass_flow / area) **
+                                                        2) * z_factor * UNIVERSAL_GAS_CONSTANT * temperature / molar_mass
             downstream_pressure_guess = sqrt(P2_2)
-            
+
             if abs(downstream_pressure_guess - downstream_pressure) <= ISOTHERMAL_TOL * downstream_pressure_guess:
                 downstream_pressure = downstream_pressure_guess
                 break
@@ -183,8 +190,10 @@ def solve_isothermal(
         upstream_pressure_guess = 1.1 * downstream_pressure
         for _ in range(MAX_ISOTHERMAL_ITER):
             upstream_pressure = upstream_pressure_guess
-            term_1 = _k_total_term(k_total, upstream_pressure, downstream_pressure)
-            P1_2 = (downstream_pressure ** 2) + term_1 * ((mass_flow / area) ** 2) * z_factor * UNIVERSAL_GAS_CONSTANT * temperature / molar_mass
+            term_1 = _k_total_term(
+                k_total, upstream_pressure, downstream_pressure)
+            P1_2 = (downstream_pressure ** 2) + term_1 * ((mass_flow / area) **
+                                                          2) * z_factor * UNIVERSAL_GAS_CONSTANT * temperature / molar_mass
             upstream_pressure_guess = sqrt(P1_2)
 
             if abs(upstream_pressure_guess - upstream_pressure) <= ISOTHERMAL_TOL * upstream_pressure_guess:
@@ -216,11 +225,22 @@ def solve_adiabatic(
     label: Optional[str] = None,
     friction_factor_type: str = "darcy",
 ) -> Tuple[GasState, GasState]:
-    
+    if length is None or length <= 0:
+        return _gas_state(boundary_pressure, temperature, mass_flow, diameter, molar_mass, z_factor, gamma), \
+            _gas_state(boundary_pressure, temperature, mass_flow,
+                       diameter, molar_mass, z_factor, gamma)
+
+    k_total = k_total + k_additional
+
+    if k_total == 0.0:
+        return _gas_state(boundary_pressure, temperature, mass_flow, diameter, molar_mass, z_factor, gamma), \
+            _gas_state(boundary_pressure, temperature, mass_flow,
+                       diameter, molar_mass, z_factor, gamma)
+
     # Helper functions
     def _calculate_y(gamma: float, ma: float) -> float:
         return 1 + (gamma - 1) / 2 * ma ** 2
-    
+
     def _find_ma(
         pressure: float,
         temperature: float,
@@ -230,7 +250,7 @@ def solve_adiabatic(
         z_factor: float,
         gamma: float,
         is_forward: bool
-        ) -> Tuple[float, float, float, float]:
+    ) -> Tuple[float, float, float, float]:
         """
         """
         area = pi * diameter * diameter / 4.0
@@ -243,7 +263,7 @@ def solve_adiabatic(
         for _ in range(MAX_ADIABATIC_ITER):
             y = _calculate_y(gamma, MA_guess)
             MA_new = MA / y
-            
+
             if abs(MA_new - MA_guess) <= ADIABATIC_TOL:
                 MA = MA_new
                 break
@@ -256,9 +276,11 @@ def solve_adiabatic(
         MA2_guess = (1.0 + direction_factor * 0.01) * MA1
         for _ in range(MAX_ADIABATIC_ITER):
             Y2 = _calculate_y(gamma, MA2_guess)
-            BigA = (gamma + 1) / 2 * (MA2_guess ** 2 * Y1) / (MA1 ** 2 * Y2) + k_total * gamma
-            MA2_new = sqrt((MA1 ** 2) / (1 - BigA * MA1 ** 2 * direction_factor))
-            
+            BigA = (gamma + 1) / 2 * (MA2_guess ** 2 * Y1) / \
+                (MA1 ** 2 * Y2) + k_total * gamma
+            MA2_new = sqrt(
+                (MA1 ** 2) / (1 - BigA * MA1 ** 2 * direction_factor))
+
             if abs(MA2_new - MA2_guess) <= ADIABATIC_TOL:
                 MA2 = MA2_new
                 break
@@ -267,22 +289,25 @@ def solve_adiabatic(
         return MA1, MA2, Y1, Y2
 
     if is_forward:
-        MA1, MA2, Y1, Y2 = _find_ma(boundary_pressure, temperature, mass_flow, diameter, molar_mass, z_factor, gamma, is_forward)
+        MA1, MA2, Y1, Y2 = _find_ma(boundary_pressure, temperature,
+                                    mass_flow, diameter, molar_mass, z_factor, gamma, is_forward)
         inlet_pressure = boundary_pressure
         inlet_temperature = temperature / Y1
         outlet_pressure = inlet_pressure * MA1 / MA2 * sqrt(Y1 / Y2)
         outlet_temperature = inlet_temperature * Y1 / Y2
     else:
-        MA2, MA1, Y2, Y1 = _find_ma(boundary_pressure, temperature, mass_flow, diameter, molar_mass, z_factor, gamma, is_forward)
+        MA2, MA1, Y2, Y1 = _find_ma(boundary_pressure, temperature,
+                                    mass_flow, diameter, molar_mass, z_factor, gamma, is_forward)
         outlet_pressure = boundary_pressure
         outlet_temperature = temperature / Y2
         inlet_pressure = outlet_pressure * MA2 / MA1 * sqrt(Y2 / Y1)
         inlet_temperature = outlet_temperature * Y2 / Y1
 
-    inlet_state = _gas_state(inlet_pressure, inlet_temperature, mass_flow, diameter, molar_mass, z_factor, gamma)
-    outlet_statae = _gas_state(outlet_pressure, outlet_temperature, mass_flow, diameter, molar_mass, z_factor, gamma)
+    inlet_state = _gas_state(inlet_pressure, inlet_temperature,
+                             mass_flow, diameter, molar_mass, z_factor, gamma)
+    outlet_statae = _gas_state(
+        outlet_pressure, outlet_temperature, mass_flow, diameter, molar_mass, z_factor, gamma)
     return inlet_state, outlet_statae
-
 
 
 def _gas_state(pressure: float, temperature: float, mass_flow: float, diameter: float, molar_mass: float, z_factor: float, gamma: float) -> GasState:
@@ -305,13 +330,16 @@ def _gas_state(pressure: float, temperature: float, mass_flow: float, diameter: 
         GasState: A dataclass containing the calculated gas properties.
     """
     # Calculate gas density using the real gas law (considering compressibility factor Z)
-    density = (pressure * molar_mass) / (z_factor * UNIVERSAL_GAS_CONSTANT * temperature)
+    density = (pressure * molar_mass) / (z_factor *
+                                         UNIVERSAL_GAS_CONSTANT * temperature)
     area = pi * diameter * diameter / 4.0
     try:
         # Calculate flow velocity from mass flow rate, density, and pipe area
         velocity = mass_flow / (density * area)
     except ZeroDivisionError:
-        raise ValueError("Diameter and mass flow must be positive for gas state calculation.")
+        raise ValueError(
+            "Diameter and mass flow must be positive for gas state calculation.")
     # Calculate the speed of sound (sonic speed) for a real gas
-    sonic = sqrt(gamma * z_factor * UNIVERSAL_GAS_CONSTANT * temperature / molar_mass) # Corrected sonic speed calculation
+    sonic = sqrt(gamma * z_factor * UNIVERSAL_GAS_CONSTANT *
+                 temperature / molar_mass)  # Corrected sonic speed calculation
     return GasState(pressure=pressure, temperature=temperature, density=density, velocity=velocity, mach=velocity / sonic)

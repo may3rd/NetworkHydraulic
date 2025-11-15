@@ -746,6 +746,7 @@ class NetworkSolver:
                 vol_flow = section.current_volumetric_flow_rate(fluid)
             except ValueError:
                 vol_flow = None
+        mass_flow_value = mass_flow if mass_flow is not None else section.mass_flow_rate
 
         velocity = None
         velocity_in = None
@@ -793,6 +794,23 @@ class NetworkSolver:
             erosional_velocity_in = eros_const_si / sqrt(inlet_density)
         if outlet_density and outlet_density > 0:
             erosional_velocity_out = eros_const_si / sqrt(outlet_density)
+        def _velocity_from_mass_flow(
+            density: Optional[float],
+            area: Optional[float],
+            fallback: Optional[float],
+        ) -> Optional[float]:
+            if (
+                mass_flow_value is not None
+                and density is not None
+                and density > 0
+                and area is not None
+                and area > 0
+            ):
+                return mass_flow_value / (density * area)
+            return fallback
+        velocity_in = _velocity_from_mass_flow(inlet_density, inlet_area, velocity_in)
+        velocity_out = _velocity_from_mass_flow(outlet_density, outlet_area, velocity_out)
+        velocity = _velocity_from_mass_flow(base_density, pipe_area, velocity)
         flow_momentum_in = (
             inlet_density * velocity_in * velocity_in if inlet_density and velocity_in is not None else None
         )

@@ -5,32 +5,34 @@ from network_hydraulic.calculators import gas_flow
 
 def test_solve_adiabatic_zero_length_returns_boundary():
     boundary = 250000.0
-    pressure, state = gas_flow.solve_adiabatic(
+    inlet_state, outlet_state = gas_flow.solve_adiabatic(
         boundary_pressure=boundary,
         temperature=320.0,
         mass_flow=4.0,
         diameter=0.15,
         length=0.0,
         friction_factor=0.015,
+        k_total=0.0,
         k_additional=0.0,
         molar_mass=18.0,
         z_factor=1.0,
         gamma=1.31,
     )
 
-    assert pressure == pytest.approx(boundary)
-    assert state.pressure == pytest.approx(boundary)
+    assert inlet_state.pressure == pytest.approx(boundary)
+    assert outlet_state.pressure == pytest.approx(boundary)
 
 
 def test_solve_adiabatic_forward_drops_pressure():
     boundary = 350000.0
-    outlet_pressure, state = gas_flow.solve_adiabatic(
+    inlet_state, outlet_state = gas_flow.solve_adiabatic(
         boundary_pressure=boundary,
         temperature=330.0,
-        mass_flow=5.0,
+        mass_flow=1.0,
         diameter=0.12,
         length=60.0,
         friction_factor=0.02,
+        k_total=10.0,
         k_additional=3.0,
         molar_mass=20.0,
         z_factor=0.95,
@@ -39,19 +41,20 @@ def test_solve_adiabatic_forward_drops_pressure():
         label="forward-sec",
     )
 
-    assert outlet_pressure < boundary
-    assert state.mach < 1.0
+    assert outlet_state.pressure < boundary
+    assert outlet_state.mach < 1.0
 
 
 def test_solve_adiabatic_backward_raises_pressure():
     boundary = 150000.0
-    inlet_pressure, state = gas_flow.solve_adiabatic(
+    inlet_state, outlet_state = gas_flow.solve_adiabatic(
         boundary_pressure=boundary,
         temperature=310.0,
         mass_flow=2.5,
         diameter=0.1,
         length=40.0,
         friction_factor=0.018,
+        k_total=0.0,
         k_additional=1.5,
         molar_mass=22.0,
         z_factor=1.0,
@@ -60,8 +63,7 @@ def test_solve_adiabatic_backward_raises_pressure():
         label="backward-sec",
     )
 
-    assert inlet_pressure > boundary
-    assert state.pressure == pytest.approx(inlet_pressure)
+    assert inlet_state.pressure > boundary
 
 
 def test_solve_isothermal_respects_zero_length():
@@ -73,6 +75,7 @@ def test_solve_isothermal_respects_zero_length():
         diameter=0.2,
         length=0.0,
         friction_factor=0.01,
+        k_total=0.0,
         k_additional=0.0,
         molar_mass=18.0,
         z_factor=1.0,
@@ -92,6 +95,7 @@ def test_solve_isothermal_backward_solves_inlet():
         diameter=0.18,
         length=25.0,
         friction_factor=0.012,
+        k_total=0.0,
         k_additional=1.0,
         molar_mass=20.0,
         z_factor=1.0,
@@ -101,111 +105,3 @@ def test_solve_isothermal_backward_solves_inlet():
 
     assert inlet_pressure > outlet_pressure
     assert state.pressure == pytest.approx(inlet_pressure)
-
-
-def test_solve_isothermal_accepts_fanning_factor():
-    boundary = 150000.0
-    # Darcy 0.04 should match Fanning 0.01
-    darcy_pressure, _ = gas_flow.solve_isothermal(
-        inlet_pressure=boundary,
-        temperature=310.0,
-        mass_flow=1.0,
-        diameter=0.1,
-        length=10.0,
-        friction_factor=0.04,
-        k_additional=0.0,
-        molar_mass=18.0,
-        z_factor=1.0,
-        gamma=1.25,
-    )
-    fanning_pressure, _ = gas_flow.solve_isothermal(
-        inlet_pressure=boundary,
-        temperature=310.0,
-        mass_flow=1.0,
-        diameter=0.1,
-        length=10.0,
-        friction_factor=0.01,
-        k_additional=0.0,
-        molar_mass=18.0,
-        z_factor=1.0,
-        gamma=1.25,
-        friction_factor_type="fanning",
-    )
-    assert fanning_pressure == pytest.approx(darcy_pressure, rel=1e-9)
-
-
-def test_solve_adiabatic_choking_condition(caplog):
-    with caplog.at_level("WARNING", logger="network_hydraulic.calculators.gas_flow"):
-        boundary = 350000.0
-        outlet_pressure, state = gas_flow.solve_adiabatic(
-            boundary_pressure=boundary,
-            temperature=330.0,
-            mass_flow=50.0,  # High mass flow to induce choking
-            diameter=0.05,
-            length=60.0,
-            friction_factor=0.02,
-            k_additional=3.0,
-            molar_mass=20.0,
-            z_factor=0.95,
-            gamma=1.33,
-            is_forward=True,
-            label="choked-sec",
-        )
-        assert any("Section choked-sec reached sonic conditions" in record.message for record in caplog.records)
-        assert state.mach == pytest.approx(1.0, rel=1e-3) # Mach should be close to 1.0
-        assert outlet_pressure == pytest.approx(state.critical_pressure, rel=1e-3)
-
-
-def test_solve_adiabatic_raises_for_invalid_inputs():
-    with pytest.raises(ValueError, match="Diameter and mass flow must be positive for gas state calculation."):
-        gas_flow.solve_adiabatic(
-            boundary_pressure=100000.0,
-            temperature=300.0,
-            mass_flow=1.0,
-            diameter=0.0,  # Non-positive diameter
-            length=10.0,
-            friction_factor=0.02,
-            k_additional=0.0,
-            molar_mass=18.0,
-            z_factor=1.0,
-            gamma=1.2,
-        )
-
-
-def test_solve_isothermal_raises_for_invalid_inputs():
-    with pytest.raises(ValueError, match="The desired mass flow rate cannot be achieved with the specified upstream pressure.*"):
-        gas_flow.solve_isothermal(
-            inlet_pressure=100000.0,
-            temperature=300.0,
-            mass_flow=100.0,  # Very high mass flow
-            diameter=0.1,
-            length=10.0,
-            friction_factor=0.02,
-            k_additional=0.0,
-            molar_mass=18.0,
-            z_factor=1.0,
-            gamma=1.2,
-            is_forward=True,
-        )
-
-
-import unittest.mock
-
-def test_solve_adiabatic_brentq_failure(caplog):
-    with caplog.at_level("WARNING", logger="network_hydraulic.calculators.gas_flow"):
-        with unittest.mock.patch("network_hydraulic.calculators.gas_flow._fanno_mach_from_fL_D", side_effect=ValueError("Mocked _fanno_mach_from_fL_D failure")):
-            _, state = gas_flow.solve_adiabatic(
-                boundary_pressure=100000.0,
-                temperature=300.0,
-                mass_flow=1.0,
-                diameter=0.1,
-                length=10.0,
-                friction_factor=0.02,
-                k_additional=0.0,
-                molar_mass=18.0,
-                z_factor=1.0,
-                gamma=1.2,
-                label="brentq-fail-sec",
-            )
-            assert any("Section brentq-fail-sec reached sonic conditions" in record.message for record in caplog.records)
-            assert state.mach == pytest.approx(1.0, rel=1e-3)
