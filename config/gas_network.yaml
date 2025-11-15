@@ -1,7 +1,7 @@
 network:
   name: sample_network
   description: Vapor Line
-  direction: forward
+  direction: backward
   gas_flow_model: isothermal
   boundary_pressure:
     value: 101.8
@@ -37,15 +37,6 @@ network:
       roughness: 4.57e-5
       length:
         value: 1000.0
-        unit: m
-      erosional_constant: 100
-      fitting_type: LR
-    - id: "2"
-      schedule: "40"
-      pipe_NPD: 4.0
-      roughness: 4.57e-5
-      length:
-        value: 53.0
         unit: m
       erosional_constant: 100
       fitting_type: LR

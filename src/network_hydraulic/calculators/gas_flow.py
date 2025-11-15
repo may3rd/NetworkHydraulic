@@ -129,6 +129,7 @@ def solve_isothermal(
     diameter: float,
     length: float,
     friction_factor: float,
+    k_total: float,
     k_additional: float,
     molar_mass: float,
     z_factor: float,
@@ -138,7 +139,7 @@ def solve_isothermal(
     viscosity: Optional[float] = None,
     roughness: Optional[float] = None,
 ) -> Tuple[float, GasState]:
-    """Use fluids.compressible.isothermal_gas to compute outlet pressure (Darcy friction factor)."""
+    """"""
     if length is None or length <= 0:
         return inlet_pressure, _gas_state(inlet_pressure, temperature, mass_flow, diameter, molar_mass, z_factor, gamma)
     equiv_length = max(length + max(k_additional, 0.0) * diameter / max(friction_factor, MIN_DARCY_F), 0.0)
@@ -148,61 +149,48 @@ def solve_isothermal(
     area = pi * diameter * diameter * 0.25
     rel_roughness = (roughness or 0.0) / diameter if diameter > 0 else 0.0
 
+    # Helper functions
     def density_from_pressure(pressure: float) -> float:
         return (pressure * molar_mass) / (z_factor * UNIVERSAL_GAS_CONSTANT * temperature)
-
+    
+    def _k_total_term(k_total: float, P1: float, P2: float):
+        return k_total + 2 * log(P1 / P2)
+    
     upstream_pressure = inlet_pressure
     downstream_pressure: Optional[float] = None
     rho_guess = density_from_pressure(upstream_pressure)
-
-    for _ in range(MAX_ISOTHERMAL_ITER):
-        if is_forward:
-            downstream_pressure = isothermal_gas(
-                rho=rho_guess,
-                fd=fd,
-                P1=upstream_pressure,
-                L=equiv_length,
-                D=diameter,
-                m=mass_flow,
-            )
-            upstream_pressure = inlet_pressure
-        else:
-            downstream_pressure = inlet_pressure
-            upstream_pressure = isothermal_gas(
-                rho=rho_guess,
-                fd=fd,
-                P2=downstream_pressure,
-                L=equiv_length,
-                D=diameter,
-                m=mass_flow,
-            )
+    
+    if is_forward:
+        downstream_pressure_guess = 0.9 * upstream_pressure
+        for _ in range(MAX_ISOTHERMAL_ITER):
+            downstream_pressure = downstream_pressure_guess
+            term_1 = _k_total_term(k_total, upstream_pressure, downstream_pressure)
+            P2_2 = (upstream_pressure ** 2 ) - term_1 * ((mass_flow / area) ** 2) * z_factor * UNIVERSAL_GAS_CONSTANT * temperature / molar_mass
+            downstream_pressure_guess = sqrt(P2_2)
+            
+            if abs(downstream_pressure_guess - downstream_pressure) <= ISOTHERMAL_TOL * downstream_pressure_guess:
+                downstream_pressure = downstream_pressure_guess
+                break
 
         if downstream_pressure is None:
-            raise ValueError("Isothermal solver failed to compute downstream pressure")
+            raise ValueError(
+                "Isothermal solver failed to compute downstream pressure")
+    else:
+        downstream_pressure = inlet_pressure
+        upstream_pressure_guess = 1.1 * downstream_pressure
+        for _ in range(MAX_ISOTHERMAL_ITER):
+            upstream_pressure = upstream_pressure_guess
+            term_1 = _k_total_term(k_total, upstream_pressure, downstream_pressure)
+            P1_2 = (downstream_pressure ** 2) + term_1 * ((mass_flow / area) ** 2) * z_factor * UNIVERSAL_GAS_CONSTANT * temperature / molar_mass
+            upstream_pressure_guess = sqrt(P1_2)
 
-        rho_up = density_from_pressure(upstream_pressure)
-        rho_down = density_from_pressure(downstream_pressure)
-        rho_avg = 0.5 * (rho_up + rho_down)
-        velocity = mass_flow / max(rho_avg * area, MIN_VISCOSITY)
-        reynolds = rho_avg * abs(velocity) * diameter / mu
-        if reynolds <= 0:
-            break
-        new_fd = max(
-            _normalize_friction_factor(
-                shacham_friction_factor(Re=reynolds, eD=rel_roughness),
-                "darcy",
-            ),
-            MIN_DARCY_F,
-        )
-        if abs(new_fd - fd) <= ISOTHERMAL_TOL * fd and abs(rho_avg - rho_guess) <= ISOTHERMAL_TOL * rho_guess:
-            rho_guess = rho_avg
-            fd = new_fd
-            break
-        rho_guess = rho_avg
-        fd = new_fd
+            if abs(upstream_pressure_guess - upstream_pressure) <= ISOTHERMAL_TOL * upstream_pressure_guess:
+                upstream_pressure = upstream_pressure_guess
+                break
 
-    if downstream_pressure is None:
-        raise ValueError("Failed to determine isothermal pressure drop")
+        if upstream_pressure is None:
+            raise ValueError(
+                "Isothermal solver failed to compute upstream pressure")
 
     final_pressure = downstream_pressure if is_forward else upstream_pressure
     return final_pressure, _gas_state(final_pressure, temperature, mass_flow, diameter, molar_mass, z_factor, gamma)
