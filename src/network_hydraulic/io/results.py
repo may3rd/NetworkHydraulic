@@ -121,7 +121,7 @@ def print_summary(network: "Network", result: "NetworkResult", *, debug: bool = 
             f"  Velocity Head (Inlet): {format_measure(velocity_head, converter.flow_momentum, network.output_units.flow_momentum)}"
         )
         print(
-            f"  Critical Pressure: {format_measure(pd.critical_pressure, converter.pressure, network.output_units.pressure)} (abs)"
+            f"  Critical Pressure: {convert_units(pd.critical_pressure, "Pa", "kPa"):.3f} (abs)"
         )
         print(f"PRESSURE LOSS SUMMARY")
         print(

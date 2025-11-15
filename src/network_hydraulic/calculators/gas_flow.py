@@ -6,7 +6,7 @@ from math import log, sqrt, pi
 from typing import Optional, Tuple
 
 from fluids.compressible import isothermal_gas
-from fluids.friction import friction_factor as colebrook_friction_factor
+from fluids.friction import Shacham_1980 as shacham_friction_factor
 from scipy.optimize import brentq # Import brentq
 
 UNIVERSAL_GAS_CONSTANT = 8314.462618  # J/(kmol*K)
@@ -32,11 +32,14 @@ def _normalize_friction_factor(value: float, factor_type: str) -> float:
 
 @dataclass
 class GasState:
-    pressure: float
-    temperature: float
-    density: float
-    velocity: float
-    mach: float
+    pressure: float = 101.325
+    temperature: float = 298.15
+    density: float = 1.0
+    velocity: float = 0.0
+    mach: float = 0.0
+    molar_mass: float = 28.9644
+    z_factor: float = 0.0
+    gamma: float = 1.4
     critical_pressure: Optional[float] = None
 
 
@@ -186,7 +189,7 @@ def solve_isothermal(
             break
         new_fd = max(
             _normalize_friction_factor(
-                colebrook_friction_factor(Re=reynolds, eD=rel_roughness),
+                shacham_friction_factor(Re=reynolds, eD=rel_roughness),
                 "darcy",
             ),
             MIN_DARCY_F,
