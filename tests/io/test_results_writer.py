@@ -331,6 +331,7 @@ def test_print_summary_output(capfd):
     pd.orifice_pressure_drop = 500.0
     # Removed pd.elevation = 200.0
     pd.total_segment_loss = 6700.0
+    pd.critical_pressure = 120000.0
     section_result.summary.inlet.pressure = 150000.0
     section_result.summary.outlet.pressure = 143300.0
     section_result.summary.inlet.temperature = 300.0

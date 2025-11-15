@@ -1,5 +1,5 @@
 {
-  "config": "/Volumes/Ginnungagap/maetee/Code/NetworkHydraulic/tests/fixtures/networks/control_valve_only.yaml",
+  "config": "tests/fixtures/networks/control_valve_only.yaml",
   "network": "control_valve_fixture",
   "result": {
     "aggregate": {

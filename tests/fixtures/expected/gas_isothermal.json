@@ -1,5 +1,5 @@
 {
-  "config": "/Volumes/Ginnungagap/maetee/Code/NetworkHydraulic/tests/fixtures/networks/gas_isothermal.yaml",
+  "config": "tests/fixtures/networks/gas_isothermal.yaml",
   "network": "gas_flow_isothermal",
   "result": {
     "aggregate": {

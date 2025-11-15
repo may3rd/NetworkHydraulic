@@ -1,5 +1,5 @@
 {
-  "config": "/Volumes/Ginnungagap/maetee/Code/NetworkHydraulic/tests/fixtures/networks/user_loss_only.yaml",
+  "config": "tests/fixtures/networks/user_loss_only.yaml",
   "network": "user_loss_fixture",
   "result": {
     "aggregate": {

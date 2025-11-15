@@ -1,5 +1,5 @@
 {
-  "config": "/Volumes/Ginnungagap/maetee/Code/NetworkHydraulic/tests/fixtures/networks/liquid_elevation.yaml",
+  "config": "tests/fixtures/networks/liquid_elevation.yaml",
   "network": "liquid_elevation",
   "result": {
     "aggregate": {

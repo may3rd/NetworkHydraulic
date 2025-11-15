@@ -1,5 +1,5 @@
 {
-  "config": "/Volumes/Ginnungagap/maetee/Code/NetworkHydraulic/tests/fixtures/networks/fittings_loss.yaml",
+  "config": "tests/fixtures/networks/fittings_loss.yaml",
   "network": "fittings_loss_fixture",
   "result": {
     "aggregate": {
@@ -7,11 +7,11 @@
       "critical_pressure": null,
       "elevation_change": 0.0,
       "frictional_factor": null,
-      "normalized_friction_loss": 27471.425044034,
+      "normalized_friction_loss": 38364.919568282,
       "orifice_pressure_drop": 0.0,
-      "pipe_and_fittings": 65341.826289897,
+      "pipe_and_fittings": 91252.416139254,
       "reynolds_number": null,
-      "total_segment_loss": 65341.826289897,
+      "total_segment_loss": 91252.416139254,
       "user_specified_fixed_loss": 0.0
     },
     "sections": [
@@ -21,11 +21,11 @@
           "critical_pressure": 5101.187579333,
           "elevation_change": 0.0,
           "frictional_factor": 0.020003039,
-          "normalized_friction_loss": 27471.425044034,
+          "normalized_friction_loss": 38364.919568282,
           "orifice_pressure_drop": 0.0,
-          "pipe_and_fittings": 65341.826289897,
+          "pipe_and_fittings": 91252.416139254,
           "reynolds_number": 317142.800677298,
-          "total_segment_loss": 65341.826289897,
+          "total_segment_loss": 91252.416139254,
           "user_specified_fixed_loss": null
         },
         "section_id": "FIT1",
@@ -41,14 +41,14 @@
             "velocity": 13.348893776
           },
           "outlet": {
-            "density": 6.978964355,
-            "erosional_velocity": 46.17744437,
-            "flow_momentum": 1512.268562742,
-            "mach_number": 0.042442864,
-            "pipe_velocity": 14.720378329,
-            "pressure": 635983.173710103,
+            "density": 6.694634375,
+            "erosional_velocity": 47.14785642,
+            "flow_momentum": 1576.496609548,
+            "mach_number": 0.044245469,
+            "pipe_velocity": 15.345572273,
+            "pressure": 610072.583860746,
             "temperature": 313.15,
-            "velocity": 14.720378329
+            "velocity": 15.345572273
           }
         }
       }
@@ -65,14 +65,14 @@
         "velocity": 13.348893776
       },
       "outlet": {
-        "density": 6.978964355,
-        "erosional_velocity": 46.17744437,
-        "flow_momentum": 1512.268562742,
-        "mach_number": 0.042442864,
-        "pipe_velocity": 14.720378329,
-        "pressure": 635983.173710103,
+        "density": 6.694634375,
+        "erosional_velocity": 47.14785642,
+        "flow_momentum": 1576.496609548,
+        "mach_number": 0.044245469,
+        "pipe_velocity": 15.345572273,
+        "pressure": 610072.583860746,
         "temperature": 313.15,
-        "velocity": 14.720378329
+        "velocity": 15.345572273
       }
     }
   }

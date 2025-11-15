@@ -14,6 +14,8 @@ from network_hydraulic.testing.snapshots import snapshot_payload
 def update_snapshots(
     networks_dir: Path,
     expected_dir: Path,
+    *,
+    base_path: Path,
 ) -> None:
     solver = NetworkSolver()
     for config_path in sorted(networks_dir.glob("*.yaml")):
@@ -21,9 +23,14 @@ def update_snapshots(
         network = loader.build_network()
         result = solver.run(network)
 
+        try:
+            relative_config = config_path.relative_to(base_path)
+        except ValueError:
+            relative_config = config_path
+
         payload = snapshot_payload(
             network_name=network.name,
-            config_path=str(config_path),
+            config_path=str(relative_config),
             result=result,
         )
         output_path = expected_dir / f"{config_path.stem}.json"
@@ -42,7 +49,7 @@ def main() -> None:
         print(f"No networks directory at {networks_dir}", file=sys.stderr)
         raise SystemExit(1)
 
-    update_snapshots(networks_dir=networks_dir, expected_dir=expected_dir)
+    update_snapshots(networks_dir=networks_dir, expected_dir=expected_dir, base_path=base)
 
 
 if __name__ == "__main__":
