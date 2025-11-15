@@ -414,15 +414,15 @@ class NetworkSolver:
                             z_factor=z_factor,
                             gamma=gamma,
                         )
-                        self._apply_gas_state(summary.inlet, inlet_state)
                         self._apply_critical_pressure(section, inlet_state, gas_flow_model)
-                        outlet_pressure, outlet_state = solve_adiabatic(
+                        inlet_state, outlet_state = solve_adiabatic(
                             boundary_pressure=section_start_pressure, # Use boundary_pressure
                             temperature=temperature,
                             mass_flow=section_mass_flow,
                             diameter=diameter,
                             length=length,
                             friction_factor=friction_factor,
+                            k_total=k_total,
                             k_additional=k_additional,
                             molar_mass=molar_mass,
                             z_factor=z_factor,
@@ -431,7 +431,9 @@ class NetworkSolver:
                             label=section.id,
                             friction_factor_type=self.friction_factor_type,
                         )
+                        outlet_pressure = outlet_state.pressure
                         summary.outlet.pressure = outlet_pressure
+                        self._apply_gas_state(summary.inlet, inlet_state)
                         self._apply_gas_state(summary.outlet, outlet_state)
                         # self._apply_critical_pressure(section, outlet_state, gas_flow_model)
                         current = outlet_pressure
@@ -446,14 +448,14 @@ class NetworkSolver:
                             z_factor=z_factor,
                             gamma=gamma,
                         )
-                        self._apply_gas_state(summary.outlet, outlet_state)
-                        inlet_pressure, inlet_state = solve_adiabatic(
+                        inlet_state, outlet_state = solve_adiabatic(
                             boundary_pressure=section_start_pressure, # Use boundary_pressure
                             temperature=temperature,
                             mass_flow=section_mass_flow,
                             diameter=diameter,
                             length=length,
                             friction_factor=friction_factor,
+                            k_total=k_total,
                             k_additional=k_additional,
                             molar_mass=molar_mass,
                             z_factor=z_factor,
@@ -462,8 +464,10 @@ class NetworkSolver:
                             label=section.id,
                             friction_factor_type=self.friction_factor_type,
                         )
+                        inlet_pressure = inlet_state.pressure
                         summary.inlet.pressure = inlet_pressure
                         self._apply_gas_state(summary.inlet, inlet_state)
+                        self._apply_gas_state(summary.outlet, outlet_state)
                         self._apply_critical_pressure(section, inlet_state, gas_flow_model)
                         current = inlet_pressure
 

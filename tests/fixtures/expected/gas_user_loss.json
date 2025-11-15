@@ -1,5 +1,5 @@
 {
-  "config": "tests/fixtures/networks/gas_user_loss.yaml",
+  "config": "/Volumes/Ginnungagap/maetee/Code/NetworkHydraulic/tests/fixtures/networks/gas_user_loss.yaml",
   "network": "gas_user_loss_fixture",
   "result": {
     "aggregate": {
@@ -43,12 +43,12 @@
           "outlet": {
             "density": 4.67957258,
             "erosional_velocity": 56.3926223,
-            "flow_momentum": 1217.962070103,
+            "flow_momentum": 1268.63369888,
             "mach_number": 0.04680152,
             "pipe_velocity": 16.132950008,
             "pressure": 412825.0,
             "temperature": 303.15,
-            "velocity": 16.132950008
+            "velocity": 16.46512484
           }
         }
       }
@@ -67,12 +67,12 @@
       "outlet": {
         "density": 4.67957258,
         "erosional_velocity": 56.3926223,
-        "flow_momentum": 1217.962070103,
+        "flow_momentum": 1268.63369888,
         "mach_number": 0.04680152,
         "pipe_velocity": 16.132950008,
         "pressure": 412825.0,
         "temperature": 303.15,
-        "velocity": 16.132950008
+        "velocity": 16.46512484
       }
     }
   }

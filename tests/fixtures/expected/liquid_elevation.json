@@ -1,5 +1,5 @@
 {
-  "config": "tests/fixtures/networks/liquid_elevation.yaml",
+  "config": "/Volumes/Ginnungagap/maetee/Code/NetworkHydraulic/tests/fixtures/networks/liquid_elevation.yaml",
   "network": "liquid_elevation",
   "result": {
     "aggregate": {
@@ -7,11 +7,11 @@
       "critical_pressure": null,
       "elevation_change": 144157.755,
       "frictional_factor": null,
-      "normalized_friction_loss": 1903.377103116,
+      "normalized_friction_loss": 1908.323977557,
       "orifice_pressure_drop": 0.0,
-      "pipe_and_fittings": 3857.5107117,
+      "pipe_and_fittings": 3867.404460583,
       "reynolds_number": null,
-      "total_segment_loss": 148015.2657117,
+      "total_segment_loss": 148025.159460583,
       "user_specified_fixed_loss": 0.0
     },
     "sections": [
@@ -20,12 +20,12 @@
           "control_valve_pressure_drop": 0.0,
           "critical_pressure": null,
           "elevation_change": 144157.755,
-          "frictional_factor": 0.023159657,
-          "normalized_friction_loss": 1903.377103116,
+          "frictional_factor": 0.023219849,
+          "normalized_friction_loss": 1908.323977557,
           "orifice_pressure_drop": 0.0,
-          "pipe_and_fittings": 3857.5107117,
+          "pipe_and_fittings": 3867.404460583,
           "reynolds_number": 41503.342614746,
-          "total_segment_loss": 148015.2657117,
+          "total_segment_loss": 148025.159460583,
           "user_specified_fixed_loss": null
         },
         "section_id": "L1",
@@ -46,7 +46,7 @@
             "flow_momentum": 168.084822001,
             "mach_number": null,
             "pipe_velocity": 0.414143845,
-            "pressure": 303309.7342883,
+            "pressure": 303299.840539417,
             "temperature": 313.15,
             "velocity": 0.414143845
           }
@@ -70,7 +70,7 @@
         "flow_momentum": 168.084822001,
         "mach_number": null,
         "pipe_velocity": 0.414143845,
-        "pressure": 303309.7342883,
+        "pressure": 303299.840539417,
         "temperature": 313.15,
         "velocity": 0.414143845
       }

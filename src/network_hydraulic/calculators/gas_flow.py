@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from math import log, sqrt, pi
+from re import M
 from typing import Optional, Tuple
 
 from fluids.compressible import isothermal_gas
@@ -16,7 +17,9 @@ MIN_DARCY_F = 1e-8
 MIN_LENGTH = 1e-9
 MIN_VISCOSITY = 1e-12
 MAX_ISOTHERMAL_ITER = 25
+MAX_ADIABATIC_ITER = 25
 ISOTHERMAL_TOL = 1e-6
+ADIABATIC_TOL = 1e-9
 
 def _normalize_friction_factor(value: float, factor_type: str) -> float:
     """Return Darcy friction factor regardless of the provided convention."""
@@ -203,6 +206,7 @@ def solve_adiabatic(
     diameter: float,
     length: float,
     friction_factor: float,
+    k_total: float,
     k_additional: float,
     molar_mass: float,
     z_factor: float,
@@ -211,73 +215,73 @@ def solve_adiabatic(
     *,
     label: Optional[str] = None,
     friction_factor_type: str = "darcy",
-) -> Tuple[float, GasState]:
-    """Fanno-flow solver for adiabatic piping segments using Darcy friction factors."""
-    base_state = _gas_state(boundary_pressure, temperature, mass_flow, diameter, molar_mass, z_factor, gamma)
-    M1 = max(base_state.mach, MIN_MACH)
-    P1 = base_state.pressure
-    T1 = base_state.temperature
+) -> Tuple[GasState, GasState]:
+    
+    # Helper functions
+    def _calculate_y(gamma: float, ma: float) -> float:
+        return 1 + (gamma - 1) / 2 * ma ** 2
+    
+    def _find_ma(
+        pressure: float,
+        temperature: float,
+        mass_flow: float,
+        diameter: float,
+        molar_mass: float,
+        z_factor: float,
+        gamma: float,
+        is_forward: bool
+        ) -> Tuple[float, float, float, float]:
+        """
+        """
+        area = pi * diameter * diameter / 4.0
 
-    pipe_length = max(length or 0.0, 0.0)
-    additional_length = 0.0
-    fd = max(_normalize_friction_factor(friction_factor, friction_factor_type), MIN_DARCY_F)
-    if k_additional and k_additional > 0:
-        additional_length = (k_additional * diameter) / fd
-    equiv_length = pipe_length + additional_length
-
-    if equiv_length <= MIN_LENGTH:
-        return boundary_pressure, base_state
-
-    fanno_param_pipe = fd * equiv_length / diameter
-    if fanno_param_pipe <= 0:
-        return boundary_pressure, base_state
-
-    f_initial = _fanno_fL_D(M1, gamma)
-    target = f_initial - fanno_param_pipe if is_forward else f_initial + fanno_param_pipe
-    choked = False
-    if is_forward and target <= MIN_FANNO_TARGET:
-        target = MIN_FANNO_TARGET
-        choked = True
-
-    target = max(target, MIN_FANNO_TARGET)
-    try:
-        M2 = _fanno_mach_from_fL_D(target, gamma, M1)
-    except ValueError:
-        M2 = 1.0 - 1e-6
-        choked = True
-
-    P_ratio_final = _fanno_pressure_ratio(M2, gamma)
-    P_ratio_initial = _fanno_pressure_ratio(M1, gamma)
-    critical_pressure = P1 / P_ratio_initial if P_ratio_initial > 0 else None
-    base_state.critical_pressure = critical_pressure
-    T_ratio_final = _fanno_temperature_ratio(M2, gamma)
-    T_ratio_initial = _fanno_temperature_ratio(M1, gamma)
-
-    final_pressure = P1 * (P_ratio_final / P_ratio_initial)
-    final_temperature = T1 * (T_ratio_final / T_ratio_initial)
-
-    if choked and label:
-        from logging import getLogger
-
-        getLogger(__name__).warning(
-            "Section %s reached sonic conditions under adiabatic flow; limiting to Mach 1.",
-            label,
+        # Initialize MA
+        MA = (mass_flow / area) / pressure * sqrt(
+            temperature * UNIVERSAL_GAS_CONSTANT * z_factor / molar_mass / gamma
         )
+        MA_guess = MA
+        for _ in range(MAX_ADIABATIC_ITER):
+            y = _calculate_y(gamma, MA_guess)
+            MA_new = MA / y
+            
+            if abs(MA_new - MA_guess) <= ADIABATIC_TOL:
+                MA = MA_new
+                break
+            MA_guess = MA_new
 
-    if not choked and critical_pressure and critical_pressure > 0 and final_pressure <= critical_pressure:
-        choked = True
-        final_pressure = critical_pressure
-        final_temperature = final_temperature  # temperature already accounts for downstream Mach; we treat at sonic limit
-        if label:
-            from logging import getLogger
-            getLogger(__name__).warning(
-                "Section %s resulted in outlet pressure below the critical pressure; limited to P*.",
-                label,
-            )
+        MA1 = MA_new
+        Y1 = _calculate_y(gamma, MA1)
 
-    final_state = _gas_state(final_pressure, final_temperature, mass_flow, diameter, molar_mass, z_factor, gamma)
-    final_state.critical_pressure = critical_pressure
-    return final_pressure, final_state
+        direction_factor = 1.0 if is_forward else -1.0
+        MA2_guess = (1.0 + direction_factor * 0.01) * MA1
+        for _ in range(MAX_ADIABATIC_ITER):
+            Y2 = _calculate_y(gamma, MA2_guess)
+            BigA = (gamma + 1) / 2 * (MA2_guess ** 2 * Y1) / (MA1 ** 2 * Y2) + k_total * gamma
+            MA2_new = sqrt((MA1 ** 2) / (1 - BigA * MA1 ** 2 * direction_factor))
+            
+            if abs(MA2_new - MA2_guess) <= ADIABATIC_TOL:
+                MA2 = MA2_new
+                break
+            MA2_guess = MA2_new
+
+        return MA1, MA2, Y1, Y2
+
+    if is_forward:
+        MA1, MA2, Y1, Y2 = _find_ma(boundary_pressure, temperature, mass_flow, diameter, molar_mass, z_factor, gamma, is_forward)
+        inlet_pressure = boundary_pressure
+        inlet_temperature = temperature / Y1
+        outlet_pressure = inlet_pressure * MA1 / MA2 * sqrt(Y1 / Y2)
+        outlet_temperature = inlet_temperature * Y1 / Y2
+    else:
+        MA2, MA1, Y2, Y1 = _find_ma(boundary_pressure, temperature, mass_flow, diameter, molar_mass, z_factor, gamma, is_forward)
+        outlet_pressure = boundary_pressure
+        outlet_temperature = temperature / Y2
+        inlet_pressure = outlet_pressure * MA2 / MA1 * sqrt(Y2 / Y1)
+        inlet_temperature = outlet_temperature * Y2 / Y1
+
+    inlet_state = _gas_state(inlet_pressure, inlet_temperature, mass_flow, diameter, molar_mass, z_factor, gamma)
+    outlet_statae = _gas_state(outlet_pressure, outlet_temperature, mass_flow, diameter, molar_mass, z_factor, gamma)
+    return inlet_state, outlet_statae
 
 
 

@@ -1,5 +1,5 @@
 {
-  "config": "tests/fixtures/networks/orifice_only.yaml",
+  "config": "/Volumes/Ginnungagap/maetee/Code/NetworkHydraulic/tests/fixtures/networks/orifice_only.yaml",
   "network": "orifice_fixture",
   "result": {
     "aggregate": {
