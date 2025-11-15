@@ -3,11 +3,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from math import log, sqrt, pi
-from re import M
 from typing import Optional, Tuple
+import numpy as np
 
-from fluids.compressible import isothermal_gas
-from fluids.friction import Shacham_1980 as shacham_friction_factor
 from scipy.optimize import brentq  # Import brentq
 
 UNIVERSAL_GAS_CONSTANT = 8314.462618  # J/(kmol*K)
@@ -133,6 +131,59 @@ def _fanno_temperature_ratio(mach: float, gamma: float) -> float:
     return (gamma + 1) / (2 * (1 + ((gamma - 1) / 2) * mach**2))
 
 
+def _validate_gas_flow_inputs(
+    pressure: float,
+    temperature: float,
+    mass_flow: float,
+    diameter: float,
+    molar_mass: float,
+    z_factor: float,
+    gamma: float,
+    friction_factor: Optional[float] = None,
+    k_total: Optional[float] = None,
+    length: Optional[float] = None,
+) -> None:
+    """
+    Validates input parameters for gas flow calculations.
+    
+    Args:
+        pressure: Absolute pressure (Pa) - must be positive
+        temperature: Absolute temperature (K) - must be positive
+        mass_flow: Mass flow rate (kg/s) - can be zero or positive
+        diameter: Pipe diameter (m) - must be positive
+        molar_mass: Molar mass (kg/kmol) - must be positive
+        z_factor: Compressibility factor - must be positive
+        gamma: Ratio of specific heats - must be > 1.0
+        friction_factor: Optional friction factor - must be non-negative
+        k_total: Optional loss coefficient - must be non-negative
+        length: Optional pipe length - must be non-negative
+    
+    Raises:
+        ValueError: If any parameter is invalid
+    """
+    if pressure <= 0:
+        raise ValueError(f"Pressure must be positive, got {pressure} Pa")
+    if temperature <= 0:
+        raise ValueError(f"Temperature must be positive, got {temperature} K")
+    if diameter <= 0:
+        raise ValueError(f"Diameter must be positive, got {diameter} m")
+    if molar_mass <= 0:
+        raise ValueError(f"Molar mass must be positive, got {molar_mass} kg/kmol")
+    if z_factor <= 0:
+        raise ValueError(f"Compressibility factor must be positive, got {z_factor}")
+    if gamma <= 1.0:
+        raise ValueError(f"Gamma (Cp/Cv) must be > 1.0, got {gamma}")
+    if mass_flow < 0:
+        raise ValueError(f"Mass flow must be non-negative, got {mass_flow} kg/s")
+    
+    if friction_factor is not None and friction_factor < 0:
+        raise ValueError(f"Friction factor must be non-negative, got {friction_factor}")
+    if k_total is not None and k_total < 0:
+        raise ValueError(f"Total loss coefficient must be non-negative, got {k_total}")
+    if length is not None and length < 0:
+        raise ValueError(f"Length must be non-negative, got {length} m")
+
+
 def solve_isothermal(
     inlet_pressure: float,
     temperature: float,
@@ -150,8 +201,45 @@ def solve_isothermal(
     viscosity: Optional[float] = None,
     roughness: Optional[float] = None,
 ) -> Tuple[float, GasState]:
-    """"""
-    if length is None or length <= 0:
+    """
+    Solves isothermal gas flow through a pipe section with friction and minor losses.
+    
+    Uses the fundamental gas dynamics equation for isothermal flow with iterative
+    solution for pressure drop. The isothermal assumption means temperature remains
+    constant throughout the pipe section.
+    
+    Args:
+        inlet_pressure (float): Upstream absolute pressure (Pa).
+        temperature (float): Constant gas temperature (K).
+        mass_flow (float): Mass flow rate through the pipe (kg/s).
+        diameter (float): Internal pipe diameter (m).
+        length (float): Pipe length (m).
+        friction_factor (float): Darcy friction factor (dimensionless).
+        k_total (float): Total minor loss coefficient (dimensionless).
+        k_additional (float): Additional loss coefficient for this section (dimensionless).
+        molar_mass (float): Gas molar mass (kg/kmol).
+        z_factor (float): Gas compressibility factor (dimensionless).
+        gamma (float): Ratio of specific heats Cp/Cv (dimensionless).
+        is_forward (bool): True for forward flow, False for reverse flow.
+        friction_factor_type (str): Type of friction factor ("darcy" or "fanning").
+        viscosity (float, optional): Gas dynamic viscosity (Pa·s).
+        roughness (float, optional): Pipe absolute roughness (m).
+    
+    Returns:
+        Tuple[float, GasState]:
+        - Final pressure at outlet/inlet depending on flow direction (Pa)
+        - GasState with calculated properties at the final point
+    
+    Raises:
+        ValueError: If input parameters are invalid or convergence is not achieved
+    """
+    # Input validation
+    _validate_gas_flow_inputs(
+        inlet_pressure, temperature, mass_flow, diameter,
+        molar_mass, z_factor, gamma, friction_factor, k_total, length
+    )
+    
+    if length <= 0:
         return inlet_pressure, _gas_state(inlet_pressure, temperature, mass_flow, diameter, molar_mass, z_factor, gamma)
 
     k_total = k_total + k_additional
@@ -225,6 +313,43 @@ def solve_adiabatic(
     label: Optional[str] = None,
     friction_factor_type: str = "darcy",
 ) -> Tuple[GasState, GasState]:
+    """
+    Solves adiabatic gas flow through a pipe section using Fanno flow theory.
+    
+    Uses Fanno flow equations for adiabatic flow with friction. The solution
+    accounts for changes in temperature, pressure, and Mach number through
+    the pipe section using iterative methods.
+    
+    Args:
+        boundary_pressure (float): Boundary absolute pressure (Pa).
+        temperature (float): Initial gas temperature (K).
+        mass_flow (float): Mass flow rate through the pipe (kg/s).
+        diameter (float): Internal pipe diameter (m).
+        length (float): Pipe length (m).
+        friction_factor (float): Darcy friction factor (dimensionless).
+        k_total (float): Total minor loss coefficient (dimensionless).
+        k_additional (float): Additional loss coefficient for this section (dimensionless).
+        molar_mass (float): Gas molar mass (kg/kmol).
+        z_factor (float): Gas compressibility factor (dimensionless).
+        gamma (float): Ratio of specific heats Cp/Cv (dimensionless).
+        is_forward (bool): True for forward flow, False for reverse flow.
+        label (str, optional): Optional label for debugging/tracing.
+        friction_factor_type (str): Type of friction factor ("darcy" or "fanning").
+    
+    Returns:
+        Tuple[GasState, GasState]:
+        - Inlet gas state (pressure, temperature, density, velocity, Mach number)
+        - Outlet gas state (pressure, temperature, density, velocity, Mach number)
+    
+    Raises:
+        ValueError: If input parameters are invalid or convergence is not achieved
+    """
+    # Input validation
+    _validate_gas_flow_inputs(
+        boundary_pressure, temperature, mass_flow, diameter,
+        molar_mass, z_factor, gamma, friction_factor, k_total, length
+    )
+    
     if length is None or length <= 0:
         return _gas_state(boundary_pressure, temperature, mass_flow, diameter, molar_mass, z_factor, gamma), \
             _gas_state(boundary_pressure, temperature, mass_flow,
@@ -252,6 +377,33 @@ def solve_adiabatic(
         is_forward: bool
     ) -> Tuple[float, float, float, float]:
         """
+        Solves for Mach numbers and temperature ratios in adiabatic gas flow using Fanno flow theory.
+
+        This function iteratively solves the coupled equations for Mach number evolution
+        through a pipe section with friction and minor losses. It uses a two-stage
+        iteration process:
+        1. First stage solves for the upstream Mach number from mass flow and conditions
+        2. Second stage solves for the downstream Mach number considering friction losses
+
+        Args:
+            pressure (float): Static pressure at the reference point (Pa).
+            temperature (float): Static temperature at the reference point (K).
+            mass_flow (float): Mass flow rate through the pipe (kg/s).
+            diameter (float): Internal pipe diameter (m).
+            molar_mass (float): Molar mass of the gas (kg/kmol).
+            z_factor (float): Compressibility factor for the gas (dimensionless).
+            gamma (float): Ratio of specific heats Cp/Cv (dimensionless).
+            is_forward (bool): True for forward flow direction, False for reverse.
+
+        Returns:
+            Tuple[float, float, float, float]:
+            - MA1: Upstream Mach number
+            - MA2: Downstream Mach number
+            - Y1: Upstream temperature ratio (T/T*)
+            - Y2: Downstream temperature ratio (T/T*)
+
+        Raises:
+            ValueError: If convergence is not achieved within MAX_ADIABATIC_ITER iterations.
         """
         area = pi * diameter * diameter / 4.0
 
@@ -305,9 +457,9 @@ def solve_adiabatic(
 
     inlet_state = _gas_state(inlet_pressure, inlet_temperature,
                              mass_flow, diameter, molar_mass, z_factor, gamma)
-    outlet_statae = _gas_state(
+    outlet_state = _gas_state(
         outlet_pressure, outlet_temperature, mass_flow, diameter, molar_mass, z_factor, gamma)
-    return inlet_state, outlet_statae
+    return inlet_state, outlet_state
 
 
 def _gas_state(pressure: float, temperature: float, mass_flow: float, diameter: float, molar_mass: float, z_factor: float, gamma: float) -> GasState:
@@ -328,18 +480,57 @@ def _gas_state(pressure: float, temperature: float, mass_flow: float, diameter: 
 
     Returns:
         GasState: A dataclass containing the calculated gas properties.
+
+    Raises:
+        ValueError: If input parameters are invalid or calculation results in numerical errors
     """
+    # Input validation
+    _validate_gas_flow_inputs(pressure, temperature, mass_flow, diameter, molar_mass, z_factor, gamma)
+    
     # Calculate gas density using the real gas law (considering compressibility factor Z)
-    density = (pressure * molar_mass) / (z_factor *
-                                         UNIVERSAL_GAS_CONSTANT * temperature)
+    if z_factor <= 0:
+        raise ValueError(f"Compressibility factor must be positive, got {z_factor}")
+    
+    density = (pressure * molar_mass) / (z_factor * UNIVERSAL_GAS_CONSTANT * temperature)
+    
+    # Check for reasonable density values
+    if density <= 0 or not np.isfinite(density):
+        raise ValueError(f"Invalid density calculated: {density} kg/m³. Check input parameters.")
+    
     area = pi * diameter * diameter / 4.0
+    
+    # Validate area calculation
+    if area <= 0:
+        raise ValueError(f"Invalid pipe area calculated: {area} m². Check diameter: {diameter} m")
+    
+    # Calculate flow velocity from mass flow rate, density, and pipe area
     try:
-        # Calculate flow velocity from mass flow rate, density, and pipe area
         velocity = mass_flow / (density * area)
     except ZeroDivisionError:
-        raise ValueError(
-            "Diameter and mass flow must be positive for gas state calculation.")
+        raise ValueError("Division by zero in velocity calculation. Check density and area values.")
+    
+    # Validate velocity calculation
+    if not np.isfinite(velocity):
+        raise ValueError(f"Invalid velocity calculated: {velocity} m/s. Check input parameters.")
+    
     # Calculate the speed of sound (sonic speed) for a real gas
-    sonic = sqrt(gamma * z_factor * UNIVERSAL_GAS_CONSTANT *
-                 temperature / molar_mass)  # Corrected sonic speed calculation
-    return GasState(pressure=pressure, temperature=temperature, density=density, velocity=velocity, mach=velocity / sonic)
+    if z_factor <= 0 or gamma <= 0 or temperature <= 0 or molar_mass <= 0:
+        raise ValueError(f"Invalid parameters for sonic speed calculation: z={z_factor}, γ={gamma}, T={temperature}, M={molar_mass}")
+    
+    sonic = sqrt(gamma * z_factor * UNIVERSAL_GAS_CONSTANT * temperature / molar_mass)
+    
+    # Validate sonic speed calculation
+    if not np.isfinite(sonic) or sonic <= 0:
+        raise ValueError(f"Invalid sonic speed calculated: {sonic} m/s. Check input parameters.")
+    
+    # Calculate Mach number with additional validation
+    if sonic <= 0:
+        raise ValueError("Sonic speed must be positive for Mach number calculation")
+    
+    mach = velocity / sonic
+    
+    # Validate Mach number is reasonable
+    if not np.isfinite(mach) or mach < 0:
+        raise ValueError(f"Invalid Mach number calculated: {mach}. Velocity: {velocity} m/s, Sonic: {sonic} m/s")
+    
+    return GasState(pressure=pressure, temperature=temperature, density=density, velocity=velocity, mach=mach)
