@@ -67,7 +67,7 @@ class _OutputUnitConverter:
 
     def viscosity(self, value: Optional[float]) -> Optional[float]:
         return _convert_value(value, "Pa*s", "cP")
-    
+
     def gas_flow_critical_pressure(self, value: Optional[float]) -> Optional[float]:
         return _convert_value(value, "Pa", self.units.gas_flow_critical_pressure)
 
@@ -110,7 +110,8 @@ def print_summary(network: "Network", result: "NetworkResult", *, debug: bool = 
         print(f"  Fitting K: {pd.fitting_K or 0:.5f}")
         print(f"  Pipe Length K: {pd.pipe_length_K or 0:.5f}")
         print(f"  User Supply K: {pd.user_K or 0:.5f}")
-        print(f"  Piping and Fitting Factor: {pd.piping_and_fitting_safety_factor or 0:.5f}")
+        print(
+            f"  Piping and Fitting Factor: {pd.piping_and_fitting_safety_factor or 0:.5f}")
         print(f"  Total K: {pd.total_K or 0:.5f}")
         if debug:
             _print_fitting_breakdown("    ", pd.fitting_breakdown)
@@ -130,20 +131,26 @@ def print_summary(network: "Network", result: "NetworkResult", *, debug: bool = 
         print(
             f"  Pipe+Fittings Loss: {fmt(converter.pressure_drop(pd.pipe_and_fittings))} {pressure_unit}"
         )
-        print(f"  Elevation Loss: {fmt(converter.pressure_drop(pd.elevation_change))} {pressure_unit}")
+        print(
+            f"  Elevation Loss: {fmt(converter.pressure_drop(pd.elevation_change))} {pressure_unit}")
         print(
             f"  Control Valve Loss: {fmt(converter.pressure_drop(pd.control_valve_pressure_drop))} {pressure_unit}"
         )
-        print(f"  Orifice Loss: {fmt(converter.pressure_drop(pd.orifice_pressure_drop))} {pressure_unit}")
+        print(
+            f"  Orifice Loss: {fmt(converter.pressure_drop(pd.orifice_pressure_drop))} {pressure_unit}")
         print(
             f"  User Specified Fixed Loss: {fmt(converter.pressure_drop(pd.user_specified_fixed_loss))} {pressure_unit}"
         )
-        print(f"  Total Segment Loss: {fmt(converter.pressure_drop(pd.total_segment_loss))} {pressure_unit}")
+        print(
+            f"  Total Segment Loss: {fmt(converter.pressure_drop(pd.total_segment_loss))} {pressure_unit}")
         normalized_loss = converter.pressure_drop(pd.normalized_friction_loss)
-        print(f"  Normalized Friction Loss: {fmt(normalized_loss)} {pressure_unit}")
-        _print_state_table("    ", section_result.summary, converter, network.output_units)
+        print(
+            f"  Normalized Friction Loss: {fmt(normalized_loss)} {pressure_unit}")
+        _print_state_table("    ", section_result.summary,
+                           converter, network.output_units)
     print("Overall Network State:")
-    _print_state_table("    ", network.result_summary, converter, network.output_units)
+    _print_state_table("    ", network.result_summary,
+                       converter, network.output_units)
 
 
 def write_output(
@@ -154,9 +161,11 @@ def write_output(
     """Persist calculation results back to YAML honoring configured output units."""
     converter = _OutputUnitConverter(network.output_units)
     network_cfg = _network_config(network, converter)
-    section_results = {section.section_id: section for section in result.sections}
+    section_results = {
+        section.section_id: section for section in result.sections}
     mass_flow_rate = network.mass_flow_rate
-    standard_density = _standard_gas_density(network.fluid, STANDARD_TEMPERATURE, STANDARD_PRESSURE)
+    standard_density = _standard_gas_density(
+        network.fluid, STANDARD_TEMPERATURE, STANDARD_PRESSURE)
 
     for section in network.sections:
         section_cfg = _section_config(section)
@@ -172,13 +181,14 @@ def write_output(
             )
         network_cfg["sections"].append(section_cfg)
 
-    flow_summary = _flow_dict(result.summary, mass_flow_rate, standard_density, converter)
+    flow_summary = _flow_dict(
+        result.summary, mass_flow_rate, standard_density, converter)
     network_cfg["summary"] = {
         "state": _summary_dict(result.summary, converter),
         "pressure_drop": _pressure_drop_dict(result.aggregate.pressure_drop, None, converter),
         "flow": flow_summary,
     }
-    
+
     data = {"network": network_cfg}
     suffix = path.suffix.lower()
     with path.open("w", encoding="utf-8") as handle:
@@ -264,6 +274,38 @@ def _print_state_table(
 
     inlet = summary.inlet
     outlet = summary.outlet
+
+    # Check Mach Number Conditions
+    # if inlet.mach_number is not None:
+    #     if inlet.mach_number > 0.5:
+    #         if inlet.remarks is None:
+    #             inlet.remarks = "WARNING: Mach number is greater than 0.5"
+    #         else:
+    #             inlet.remarks += "\nWARNING: Mach number is greater than 0.5"
+
+    # if outlet.mach_number is not None:
+    #     if outlet.mach_number > 0.5:
+    #         if outlet.remarks is None:
+    #             outlet.remarks = "WARNING: Mach number is greater than 0.5"
+    #         else:
+    #             outlet.remarks += "\nWARNING: Mach number is greater than 0.5"
+
+    # # Check if Velocity > Erosional Velocity
+    # if inlet.velocity is not None and inlet.erosional_velocity is not None:
+    #     if inlet.velocity > inlet.erosional_velocity:
+    #         if inlet.remarks is None:
+    #             inlet.remarks = "WARNING: Velocity is greater than Erosional Velocity"
+    #         else:
+    #             inlet.remarks += "\nWARNING: Velocity is greater than Erosional Velocity"
+
+    # if outlet.velocity is not None and outlet.erosional_velocity is not None:
+    #     if outlet.velocity > outlet.erosional_velocity:
+    #         if outlet.remarks is None:
+    #             outlet.remarks = "WARNING: Velocity is greater than Erosinal Velocity"
+    #         else:
+    #             outlet.remarks += "\nWARNING: Velocity is greater than Erosinal Velocity"
+
+    # Print State
     print(f"{prefix}Inlet State:")
     print(f"{prefix}  Pressure: {fmt(converter.pressure(inlet.pressure))} {units.pressure}")
     print(f"{prefix}  Temperature: {fmt(converter.temperature(inlet.temperature))} {units.temperature}")
@@ -298,6 +340,7 @@ def _print_state_table(
     )
     if outlet.remarks:
         print(f"{prefix}  Remarks: {outlet.remarks}")
+
 
 def _print_fitting_breakdown(prefix: str, breakdown: Optional[List["FittingBreakdown"]]) -> None:
     if not breakdown:
@@ -432,7 +475,8 @@ def _section_result_payload(
     converter: _OutputUnitConverter,
 ) -> Dict[str, Any]:
     calculation = section_result.calculation
-    pressure_drop_dict = _pressure_drop_dict(calculation.pressure_drop, section_length, converter)
+    pressure_drop_dict = _pressure_drop_dict(
+        calculation.pressure_drop, section_length, converter)
     pressure_drop_dict["fitting_K"] = section.fitting_K
     pressure_drop_dict["pipe_length_K"] = section.pipe_length_K
     pressure_drop_dict["user_K"] = section.user_K
@@ -488,7 +532,8 @@ def _convert_value(value: Optional[float], from_unit: str, to_unit: str) -> Opti
     if value is None:
         return None
     if isinstance(value, (int, float)) and not math.isfinite(value):
-        raise ValueError(f"Non-finite value '{value}' encountered while converting from {from_unit} to {to_unit}")
+        raise ValueError(
+            f"Non-finite value '{value}' encountered while converting from {from_unit} to {to_unit}")
     if not to_unit or to_unit == from_unit:
         return value
     converted = convert_units(value, from_unit, to_unit)
@@ -509,8 +554,10 @@ def _print_section_overview(
 ) -> None:
     fluid = network.fluid
     section_id = section.id if section else None
-    description = (section.description if section and section.description else network.description) or "—"
-    direction = (section.direction if section and section.direction else network.direction) or "—"
+    description = (
+        section.description if section and section.description else network.description) or "—"
+    direction = (
+        section.direction if section and section.direction else network.direction) or "—"
     boundary_pressure = (
         section.boundary_pressure if section and section.boundary_pressure is not None else network.boundary_pressure
     )
@@ -522,13 +569,15 @@ def _print_section_overview(
     if section:
         reference_density = section.result_summary.inlet.density
     if not (reference_density and reference_density > 0):
-        reference_density = fluid.current_density(network.boundary_temperature, network.boundary_pressure)
+        reference_density = fluid.current_density(
+            network.boundary_temperature, network.boundary_pressure)
     if actual_mass_flow is not None and reference_density and reference_density > 0:
         actual_vol_flow = actual_mass_flow / reference_density
 
     standard_flow = fluid.standard_flow_rate if fluid.is_gas() else None
     temperature = network.boundary_temperature
-    density = fluid.current_density(network.boundary_temperature, network.boundary_pressure)
+    density = fluid.current_density(
+        network.boundary_temperature, network.boundary_pressure)
 
     def pipe_value(value: Optional[float], unit: Optional[str] = None) -> str:
         if value is None:
@@ -580,14 +629,18 @@ def _print_section_overview(
         f"  Design Volumetric Flow Rate: {format_measure(design_vol_flow, converter.volumetric_flow, network.output_units.volumetric_flow_rate)}"
     )
     standard_flow_text = (
-        format_measure(standard_flow, converter.volumetric_flow, network.output_units.volumetric_flow_rate)
+        format_measure(standard_flow, converter.volumetric_flow,
+                       network.output_units.volumetric_flow_rate)
         if standard_flow is not None
         else "—"
     )
     print("  Standard Flow Rate (@15 degC, 1 ATM):", standard_flow_text)
-    print(f"  Boundary Temperature: {format_measure(temperature, converter.temperature, network.output_units.temperature)}")
-    print(f"  Density: {format_measure(density, converter.density, network.output_units.density)}")
-    print(f"  Viscosity: {format_measure(fluid.viscosity, converter.viscosity, 'cP')}")
+    print(
+        f"  Boundary Temperature: {format_measure(temperature, converter.temperature, network.output_units.temperature)}")
+    print(
+        f"  Density: {format_measure(density, converter.density, network.output_units.density)}")
+    print(
+        f"  Viscosity: {format_measure(fluid.viscosity, converter.viscosity, 'cP')}")
     if fluid.is_gas():
         print(f"  Molecular Weight (gas): {fmt(fluid.molecular_weight)}")
         print(f"  Compressibility Z (gas): {fmt(fluid.z_factor)}")
@@ -600,13 +653,20 @@ def _print_section_overview(
     print("PIPE & FITTINGS")
     print(f"  Pipe NPD: {pipe_value(section.pipe_NPD) if section else '—'}")
     print(f"  Schedule: {fmt(section.schedule) if section else '—'}")
-    print(f"  Inlet Diameter: {pipe_value(section.inlet_diameter, 'm') if section else '—'}")
-    print(f"  Pipe Diameter: {pipe_value(section.pipe_diameter, 'm') if section else '—'}")
-    print(f"  Outlet Diameter: {pipe_value(section.outlet_diameter, 'm') if section else '—'}")
-    print(f"  Roughness: {pipe_value(section.roughness, 'm') if section else '—'}")
-    print(f"  Pipe Length: {pipe_value(section.length, 'm') if section else '—'}")
-    print(f"  Elevation Change: {pipe_value(section.elevation_change, 'm') if section else '—'}")
-    print(f"  Erosional Constant: {pipe_value(section.erosional_constant) if section else '—'}")
+    print(
+        f"  Inlet Diameter: {pipe_value(section.inlet_diameter, 'm') if section else '—'}")
+    print(
+        f"  Pipe Diameter: {pipe_value(section.pipe_diameter, 'm') if section else '—'}")
+    print(
+        f"  Outlet Diameter: {pipe_value(section.outlet_diameter, 'm') if section else '—'}")
+    print(
+        f"  Roughness: {pipe_value(section.roughness, 'm') if section else '—'}")
+    print(
+        f"  Pipe Length: {pipe_value(section.length, 'm') if section else '—'}")
+    print(
+        f"  Elevation Change: {pipe_value(section.elevation_change, 'm') if section else '—'}")
+    print(
+        f"  Erosional Constant: {pipe_value(section.erosional_constant) if section else '—'}")
     print(f"  Fitting Type: {fmt(section.fitting_type) if section else '—'}")
 
 
@@ -631,7 +691,8 @@ def _print_control_elements(section: Optional["PipeSection"]) -> None:
             ("  Calculation Note", getattr(valve, "calculation_note", None)),
         ]
         for label, value in kv_pairs:
-            text = f"{value:.3f}" if isinstance(value, float) else (value if value is not None else "—")
+            text = f"{value:.3f}" if isinstance(value, float) else (
+                value if value is not None else "—")
             print(f"{label}: {text}")
     if section.orifice:
         orifice = section.orifice
@@ -645,10 +706,12 @@ def _print_control_elements(section: Optional["PipeSection"]) -> None:
             ("  Meter Type", getattr(orifice, "meter_type", None)),
             ("  Taps", getattr(orifice, "taps", None)),
             ("  Tap Position", getattr(orifice, "tap_position", None)),
-            ("  Discharge Coefficient", getattr(orifice, "discharge_coefficient", None)),
+            ("  Discharge Coefficient", getattr(
+                orifice, "discharge_coefficient", None)),
             ("  Expansibility", getattr(orifice, "expansibility", None)),
             ("  Calculation Note", getattr(orifice, "calculation_note", None)),
         ]
         for label, value in kv_pairs:
-            text = f"{value:.3f}" if isinstance(value, float) else (value if value is not None else "—")
+            text = f"{value:.3f}" if isinstance(value, float) else (
+                value if value is not None else "—")
             print(f"{label}: {text}")

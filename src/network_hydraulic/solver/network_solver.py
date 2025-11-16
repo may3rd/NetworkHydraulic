@@ -332,8 +332,6 @@ class NetworkSolver:
                             z_factor=z_factor,
                             gamma=gamma,
                         )
-                        self._apply_gas_state(summary.inlet, inlet_state)
-                        self._apply_gas_flow_critical_pressure(section, inlet_state, gas_flow_model)
                         outlet_pressure, outlet_state = solve_isothermal(
                             inlet_pressure=section_start_pressure,
                             temperature=temperature,
@@ -352,7 +350,9 @@ class NetworkSolver:
                             roughness=roughness,
                         )
                         summary.outlet.pressure = outlet_pressure
+                        self._apply_gas_state(summary.inlet, inlet_state)
                         self._apply_gas_state(summary.outlet, outlet_state)
+                        self._apply_gas_flow_critical_pressure(section, inlet_state, gas_flow_model)
                         # self._apply_gas_flow_critical_pressure(section, outlet_state, gas_flow_model)
                         current = outlet_pressure
                     else:
@@ -366,7 +366,6 @@ class NetworkSolver:
                             z_factor=z_factor,
                             gamma=gamma,
                         )
-                        self._apply_gas_state(summary.outlet, outlet_state)
                         inlet_pressure, inlet_state = solve_isothermal(
                             inlet_pressure=section_start_pressure, # Pass current as inlet_pressure for backward calculation
                             temperature=temperature,
@@ -386,6 +385,7 @@ class NetworkSolver:
                         )
                         summary.inlet.pressure = inlet_pressure
                         self._apply_gas_state(summary.inlet, inlet_state)
+                        self._apply_gas_state(summary.outlet, outlet_state)
                         self._apply_gas_flow_critical_pressure(section, inlet_state, gas_flow_model)
                         current = inlet_pressure
                     
@@ -414,7 +414,6 @@ class NetworkSolver:
                             z_factor=z_factor,
                             gamma=gamma,
                         )
-                        self._apply_gas_flow_critical_pressure(section, inlet_state, gas_flow_model)
                         inlet_state, outlet_state = solve_adiabatic(
                             boundary_pressure=section_start_pressure, # Use boundary_pressure
                             temperature=temperature,
@@ -435,6 +434,7 @@ class NetworkSolver:
                         summary.outlet.pressure = outlet_pressure
                         self._apply_gas_state(summary.inlet, inlet_state)
                         self._apply_gas_state(summary.outlet, outlet_state)
+                        self._apply_gas_flow_critical_pressure(section, inlet_state, gas_flow_model)
                         # self._apply_gas_flow_critical_pressure(section, outlet_state, gas_flow_model)
                         current = outlet_pressure
                     else:
@@ -819,12 +819,24 @@ class NetworkSolver:
         )
         section.mach_number = mach
         extra_warnings = list(section.calculation_output.ignored_components)
-        remarks = self._build_remarks(
+        mach_in = summary.inlet.mach_number if summary.inlet.mach_number is not None else mach
+        mach_out = summary.outlet.mach_number if summary.outlet.mach_number is not None else mach
+        inlet_velocity_for_remarks = velocity_in or velocity
+        outlet_velocity_for_remarks = velocity_out or velocity
+        remarks_in = self._build_remarks(
             section,
             summary,
-            mach,
-            velocity,
+            mach_in,
+            inlet_velocity_for_remarks,
             erosional_velocity_in,
+            extra_warnings=extra_warnings,
+        )
+        remarks_out = self._build_remarks(
+            section,
+            summary,
+            mach_out,
+            outlet_velocity_for_remarks,
+            erosional_velocity_out,
             extra_warnings=extra_warnings,
         )
         section.calculation_output.ignored_components.clear()
@@ -837,7 +849,7 @@ class NetworkSolver:
             erosional_velocity_in,
             flow_momentum_in,
             mach if phase in {"gas", "vapor"} else None,
-            remarks,
+            remarks_in,
             temperature,
             pressure,
         )
@@ -850,7 +862,7 @@ class NetworkSolver:
             erosional_velocity_out,
             flow_momentum_out,
             mach if phase in {"gas", "vapor"} else None,
-            remarks,
+            remarks_out,
             temperature,
             pressure,
         )
@@ -908,6 +920,8 @@ class NetworkSolver:
             warnings.append(f"Mach {mach:.2f} exceeds sonic conditions")
         elif mach and mach > 0.7:
             warnings.append(f"Mach {mach:.2f} exceeds 0.7 threshold")
+        elif mach and mach > 0.5:
+            warnings.append(f"Mach {mach:.2f} exceeds 0.5 threshold")
         if extra_warnings:
             warnings.extend(extra_warnings)
         return "; ".join(warnings) if warnings else "OK"

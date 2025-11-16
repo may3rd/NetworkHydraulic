@@ -140,6 +140,7 @@ def _gas_flow_critical_pressure_from_conditions(
     molar_mass: float,
     z_factor: float,
     gamma: float,
+    gas_flow_model: Optional[str] = "adiabatic",
 ) -> Optional[float]:
     """Return the pressure at which Mach 1 occurs for the provided conditions."""
     if (
@@ -159,6 +160,10 @@ def _gas_flow_critical_pressure_from_conditions(
     density_star = mass_flow / (area * sonic)
     if density_star <= 0 or not np.isfinite(density_star):
         return None
+    if gas_flow_model == "adiabatic":
+        return mass_flow / area * sqrt(temperature * UNIVERSAL_GAS_CONSTANT / gamma / molar_mass / (1 + (gamma - 1) / 2))
+    else:
+        return mass_flow / area * sqrt(temperature * UNIVERSAL_GAS_CONSTANT / gamma / mass_flow)
     return density_star * z_factor * UNIVERSAL_GAS_CONSTANT * temperature / molar_mass
 
 
@@ -528,6 +533,7 @@ def solve_adiabatic(
             molar_mass=molar_mass,
             z_factor=z_factor,
             gamma=gamma,
+            gas_flow_model="adiabatic",
         )
         if gas_flow_critical_pressure is not None and state.pressure <= gas_flow_critical_pressure:
             choked_state = _gas_state(
