@@ -105,3 +105,48 @@ def test_solve_isothermal_backward_solves_inlet():
 
     assert inlet_pressure > outlet_pressure
     assert state.pressure == pytest.approx(inlet_pressure)
+
+
+def test_solve_isothermal_detects_choked_flow():
+    boundary = 250000.0
+    pressure, state = gas_flow.solve_isothermal(
+        inlet_pressure=boundary,
+        temperature=320.0,
+        mass_flow=5.0,
+        diameter=0.05,
+        length=80.0,
+        friction_factor=0.03,
+        k_total=25.0,
+        k_additional=5.0,
+        molar_mass=20.0,
+        z_factor=0.95,
+        gamma=1.3,
+    )
+
+    assert state.is_choked
+    assert state.mach == pytest.approx(1.0, rel=1e-3)
+    assert state.critical_pressure is not None
+    assert pressure == pytest.approx(state.critical_pressure)
+
+
+def test_solve_adiabatic_detects_choked_flow():
+    boundary = 400000.0
+    inlet_state, outlet_state = gas_flow.solve_adiabatic(
+        boundary_pressure=boundary,
+        temperature=360.0,
+        mass_flow=6.0,
+        diameter=0.06,
+        length=120.0,
+        friction_factor=0.025,
+        k_total=20.0,
+        k_additional=10.0,
+        molar_mass=22.0,
+        z_factor=0.92,
+        gamma=1.32,
+        is_forward=True,
+        label="choked-adiabatic",
+    )
+
+    assert outlet_state.is_choked
+    assert outlet_state.mach == pytest.approx(1.0, rel=1e-3)
+    assert outlet_state.critical_pressure is not None

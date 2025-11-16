@@ -971,22 +971,30 @@ class NetworkSolver:
         if gas_state is None:
             return
 
-        mass_flow = section.mass_flow_rate
-        pipe_dimensions = section.pipe_diameter or 0.0
-        if pipe_dimensions and pipe_dimensions < 0:
-            raise ValueError("Pipe diameter must be positive")
-        area = pi * pipe_dimensions * pipe_dimensions * 0.25
-        temperature = gas_state.temperature
-        molar_mass = gas_state.molar_mass
-        z_state = gas_state.z_factor
-        gamma = gas_state.gamma
-        
-        if gas_flow_model == "adiabatic":
-            critical = mass_flow / area * sqrt(UNIVERSAL_GAS_CONSTANT * temperature / gamma / molar_mass / (1 + (gamma - 1) / 2))
-        elif gas_flow_model == "isothermal":
-            critical = mass_flow / area * sqrt(UNIVERSAL_GAS_CONSTANT * temperature / gamma / mass_flow / 3600)
-        else:
-            critical = gas_state.critical_pressure
+        critical = gas_state.critical_pressure
+        if critical is None:
+            mass_flow = section.mass_flow_rate
+            pipe_dimensions = section.pipe_diameter or 0.0
+            if pipe_dimensions and pipe_dimensions < 0:
+                raise ValueError("Pipe diameter must be positive")
+            area = pi * pipe_dimensions * pipe_dimensions * 0.25
+            temperature = gas_state.temperature
+            molar_mass = gas_state.molar_mass
+            z_state = gas_state.z_factor
+            gamma = gas_state.gamma
+            if (
+                mass_flow
+                and mass_flow > 0
+                and pipe_dimensions > 0
+                and temperature
+                and molar_mass
+                and z_state
+                and gamma
+            ):
+                sonic = sqrt(gamma * z_state * UNIVERSAL_GAS_CONSTANT * temperature / molar_mass)
+                if sonic > 0:
+                    density_star = mass_flow / (area * sonic)
+                    critical = density_star * z_state * UNIVERSAL_GAS_CONSTANT * temperature / molar_mass
         if critical is None:
             return
         section.calculation_output.pressure_drop.critical_pressure = critical

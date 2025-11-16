@@ -59,7 +59,7 @@ def test_gas_network_adiabatic():
     assert inlet.density == pytest.approx(8.86083251156075, rel=1e-6)
     assert outlet.density == pytest.approx(7.4621024570078545, rel=1e-6)
     assert section.calculation.pressure_drop.critical_pressure == pytest.approx(
-        67974.2237098774, rel=1e-6)
+        74088.78569449647, rel=1e-6)
     
     # Check the inlet conditions
     assert inlet.mach_number == pytest.approx(0.09237918081017864, rel=1e-6)

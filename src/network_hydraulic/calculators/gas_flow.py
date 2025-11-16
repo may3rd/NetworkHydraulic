@@ -44,6 +44,7 @@ class GasState:
     z_factor: float = 0.0
     gamma: float = 1.4
     critical_pressure: Optional[float] = None
+    is_choked: bool = False
 
 
 def _fanno_fL_D(mach: float, gamma: float) -> float:
@@ -129,6 +130,36 @@ def _fanno_temperature_ratio(mach: float, gamma: float) -> float:
         float: The ratio of static temperature to critical static temperature (T/T*).
     """
     return (gamma + 1) / (2 * (1 + ((gamma - 1) / 2) * mach**2))
+
+
+def _critical_pressure_from_conditions(
+    *,
+    mass_flow: float,
+    diameter: float,
+    temperature: float,
+    molar_mass: float,
+    z_factor: float,
+    gamma: float,
+) -> Optional[float]:
+    """Return the pressure at which Mach 1 occurs for the provided conditions."""
+    if (
+        mass_flow is None
+        or mass_flow <= 0
+        or diameter <= 0
+        or temperature <= 0
+        or molar_mass <= 0
+        or z_factor <= 0
+        or gamma <= 0
+    ):
+        return None
+    area = pi * diameter * diameter * 0.25
+    sonic = sqrt(gamma * z_factor * UNIVERSAL_GAS_CONSTANT * temperature / molar_mass)
+    if sonic <= 0 or not np.isfinite(sonic):
+        return None
+    density_star = mass_flow / (area * sonic)
+    if density_star <= 0 or not np.isfinite(density_star):
+        return None
+    return density_star * z_factor * UNIVERSAL_GAS_CONSTANT * temperature / molar_mass
 
 
 def _validate_gas_flow_inputs(
@@ -264,6 +295,9 @@ def solve_isothermal(
                 k_total, upstream_pressure, downstream_pressure)
             P2_2 = (upstream_pressure ** 2) - term_1 * ((mass_flow / area) **
                                                         2) * z_factor * UNIVERSAL_GAS_CONSTANT * temperature / molar_mass
+            if P2_2 <= 0:
+                downstream_pressure_guess = 0.0
+                break
             downstream_pressure_guess = sqrt(P2_2)
 
             if abs(downstream_pressure_guess - downstream_pressure) <= ISOTHERMAL_TOL * downstream_pressure_guess:
@@ -282,6 +316,9 @@ def solve_isothermal(
                 k_total, upstream_pressure, downstream_pressure)
             P1_2 = (downstream_pressure ** 2) + term_1 * ((mass_flow / area) **
                                                           2) * z_factor * UNIVERSAL_GAS_CONSTANT * temperature / molar_mass
+            if P1_2 <= 0:
+                upstream_pressure_guess = 0.0
+                break
             upstream_pressure_guess = sqrt(P1_2)
 
             if abs(upstream_pressure_guess - upstream_pressure) <= ISOTHERMAL_TOL * upstream_pressure_guess:
@@ -292,8 +329,25 @@ def solve_isothermal(
             raise ValueError(
                 "Isothermal solver failed to compute upstream pressure")
 
+    critical_pressure = _critical_pressure_from_conditions(
+        mass_flow=mass_flow,
+        diameter=diameter,
+        temperature=temperature,
+        molar_mass=molar_mass,
+        z_factor=z_factor,
+        gamma=gamma,
+    )
+    choked = False
     final_pressure = downstream_pressure if is_forward else upstream_pressure
-    return final_pressure, _gas_state(final_pressure, temperature, mass_flow, diameter, molar_mass, z_factor, gamma)
+    if critical_pressure is not None and (final_pressure <= critical_pressure or final_pressure <= 0):
+        final_pressure = critical_pressure
+        choked = True
+    elif final_pressure <= 0:
+        raise ValueError("Isothermal solver produced non-positive pressure. Check inputs.")
+    final_state = _gas_state(final_pressure, temperature, mass_flow, diameter, molar_mass, z_factor, gamma)
+    final_state.critical_pressure = critical_pressure
+    final_state.is_choked = choked
+    return final_pressure, final_state
 
 
 def solve_adiabatic(
@@ -427,16 +481,22 @@ def solve_adiabatic(
         direction_factor = 1.0 if is_forward else -1.0
         MA2_guess = (1.0 + direction_factor * 0.01) * MA1
         for _ in range(MAX_ADIABATIC_ITER):
-            Y2 = _calculate_y(gamma, MA2_guess)
+            Y2_guess = _calculate_y(gamma, MA2_guess)
             BigA = (gamma + 1) / 2 * (MA2_guess ** 2 * Y1) / \
-                (MA1 ** 2 * Y2) + k_total * gamma
-            MA2_new = sqrt(
-                (MA1 ** 2) / (1 - BigA * MA1 ** 2 * direction_factor))
+                (MA1 ** 2 * Y2_guess) + k_total * gamma
+            denom = 1 - BigA * MA1 ** 2 * direction_factor
+            if denom <= 0:
+                MA2 = 1.0 - 1e-6 if direction_factor > 0 else 1.0 + 1e-6
+                break
+            MA2_new = sqrt((MA1 ** 2) / denom)
 
             if abs(MA2_new - MA2_guess) <= ADIABATIC_TOL:
                 MA2 = MA2_new
                 break
             MA2_guess = MA2_new
+        else:
+            MA2 = MA2_guess
+        Y2 = _calculate_y(gamma, MA2)
 
         return MA1, MA2, Y1, Y2
 
@@ -459,6 +519,28 @@ def solve_adiabatic(
                              mass_flow, diameter, molar_mass, z_factor, gamma)
     outlet_state = _gas_state(
         outlet_pressure, outlet_temperature, mass_flow, diameter, molar_mass, z_factor, gamma)
+
+    def _apply_choke(state: GasState, temperature: float) -> GasState:
+        critical_pressure = _critical_pressure_from_conditions(
+            mass_flow=mass_flow,
+            diameter=diameter,
+            temperature=temperature,
+            molar_mass=molar_mass,
+            z_factor=z_factor,
+            gamma=gamma,
+        )
+        if critical_pressure is not None and state.pressure <= critical_pressure:
+            choked_state = _gas_state(
+                critical_pressure, temperature, mass_flow, diameter, molar_mass, z_factor, gamma
+            )
+            choked_state.critical_pressure = critical_pressure
+            choked_state.is_choked = True
+            return choked_state
+        state.critical_pressure = critical_pressure
+        return state
+
+    inlet_state = _apply_choke(inlet_state, inlet_temperature)
+    outlet_state = _apply_choke(outlet_state, outlet_temperature)
     return inlet_state, outlet_state
 
 
@@ -533,4 +615,13 @@ def _gas_state(pressure: float, temperature: float, mass_flow: float, diameter: 
     if not np.isfinite(mach) or mach < 0:
         raise ValueError(f"Invalid Mach number calculated: {mach}. Velocity: {velocity} m/s, Sonic: {sonic} m/s")
     
-    return GasState(pressure=pressure, temperature=temperature, density=density, velocity=velocity, mach=mach)
+    return GasState(
+        pressure=pressure,
+        temperature=temperature,
+        density=density,
+        velocity=velocity,
+        mach=mach,
+        molar_mass=molar_mass,
+        z_factor=z_factor,
+        gamma=gamma,
+    )

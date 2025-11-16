@@ -18,7 +18,7 @@
       {
         "pressure_drop": {
           "control_valve_pressure_drop": 0.0,
-          "critical_pressure": 5572.228189675,
+          "critical_pressure": 74088.785694496,
           "elevation_change": 0.0,
           "frictional_factor": 0.018088077,
           "normalized_friction_loss": 122218.363016248,

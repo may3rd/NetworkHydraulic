@@ -7,25 +7,25 @@
       "critical_pressure": null,
       "elevation_change": 0.0,
       "frictional_factor": null,
-      "normalized_friction_loss": 128994.357684413,
+      "normalized_friction_loss": 128994.357685273,
       "orifice_pressure_drop": 0.0,
-      "pipe_and_fittings": 130845.717471751,
+      "pipe_and_fittings": 130845.717472623,
       "reynolds_number": null,
-      "total_segment_loss": 130845.717471751,
+      "total_segment_loss": 130845.717472623,
       "user_specified_fixed_loss": 0.0
     },
     "sections": [
       {
         "pressure_drop": {
           "control_valve_pressure_drop": 0.0,
-          "critical_pressure": 67974.223709877,
+          "critical_pressure": 74088.785694496,
           "elevation_change": 0.0,
           "frictional_factor": 0.018088077,
-          "normalized_friction_loss": 128994.357684413,
+          "normalized_friction_loss": 128994.357685273,
           "orifice_pressure_drop": 0.0,
-          "pipe_and_fittings": 130845.717471751,
+          "pipe_and_fittings": 130845.717472623,
           "reynolds_number": 567373.028932436,
-          "total_segment_loss": 130845.717471751,
+          "total_segment_loss": 130845.717472623,
           "user_specified_fixed_loss": null
         },
         "section_id": "1",
@@ -43,11 +43,11 @@
           "outlet": {
             "density": 7.419365733,
             "erosional_velocity": 44.785970937,
-            "flow_momentum": 11433.855228915,
+            "flow_momentum": 11433.8552289,
             "mach_number": 0.110367104,
             "pipe_velocity": 39.256624566,
-            "pressure": 670479.282528249,
-            "temperature": 307.402386449,
+            "pressure": 670479.282527377,
+            "temperature": 307.402386448,
             "velocity": 39.256624566
           }
         }
@@ -67,11 +67,11 @@
       "outlet": {
         "density": 7.419365733,
         "erosional_velocity": 44.785970937,
-        "flow_momentum": 11433.855228915,
+        "flow_momentum": 11433.8552289,
         "mach_number": 0.110367104,
         "pipe_velocity": 39.256624566,
-        "pressure": 670479.282528249,
-        "temperature": 307.402386449,
+        "pressure": 670479.282527377,
+        "temperature": 307.402386448,
         "velocity": 39.256624566
       }
     }
