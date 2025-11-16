@@ -117,6 +117,7 @@ def test_write_output_includes_flow_rates(tmp_path: Path):
         "volumetric_flow_rate": "m^3/s",
         "mass_flow_rate": "kg/s",
         "flow_momentum": "Pa",
+        "gas_flow_critical_pressure": "kPa",
     }
 
 
@@ -331,7 +332,7 @@ def test_print_summary_output(capfd):
     pd.orifice_pressure_drop = 500.0
     # Removed pd.elevation = 200.0
     pd.total_segment_loss = 6700.0
-    pd.critical_pressure = 120000.0
+    pd.gas_flow_critical_pressure = 120000.0
     section_result.summary.inlet.pressure = 150000.0
     section_result.summary.outlet.pressure = 143300.0
     section_result.summary.inlet.temperature = 300.0

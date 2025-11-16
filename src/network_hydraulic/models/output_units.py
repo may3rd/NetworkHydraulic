@@ -24,6 +24,8 @@ class OutputUnits:
     volumetric_flow_rate: str = "m^3/s"
     mass_flow_rate: str = "kg/s"
     flow_momentum: str = "Pa"
+    gas_flow_critical_pressure: str = "kPa"
+
 
     def __post_init__(self) -> None:
         self.pressure = self._normalize(self.pressure, "Pa")
@@ -34,6 +36,8 @@ class OutputUnits:
         self.volumetric_flow_rate = self._normalize(self.volumetric_flow_rate, "m^3/s")
         self.mass_flow_rate = self._normalize(self.mass_flow_rate, "kg/s")
         self.flow_momentum = self._normalize(self.flow_momentum, self.pressure_drop)
+        self.gas_flow_critical_pressure = self._normalize(self.gas_flow_critical_pressure, "Pa")
+
 
         errors: list[str] = []
         for field_name in self.__dataclass_fields__:

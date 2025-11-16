@@ -333,7 +333,7 @@ class NetworkSolver:
                             gamma=gamma,
                         )
                         self._apply_gas_state(summary.inlet, inlet_state)
-                        self._apply_critical_pressure(section, inlet_state, gas_flow_model)
+                        self._apply_gas_flow_critical_pressure(section, inlet_state, gas_flow_model)
                         outlet_pressure, outlet_state = solve_isothermal(
                             inlet_pressure=section_start_pressure,
                             temperature=temperature,
@@ -353,7 +353,7 @@ class NetworkSolver:
                         )
                         summary.outlet.pressure = outlet_pressure
                         self._apply_gas_state(summary.outlet, outlet_state)
-                        # self._apply_critical_pressure(section, outlet_state, gas_flow_model)
+                        # self._apply_gas_flow_critical_pressure(section, outlet_state, gas_flow_model)
                         current = outlet_pressure
                     else:
                         summary.outlet.pressure = section_start_pressure
@@ -386,7 +386,7 @@ class NetworkSolver:
                         )
                         summary.inlet.pressure = inlet_pressure
                         self._apply_gas_state(summary.inlet, inlet_state)
-                        self._apply_critical_pressure(section, inlet_state, gas_flow_model)
+                        self._apply_gas_flow_critical_pressure(section, inlet_state, gas_flow_model)
                         current = inlet_pressure
                     
                     # Update pipe_and_fittings and total_segment_loss for gas flow
@@ -414,7 +414,7 @@ class NetworkSolver:
                             z_factor=z_factor,
                             gamma=gamma,
                         )
-                        self._apply_critical_pressure(section, inlet_state, gas_flow_model)
+                        self._apply_gas_flow_critical_pressure(section, inlet_state, gas_flow_model)
                         inlet_state, outlet_state = solve_adiabatic(
                             boundary_pressure=section_start_pressure, # Use boundary_pressure
                             temperature=temperature,
@@ -435,7 +435,7 @@ class NetworkSolver:
                         summary.outlet.pressure = outlet_pressure
                         self._apply_gas_state(summary.inlet, inlet_state)
                         self._apply_gas_state(summary.outlet, outlet_state)
-                        # self._apply_critical_pressure(section, outlet_state, gas_flow_model)
+                        # self._apply_gas_flow_critical_pressure(section, outlet_state, gas_flow_model)
                         current = outlet_pressure
                     else:
                         summary.outlet.pressure = section_start_pressure
@@ -468,7 +468,7 @@ class NetworkSolver:
                         summary.inlet.pressure = inlet_pressure
                         self._apply_gas_state(summary.inlet, inlet_state)
                         self._apply_gas_state(summary.outlet, outlet_state)
-                        self._apply_critical_pressure(section, inlet_state, gas_flow_model)
+                        self._apply_gas_flow_critical_pressure(section, inlet_state, gas_flow_model)
                         current = inlet_pressure
 
                     # Update pipe_and_fittings and total_segment_loss for gas flow
@@ -967,11 +967,11 @@ class NetworkSolver:
         target.mach_number = gas_state.mach
 
     @staticmethod
-    def _apply_critical_pressure(section: PipeSection, gas_state: Optional[GasState], gas_flow_model: Optional[str] = "adiabatic") -> None:
+    def _apply_gas_flow_critical_pressure(section: PipeSection, gas_state: Optional[GasState], gas_flow_model: Optional[str] = "adiabatic") -> None:
         if gas_state is None:
             return
 
-        critical = gas_state.critical_pressure
+        critical = gas_state.gas_flow_critical_pressure
         if critical is None:
             mass_flow = section.mass_flow_rate
             pipe_dimensions = section.pipe_diameter or 0.0
@@ -997,7 +997,7 @@ class NetworkSolver:
                     critical = density_star * z_state * UNIVERSAL_GAS_CONSTANT * temperature / molar_mass
         if critical is None:
             return
-        section.calculation_output.pressure_drop.critical_pressure = critical
+        section.calculation_output.pressure_drop.gas_flow_critical_pressure = critical
 
     @staticmethod
     def _recomputed_density(

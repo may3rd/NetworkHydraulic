@@ -58,7 +58,7 @@ def test_gas_network_adiabatic():
         34.26092534557106, rel=1e-6)
     assert inlet.density == pytest.approx(8.86083251156075, rel=1e-6)
     assert outlet.density == pytest.approx(7.4621024570078545, rel=1e-6)
-    assert section.calculation.pressure_drop.critical_pressure == pytest.approx(
+    assert section.calculation.pressure_drop.gas_flow_critical_pressure == pytest.approx(
         74088.78569449647, rel=1e-6)
     
     # Check the inlet conditions
@@ -117,7 +117,7 @@ def test_gas_network_isothermal():
         35.0, rel=1e-6)
     assert inlet.density == pytest.approx(8.8457604, rel=1e-6)
     assert outlet.density == pytest.approx(7.496602001148042, rel=1e-6)
-    # assert section.calculation.pressure_drop.critical_pressure == pytest.approx(
+    # assert section.calculation.pressure_drop.gas_flow_critical_pressure == pytest.approx(
     #     67691.29013144, rel=1e-6)
 
     # Check the inlet conditions

@@ -41,7 +41,7 @@ def serialize_pressure_drop(details: PressureDropDetails) -> Dict[str, Optional[
         "normalized_friction_loss": _round_value(details.normalized_friction_loss),
         "reynolds_number": _round_value(details.reynolds_number),
         "frictional_factor": _round_value(details.frictional_factor),
-        "critical_pressure": _round_value(details.critical_pressure),
+        "critical_pressure": _round_value(details.gas_flow_critical_pressure),
     }
 
 
@@ -79,4 +79,3 @@ def snapshot_payload(
         "config": config_path,
         "result": serialize_result(result),
     }
-

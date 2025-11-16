@@ -43,7 +43,7 @@ class GasState:
     molar_mass: float = 28.9644
     z_factor: float = 0.0
     gamma: float = 1.4
-    critical_pressure: Optional[float] = None
+    gas_flow_critical_pressure: Optional[float] = None
     is_choked: bool = False
 
 
@@ -132,7 +132,7 @@ def _fanno_temperature_ratio(mach: float, gamma: float) -> float:
     return (gamma + 1) / (2 * (1 + ((gamma - 1) / 2) * mach**2))
 
 
-def _critical_pressure_from_conditions(
+def _gas_flow_critical_pressure_from_conditions(
     *,
     mass_flow: float,
     diameter: float,
@@ -329,7 +329,7 @@ def solve_isothermal(
             raise ValueError(
                 "Isothermal solver failed to compute upstream pressure")
 
-    critical_pressure = _critical_pressure_from_conditions(
+    gas_flow_critical_pressure = _gas_flow_critical_pressure_from_conditions(
         mass_flow=mass_flow,
         diameter=diameter,
         temperature=temperature,
@@ -339,13 +339,13 @@ def solve_isothermal(
     )
     choked = False
     final_pressure = downstream_pressure if is_forward else upstream_pressure
-    if critical_pressure is not None and (final_pressure <= critical_pressure or final_pressure <= 0):
-        final_pressure = critical_pressure
+    if gas_flow_critical_pressure is not None and (final_pressure <= gas_flow_critical_pressure or final_pressure <= 0):
+        final_pressure = gas_flow_critical_pressure
         choked = True
     elif final_pressure <= 0:
         raise ValueError("Isothermal solver produced non-positive pressure. Check inputs.")
     final_state = _gas_state(final_pressure, temperature, mass_flow, diameter, molar_mass, z_factor, gamma)
-    final_state.critical_pressure = critical_pressure
+    final_state.gas_flow_critical_pressure = gas_flow_critical_pressure
     final_state.is_choked = choked
     return final_pressure, final_state
 
@@ -521,7 +521,7 @@ def solve_adiabatic(
         outlet_pressure, outlet_temperature, mass_flow, diameter, molar_mass, z_factor, gamma)
 
     def _apply_choke(state: GasState, temperature: float) -> GasState:
-        critical_pressure = _critical_pressure_from_conditions(
+        gas_flow_critical_pressure = _gas_flow_critical_pressure_from_conditions(
             mass_flow=mass_flow,
             diameter=diameter,
             temperature=temperature,
@@ -529,14 +529,14 @@ def solve_adiabatic(
             z_factor=z_factor,
             gamma=gamma,
         )
-        if critical_pressure is not None and state.pressure <= critical_pressure:
+        if gas_flow_critical_pressure is not None and state.pressure <= gas_flow_critical_pressure:
             choked_state = _gas_state(
-                critical_pressure, temperature, mass_flow, diameter, molar_mass, z_factor, gamma
+                gas_flow_critical_pressure, temperature, mass_flow, diameter, molar_mass, z_factor, gamma
             )
-            choked_state.critical_pressure = critical_pressure
+            choked_state.gas_flow_critical_pressure = gas_flow_critical_pressure
             choked_state.is_choked = True
             return choked_state
-        state.critical_pressure = critical_pressure
+        state.gas_flow_critical_pressure = gas_flow_critical_pressure
         return state
 
     inlet_state = _apply_choke(inlet_state, inlet_temperature)

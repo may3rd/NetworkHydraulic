@@ -21,6 +21,7 @@ network:
     volumetric_flow_rate: m^3/h
     mass_flow_rate: kg/h
     flow_momentum: Pa
+    gas_flow_critical_pressure: kPa
   fluid:
     name: gas
     phase: gas

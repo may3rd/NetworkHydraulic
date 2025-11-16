@@ -67,6 +67,9 @@ class _OutputUnitConverter:
 
     def viscosity(self, value: Optional[float]) -> Optional[float]:
         return _convert_value(value, "Pa*s", "cP")
+    
+    def gas_flow_critical_pressure(self, value: Optional[float]) -> Optional[float]:
+        return _convert_value(value, "Pa", self.units.gas_flow_critical_pressure)
 
 
 def print_summary(network: "Network", result: "NetworkResult", *, debug: bool = False) -> None:
@@ -121,7 +124,7 @@ def print_summary(network: "Network", result: "NetworkResult", *, debug: bool = 
             f"  Velocity Head (Inlet): {format_measure(velocity_head, converter.flow_momentum, network.output_units.flow_momentum)}"
         )
         print(
-            f"  Critical Pressure: {convert_units(pd.critical_pressure, "Pa", "kPa"):.3f} (abs)"
+            f"  Critical Pressure: {fmt(converter.gas_flow_critical_pressure(pd.gas_flow_critical_pressure))} {network.output_units.gas_flow_critical_pressure}"
         )
         print(f"PRESSURE LOSS SUMMARY")
         print(
@@ -200,7 +203,7 @@ def _pressure_drop_dict(details, length: float | None, converter: _OutputUnitCon
         "reynolds_number": details.reynolds_number,
         "flow_scheme": details.flow_scheme,
         "frictional_factor": details.frictional_factor,
-        "critical_pressure": converter.pressure(details.critical_pressure),
+        "critical_pressure": converter.gas_flow_critical_pressure(details.gas_flow_critical_pressure),
         "pipe_and_fittings": converter.pressure_drop(details.pipe_and_fittings),
         "elevation_change": converter.pressure_drop(details.elevation_change),
         "control_valve": converter.pressure_drop(details.control_valve_pressure_drop),
