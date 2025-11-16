@@ -275,36 +275,6 @@ def _print_state_table(
     inlet = summary.inlet
     outlet = summary.outlet
 
-    # Check Mach Number Conditions
-    # if inlet.mach_number is not None:
-    #     if inlet.mach_number > 0.5:
-    #         if inlet.remarks is None:
-    #             inlet.remarks = "WARNING: Mach number is greater than 0.5"
-    #         else:
-    #             inlet.remarks += "\nWARNING: Mach number is greater than 0.5"
-
-    # if outlet.mach_number is not None:
-    #     if outlet.mach_number > 0.5:
-    #         if outlet.remarks is None:
-    #             outlet.remarks = "WARNING: Mach number is greater than 0.5"
-    #         else:
-    #             outlet.remarks += "\nWARNING: Mach number is greater than 0.5"
-
-    # # Check if Velocity > Erosional Velocity
-    # if inlet.velocity is not None and inlet.erosional_velocity is not None:
-    #     if inlet.velocity > inlet.erosional_velocity:
-    #         if inlet.remarks is None:
-    #             inlet.remarks = "WARNING: Velocity is greater than Erosional Velocity"
-    #         else:
-    #             inlet.remarks += "\nWARNING: Velocity is greater than Erosional Velocity"
-
-    # if outlet.velocity is not None and outlet.erosional_velocity is not None:
-    #     if outlet.velocity > outlet.erosional_velocity:
-    #         if outlet.remarks is None:
-    #             outlet.remarks = "WARNING: Velocity is greater than Erosinal Velocity"
-    #         else:
-    #             outlet.remarks += "\nWARNING: Velocity is greater than Erosinal Velocity"
-
     # Print State
     print(f"{prefix}Inlet State:")
     print(f"{prefix}  Pressure: {fmt(converter.pressure(inlet.pressure))} {units.pressure}")
