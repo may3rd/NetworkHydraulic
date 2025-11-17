@@ -17,7 +17,7 @@
     "sections": [
       {
         "pressure_drop": {
-          "control_valve_pressure_drop": null,
+          "control_valve_pressure_drop": 0.0,
           "critical_pressure": null,
           "elevation_change": 0.0,
           "frictional_factor": null,

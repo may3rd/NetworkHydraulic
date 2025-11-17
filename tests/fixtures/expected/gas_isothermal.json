@@ -17,12 +17,12 @@
     "sections": [
       {
         "pressure_drop": {
-          "control_valve_pressure_drop": 0.0,
+          "control_valve_pressure_drop": null,
           "critical_pressure": 74088.785694496,
           "elevation_change": 0.0,
           "frictional_factor": 0.018088077,
           "normalized_friction_loss": 122218.363016248,
-          "orifice_pressure_drop": 0.0,
+          "orifice_pressure_drop": null,
           "pipe_and_fittings": 122218.363016248,
           "reynolds_number": 567373.028932436,
           "total_segment_loss": 122218.363016248,

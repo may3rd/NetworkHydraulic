@@ -97,10 +97,10 @@ def test_network_solver_runs_all_calculations():
     assert len(result.sections) == 1
     calc = section.calculation_output.pressure_drop
     assert calc.pipe_and_fittings is not None and calc.pipe_and_fittings > 0
-    assert calc.control_valve_pressure_drop == 0.0
+    assert calc.control_valve_pressure_drop == pytest.approx(2000.0)
     assert calc.orifice_pressure_drop == 0.0
     assert calc.total_segment_loss is not None and calc.total_segment_loss > 0
-    assert section.calculation_output.pressure_drop.normalized_friction_loss is not None
+    assert section.calculation_output.pressure_drop.normalized_friction_loss is None
 
     aggregate = result.aggregate.pressure_drop.total_segment_loss
     assert aggregate == pytest.approx(calc.total_segment_loss)

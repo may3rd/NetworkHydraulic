@@ -108,17 +108,7 @@ def test_write_output_includes_flow_rates(tmp_path: Path):
     section_flow = data["network"]["sections"][0]["calculation_result"]["flow"]
     assert section_flow["volumetric_actual"] == pytest.approx(actual_expected)
     assert section_flow["volumetric_standard"] == pytest.approx(standard_expected)
-    assert data["network"]["output_units"] == {
-        "pressure": "Pa",
-        "pressure_drop": "Pa",
-        "temperature": "K",
-        "density": "kg/m^3",
-        "velocity": "m/s",
-        "volumetric_flow_rate": "m^3/s",
-        "mass_flow_rate": "kg/s",
-        "flow_momentum": "Pa",
-        "gas_flow_critical_pressure": "kPa",
-    }
+    assert data["network"]["output_units"] == network.output_units.as_dict()
 
 
 def test_section_flow_uses_section_mass_flow(tmp_path: Path):

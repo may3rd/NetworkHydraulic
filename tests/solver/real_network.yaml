@@ -68,7 +68,7 @@ network:
       pipe_NPD: 4.0
       roughness: 4.57e-5
       length:
-        value: 0.708
+        value: 0.712
         unit: m
       elevation_change:
         value: -0.712

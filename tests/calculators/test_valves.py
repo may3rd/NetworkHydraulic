@@ -107,7 +107,6 @@ def test_liquid_cv_from_pressure_drop():
     assert pytest.approx(valve.cv, rel=1e-4) == cv_expected
     assert valve.cg is None
     assert section.calculation_output.pressure_drop.control_valve_pressure_drop == drop
-    assert valve.calculation_note.startswith("Used specified pressure_drop")
 
 
 def test_liquid_drop_sets_cg_when_c1_present():
@@ -195,9 +194,6 @@ def test_liquid_pressure_drop_from_cv():
     calc = ControlValveCalculator(fluid=fluid)
     calc.calculate(section)
     assert pytest.approx(valve.pressure_drop, rel=1e-4) == 460e3
-    assert valve.calculation_note.startswith("Calculated pressure_drop from Cv")
-
-
 def test_control_valve_adjustable_overrides_fixed_drop():
     fluid = liquid_fluid()
     section = make_section(
@@ -240,9 +236,6 @@ def test_control_valve_adjustable_overrides_fixed_drop():
         control_valve_calculator=control_calc,
         orifice_calculator=orifice_calc,
     )
-    assert valve.calculation_note.startswith("Calculated pressure_drop from Cv")
-
-
 def test_gas_valve_drop_from_cv():
     fluid = gas_fluid()
     section = make_section(

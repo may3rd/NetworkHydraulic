@@ -84,6 +84,7 @@ class NetworkSolver:
             self._validate_section_prerequisites(section)
             for calculator in calculators:
                 calculator.calculate(section)
+            self._apply_loss_precedence(section)
             fitting_K = section.fitting_K or 0.0
             pipe_length_K = section.pipe_length_K or 0.0
             user_K = section.user_K or 0.0
@@ -668,23 +669,15 @@ class NetworkSolver:
         pressure_drop = section.calculation_output.pressure_drop
         ignored = section.calculation_output.ignored_components
 
-        valve = section.control_valve
+        component = self._primary_loss_component(section)
+        pipeline_active = component == "pipeline"
 
-        if section.has_pipeline_segment and not (valve and valve.adjustable):
-            if section.control_valve:
-                ignored.append("Control valve ignored because section includes a pipeline segment.")
-            if section.orifice:
-                ignored.append("Orifice ignored because section includes a pipeline segment.")
-            pressure_drop.control_valve_pressure_drop = 0.0
-            pressure_drop.orifice_pressure_drop = 0.0
-            return
+        if section.has_pipeline_segment and not pipeline_active:
+            reason = "control valve" if component == "control_valve" else "orifice"
+            ignored.append(f"Pipeline ignored because {reason} takes precedence in this section.")
 
         valve = section.control_valve
-        saved_drop: Optional[float] = None
-        if valve and valve.adjustable:
-            saved_drop = valve.pressure_drop
-        if valve and valve.adjustable and saved_drop is not None:
-            valve.pressure_drop = saved_drop
+        if component == "control_valve" and valve:
             control_valve_calculator.calculate(
                 section,
                 inlet_pressure_override=inlet_pressure,
@@ -693,20 +686,44 @@ class NetworkSolver:
                 ignored.append("Orifice ignored because control valve takes precedence in this section.")
             pressure_drop.orifice_pressure_drop = 0.0
             return
-        if section.control_valve:
-            control_valve_calculator.calculate(
-                section,
-                inlet_pressure_override=inlet_pressure,
-            )
 
-        if section.orifice:
+        if component == "orifice" and section.orifice:
             orifice_calculator.calculate(
                 section,
                 inlet_pressure_override=inlet_pressure,
                 mass_flow_override=mass_flow_override,
             )
-            if section.user_specified_fixed_loss:
-                ignored.append("User-defined fixed loss is additive to orifice losses.")
+            pressure_drop.control_valve_pressure_drop = 0.0
+            return
+
+    def _apply_loss_precedence(self, section: PipeSection) -> None:
+        component = self._primary_loss_component(section)
+        if component != "pipeline":
+            section.pipe_length_K = 0.0
+            section.fitting_K = 0.0
+            self._remove_pipeline_elevation(section)
+
+    @staticmethod
+    def _primary_loss_component(section: PipeSection) -> str:
+        if section.control_valve:
+            return "control_valve"
+        if section.orifice:
+            return "orifice"
+        if section.has_pipeline_segment:
+            return "pipeline"
+        if section.user_specified_fixed_loss is not None:
+            return "user_loss"
+        return "none"
+
+    @staticmethod
+    def _remove_pipeline_elevation(section: PipeSection) -> None:
+        pressure_drop = section.calculation_output.pressure_drop
+        elevation = pressure_drop.elevation_change or 0.0
+        if elevation == 0.0:
+            return
+        baseline = pressure_drop.total_segment_loss or 0.0
+        pressure_drop.total_segment_loss = baseline - elevation
+        pressure_drop.elevation_change = 0.0
 
     def _update_gas_friction_losses(self, section: PipeSection) -> None:
         """Derive friction + normalized losses directly from gas solver pressures."""
@@ -724,7 +741,6 @@ class NetworkSolver:
             (pd.elevation_change or 0.0)
             + (pd.control_valve_pressure_drop or 0.0)
             + (pd.orifice_pressure_drop or 0.0)
-            + (pd.user_specified_fixed_loss or 0.0)
         )
         frictional_loss = max(0.0, total_drop - other_losses)
         pd.pipe_and_fittings = frictional_loss
