@@ -29,8 +29,11 @@ def optimize_control_valves(network: Network, *, tolerance: float = 10.0) -> Opt
         start_node, end_node = solver._section_node_ids(
             adjustable_section, network.topology, forward=True
         )
+        downstream_node = _find_rejoin_node(network.topology, end_node)
         upstream_ids = _sections_to_node(network.topology, start_node, forward=True)
-        downstream_ids = _sections_to_node(network.topology, end_node, forward=False)
+        downstream_ids = _sections_between_nodes(
+            network.topology, end_node, downstream_node, forward=True
+        )
         upstream_sections = [sec for sec in network.sections if sec.id in upstream_ids]
         downstream_sections = [sec for sec in network.sections if sec.id in downstream_ids]
 
@@ -115,3 +118,49 @@ def _sections_to_node(
                 visited.add(next_node)
                 queue.append(next_node)
     return sections
+
+
+def _sections_between_nodes(
+    graph: TopologyGraph,
+    start_node: Optional[str],
+    end_node: Optional[str],
+    forward: bool,
+) -> Set[str]:
+    if start_node is None or end_node is None:
+        return set()
+    sections: Set[str] = set()
+    queue = [start_node]
+    visited: Set[str] = set()
+    while queue:
+        node_id = queue.pop()
+        if node_id == end_node:
+            continue
+        edges = graph.outgoing_edges(node_id) if forward else graph.incoming_edges(node_id)
+        for edge in edges:
+            next_node = edge.end_node_id if forward else edge.start_node_id
+            sections.add(edge.id)
+            if next_node not in visited and next_node != end_node:
+                visited.add(next_node)
+                queue.append(next_node)
+    return sections
+
+
+def _find_rejoin_node(graph: TopologyGraph, start_node: Optional[str]) -> Optional[str]:
+    if start_node is None:
+        return None
+    queue = [start_node]
+    visited: Set[str] = {start_node}
+    while queue:
+        node_id = queue.pop(0)
+        incoming = graph.reverse_adjacency.get(node_id, [])
+        if len(incoming) > 1:
+            return node_id
+        edges = graph.outgoing_edges(node_id)
+        if not edges:
+            return node_id
+        for edge in edges:
+            next_node = edge.end_node_id
+            if next_node not in visited:
+                visited.add(next_node)
+                queue.append(next_node)
+    return None

@@ -108,7 +108,7 @@ Tips:
 
  ### 3.3 Components
 
- #### Control Valve (`control_valve`)
+#### Control Valve (`control_valve`)
 
  | Field | Description |
  | --- | --- |
@@ -117,6 +117,7 @@ Tips:
 | `pressure_drop` | Fixed ΔP (Pa). |
 | `C1`, `FL`, `Fd`, `xT` | Vendor constants. |
 | `inlet_diameter`, `outlet_diameter`, `valve_diameter` | Defaults to section diameters. |
+| `adjustable` | When `true`, the valve drop is solved instead of treated as a fixed `pressure_drop`. You can run `run_valve_optimizer.py` (or call `network_hydraulic.optimizer.optimize_control_valves`) to tune these valves so the downstream pressure matches the configured value. | 
 - | `adjustable` | When `true`, the valve drop is solved from Cv/Cg instead of fixed `pressure_drop`, letting multiple valves share the total pressure drop along the route. |
 
  The calculator requires either a specified pressure drop or a Cv/Cg. Liquid valves also need `fluid.vapor_pressure` and `fluid.critical_pressure`.

@@ -7,7 +7,7 @@ from network_hydraulic.models.pipe_section import PipeSection
 from network_hydraulic.optimizer import optimize_control_valves
 
 
-def _branch_network() -> Network:
+def _branch_network(nested: bool = False, one_valve: bool = False) -> Network:
     fluid = Fluid(
         name="water",
         phase="liquid",
@@ -66,7 +66,36 @@ def _branch_network() -> Network:
         make_section("return-b", "node-b", "node-merge"),
         make_section("outlet", "node-merge", "node-end"),
     ]
-
+    
+    sections_with_one_valve = [
+        make_section("inlet", "node-start", "node-split"),
+        make_section("branch-a-1", "node-split", "node-a-1"),
+        make_section("branch-a-cv", "node-a-1", "node-a-2", has_valve=True),
+        make_section("branch-a-2", "node-a-2", "node-merge"),
+        make_section("branch-b", "node-split", "node-b"),
+        make_section("return-b", "node-b", "node-merge"),
+        make_section("outlet", "node-merge", "node-end"),
+    ]
+    
+    nested_sections = [
+        make_section("inlet", "node-start", "node-split"),
+        make_section("branch-a-1", "node-split", "node-a-1"),
+        make_section("branch-a-cv-1", "node-a-1", "node-a-1-1", has_valve=True),
+        make_section("branch-a-cv-2", "node-a-1", "node-a-1-2", has_valve=True),
+        make_section("branch-a-cv-3", "node-a-1-1", "node-a-2"),
+        make_section("branch-a-cv-4", "node-a-1-2", "node-a-2"),
+        make_section("branch-a-2", "node-a-2", "node-merge"),
+        make_section("branch-b", "node-split", "node-b"),
+        make_section("return-b", "node-b", "node-merge"),
+        make_section("outlet", "node-merge", "node-end"),
+    ]
+    
+    if one_valve:
+        sections = sections_with_one_valve
+        
+    if nested:
+        sections = nested_sections
+    
     return Network(
         name="branch-valves",
         description="Two-branch network",
@@ -90,3 +119,26 @@ def test_optimize_two_branch_two_valves():
         valve = section.control_valve
         if valve and valve.adjustable:
             assert valve.pressure_drop is not None and valve.pressure_drop > 0
+
+def test_optimize_two_branch_one_valve():
+    network = _branch_network(one_valve=True)
+    baseline_diff = abs(network.boundary_pressure - network.downstream_pressure)
+    error = optimize_control_valves(network)
+    assert error is not None
+    assert error <= baseline_diff
+    for section in network.sections:
+        valve = section.control_valve
+        if valve and valve.adjustable:
+            assert valve.pressure_drop is not None and valve.pressure_drop > 0
+    
+def test_optimize_nested_two_branch_two_valves():
+    network = _branch_network(nested=True)
+    baseline_diff = abs(network.boundary_pressure - network.downstream_pressure)
+    error = optimize_control_valves(network)
+    assert error is not None
+    assert error <= baseline_diff
+    for section in network.sections:
+        valve = section.control_valve
+        if valve and valve.adjustable:
+            assert valve.pressure_drop is not None and valve.pressure_drop > 0
+    

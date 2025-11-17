@@ -52,11 +52,19 @@
     | `--flow-rate` | Override for volumetric flow (m³/s) used by calculators. |
     | `--debug-fittings` | Prints the per-fitting `K` breakdown in the CLI summary. |
 
- 2. **Module invocation**
+2. **Module invocation**
+
+   ```bash
+   python -m network_hydraulic.cli.app run config/sample_network.yaml
+   ```
+
+ 3. **Optimizer helper**
 
     ```bash
-    python -m network_hydraulic.cli.app run config/sample_network.yaml
+    python run_valve_optimizer.py
     ```
+
+    This script loads `config/test_valve_network.yaml`, runs `optimize_control_valves` (which assumes adjustable valves plus a downstream pressure target), updates the control-valve pressure drop, and then re-runs the solver to present the stabilized summary.
 
  3. **Ad-hoc helper** (`main.py`) – handy while developing:
 
