@@ -97,11 +97,20 @@ class NetworkSolver:
             pressure_drop.piping_and_fitting_safety_factor = section.piping_and_fitting_safety_factor
             pressure_drop.total_K = section.total_K
 
+        boundary_hint = (
+            self.boundary_pressure
+            if self.boundary_pressure is not None
+            else (
+                network.boundary_pressure
+                if resolved_direction != "backward"
+                else network.downstream_pressure or network.boundary_pressure
+            )
+        )
         node_pressures = self._apply_pressure_profile(
             sections,
             network,
             direction=resolved_direction,
-            boundary=self.boundary_pressure if self.boundary_pressure is not None else network.boundary_pressure,
+            boundary=boundary_hint,
         )
         result.node_pressures = node_pressures
         self._populate_states(sections, network)

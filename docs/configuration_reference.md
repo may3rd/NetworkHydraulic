@@ -69,6 +69,7 @@
 - `user_specified_fixed_loss` – pressure drop (Pa) applied directly; it now adds on top of pipe/elevation losses (only control valves/orifices still block it).
  - `user_K`, `fitting_K`, `pipe_length_K`, `total_K`, `piping_and_fitting_safety_factor` – manual loss overrides (rare).
 - `boundary_pressure` – per-section pressure boundary (Pa).
+- `downstream_pressure` – optional outlet pressure (Pa) that seeds the graph when `direction` is `backward`; otherwise the solver uses `boundary_pressure` as the source.
 - `direction` – overrides network direction for that section.
 - `design_margin` – percent overriding network-level margin.
 - `erosional_constant` – used for erosional velocity checks.

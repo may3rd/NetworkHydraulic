@@ -173,3 +173,8 @@ def test_pipe_section_current_volumetric_flow_rate_raises_if_zero_density():
     fluid.density = 0.0 # Then set density to 0.0 for the test
     with pytest.raises(ValueError, match="density must be positive to determine flow parameters"):
         section.current_volumetric_flow_rate(fluid)
+
+
+def test_pipe_section_elevation_not_exceed_length():
+    with pytest.raises(ValueError, match="PipeSection 'sec-1' elevation_change magnitude \\(20.0\\) cannot exceed length \\(10.0\\)"):
+        make_pipe_section(elevation_change=20.0, length=10.0)

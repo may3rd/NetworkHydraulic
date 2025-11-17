@@ -140,3 +140,15 @@ def test_node_pressure_stores_min_of_merging_sections():
     ]
     expected = min(p for p in pressures if p is not None)
     assert result.node_pressures["node-merge"] == pytest.approx(expected)
+
+
+def test_solver_uses_downstream_pressure_hint():
+    sec1 = _make_pipeline_section("sec-1", "node-1", "node-2")
+    sec2 = _make_pipeline_section("sec-2", "node-2", "node-3")
+    network = _build_network([sec1, sec2])
+    network.direction = "backward"
+    network.downstream_pressure = 50000.0
+    solver = NetworkSolver()
+
+    result = solver.run(network)
+    assert result.node_pressures["node-3"] == pytest.approx(50000.0)

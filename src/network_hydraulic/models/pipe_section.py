@@ -133,9 +133,14 @@ class PipeSection:
         
         if self.roughness < 0:
             errors.append("PipeSection roughness must be non-negative")
-        
+
         if self.length < 0:
             errors.append("PipeSection length must be non-negative")
+        if abs(self.elevation_change) > self.length:
+            errors.append(
+                f"PipeSection '{self.id}' elevation_change magnitude "
+                f"({self.elevation_change}) cannot exceed length ({self.length})"
+            )
         
         if self.pipe_diameter is not None and self.pipe_diameter <= 0:
             errors.append("PipeSection pipe_diameter must be positive if provided")

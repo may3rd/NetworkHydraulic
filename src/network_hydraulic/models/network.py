@@ -40,6 +40,7 @@ class Network:
     output_units: OutputUnits = field(default_factory=OutputUnits)
     design_margin: float = 0.0 # For design rate 110% set design_margin = 0.1
     topology: TopologyGraph = field(default_factory=TopologyGraph)
+    downstream_pressure: Optional[float] = None
 
     def __post_init__(self) -> None:
         errors: list[str] = []
@@ -48,6 +49,8 @@ class Network:
             errors.append("network.boundary_temperature must be positive")
         if self.boundary_pressure is None or self.boundary_pressure <= 0:
             errors.append("network.boundary_pressure must be positive")
+        if self.downstream_pressure is not None and self.downstream_pressure <= 0:
+            errors.append("network.downstream_pressure must be positive")
 
         if self.mass_flow_rate is None:
             errors.append("mass_flow_rate must be provided for the network")

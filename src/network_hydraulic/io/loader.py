@@ -210,6 +210,14 @@ class ConfigurationLoader:
         )
         logger.info(f"{boundary_pressure} is loaded successfully.")
 
+        downstream_pressure = self._quantity(
+            network_cfg.get("downstream_pressure"),
+            "network.downstream_pressure",
+            target_unit="Pa",
+        )
+        if downstream_pressure is not None:
+            logger.info("Downstream pressure %.3f Pa is configured.", downstream_pressure)
+
         mass_flow_rate_val = self._require_positive_quantity(
             network_cfg.get("mass_flow_rate"),
             "network.mass_flow_rate",
@@ -249,6 +257,7 @@ class ConfigurationLoader:
             sections=sections,
             output_units=output_units,
             design_margin=self._coerce_optional_float(network_cfg.get("design_margin"), "network.design_margin"),
+            downstream_pressure=downstream_pressure,
         )
         logger.info(
             "Built network '%s' with %d section(s) and fluid '%s'",
