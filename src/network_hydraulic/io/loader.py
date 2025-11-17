@@ -486,6 +486,7 @@ class ConfigurationLoader:
             ),
             valve_diameter=self._quantity(cfg.get("valve_diameter"), "control_valve.valve_diameter", target_unit="m"),
             calculation_note=cfg.get("calculation_note"),
+            adjustable=bool(cfg.get("adjustable")),
         )
 
     def _build_orifice(self, cfg: Optional[Dict[str, Any]]) -> Optional[Orifice]:

@@ -2,9 +2,11 @@ import pytest
 from fluids.control_valve import convert_flow_coefficient, size_control_valve_g, size_control_valve_l
 
 from network_hydraulic.calculators.valves import ControlValveCalculator
+from network_hydraulic.calculators.orifices import OrificeCalculator
 from network_hydraulic.models.components import ControlValve
 from network_hydraulic.models.fluid import Fluid
 from network_hydraulic.models.pipe_section import PipeSection
+from network_hydraulic.solver.network_solver import NetworkSolver
 
 
 def make_section(control_valve: ControlValve, **overrides) -> PipeSection:
@@ -196,6 +198,51 @@ def test_liquid_pressure_drop_from_cv():
     assert valve.calculation_note.startswith("Calculated pressure_drop from Cv")
 
 
+def test_control_valve_adjustable_overrides_fixed_drop():
+    fluid = liquid_fluid()
+    section = make_section(
+        ControlValve(tag="placeholder", cv=None, cg=None, pressure_drop=None, C1=None),
+        mass_flow_rate=1.0,
+        temperature=300.0,
+        pressure=680e3,
+    )
+    density = fluid.current_density(section.temperature, section.pressure)
+    volumetric_flow_rate = section.mass_flow_rate / density
+    kv = size_control_valve_l(
+        rho=density,
+        Psat=fluid.vapor_pressure,
+        Pc=fluid.critical_pressure,
+        mu=fluid.viscosity,
+        P1=section.pressure,
+        P2=section.pressure - 460e3,
+        Q=volumetric_flow_rate,
+    )
+    cv = convert_flow_coefficient(kv, "Kv", "Cv")
+    valve = ControlValve(
+        tag="CV-adjust",
+        cv=cv,
+        cg=None,
+        pressure_drop=100e3,
+        C1=None,
+        adjustable=True,
+    )
+    section.control_valve = valve
+    solver = NetworkSolver()
+    control_calc = ControlValveCalculator(fluid=fluid)
+    orifice_calc = OrificeCalculator(
+        fluid=fluid,
+        default_pipe_diameter=section.pipe_diameter,
+        mass_flow_rate=section.mass_flow_rate,
+    )
+    solver._apply_pressure_dependent_losses(
+        section,
+        inlet_pressure=section.pressure,
+        control_valve_calculator=control_calc,
+        orifice_calculator=orifice_calc,
+    )
+    assert valve.calculation_note.startswith("Calculated pressure_drop from Cv")
+
+
 def test_gas_valve_drop_from_cv():
     fluid = gas_fluid()
     section = make_section(
@@ -234,6 +281,3 @@ def test_control_valve_note_when_insufficient_data():
     calc = ControlValveCalculator(fluid=fluid)
     calc.calculate(section)
     assert valve.calculation_note.startswith("Skipped control valve calculation")
-
-
-

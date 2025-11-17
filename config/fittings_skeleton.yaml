@@ -63,6 +63,7 @@ network:  # Top-level network metadata
         inlet_diameter: null  # Valve inlet ID, m
         outlet_diameter: null  # Valve outlet ID, m
         valve_diameter: null  # Valve nominal bore, m
+        adjustable: false  # Let the solver recompute Cv-based drop when true
       orifice:  # Flow element data
         tag: FE-DEMO  # Orifice tag/identifier, unitless text
         d_over_D_ratio: null  # Orifice beta ratio (d/D), dimensionless

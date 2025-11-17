@@ -668,7 +668,9 @@ class NetworkSolver:
         pressure_drop = section.calculation_output.pressure_drop
         ignored = section.calculation_output.ignored_components
 
-        if section.has_pipeline_segment:
+        valve = section.control_valve
+
+        if section.has_pipeline_segment and not (valve and valve.adjustable):
             if section.control_valve:
                 ignored.append("Control valve ignored because section includes a pipeline segment.")
             if section.orifice:
@@ -677,15 +679,24 @@ class NetworkSolver:
             pressure_drop.orifice_pressure_drop = 0.0
             return
 
+        valve = section.control_valve
+        saved_drop: Optional[float] = None
+        if valve and valve.adjustable:
+            saved_drop = valve.pressure_drop
+        if valve and valve.adjustable and saved_drop is not None:
+            pressure_drop.control_valve_pressure_drop = saved_drop
+            valve.pressure_drop = saved_drop
+            baseline = pressure_drop.total_segment_loss or 0.0
+            pressure_drop.total_segment_loss = baseline + saved_drop
+            if section.orifice:
+                ignored.append("Orifice ignored because control valve takes precedence in this section.")
+            pressure_drop.orifice_pressure_drop = 0.0
+            return
         if section.control_valve:
             control_valve_calculator.calculate(
                 section,
                 inlet_pressure_override=inlet_pressure,
             )
-            if section.orifice:
-                ignored.append("Orifice ignored because control valve takes precedence in this section.")
-            pressure_drop.orifice_pressure_drop = 0.0
-            return
 
         if section.orifice:
             orifice_calculator.calculate(

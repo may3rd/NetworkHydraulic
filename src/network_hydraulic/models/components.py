@@ -25,6 +25,7 @@ class ControlValve:
     outlet_diameter: Optional[float] = None
     valve_diameter: Optional[float] = None
     calculation_note: Optional[str] = None
+    adjustable: bool = False
 
     def __post_init__(self) -> None:
         errors: list[str] = []
