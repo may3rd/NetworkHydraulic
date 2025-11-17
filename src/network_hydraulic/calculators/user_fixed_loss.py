@@ -18,9 +18,6 @@ class UserFixedLossCalculator(LossCalculator):
         ignored = section.calculation_output.ignored_components
 
         # User-defined losses behave like a dedicated component: only one per section.
-        if section.has_pipeline_segment:
-            ignored.append("User-defined fixed loss ignored because section includes a pipeline segment.")
-            return
         if section.control_valve:
             ignored.append("User-defined fixed loss ignored because control valve takes precedence in this section.")
             return

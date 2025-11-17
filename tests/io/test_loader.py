@@ -208,6 +208,26 @@ def test_loader_warns_on_cycle(caplog):
     assert any("no start node" in record.message for record in caplog.records)
 
 
+def test_loader_defaults_sections_to_series():
+    raw = liquid_network_cfg()
+    raw["network"]["sections"] = [
+        section_cfg(id="s1"),
+        section_cfg(id="s2"),
+        section_cfg(id="s3"),
+    ]
+    loader = ConfigurationLoader(raw=raw)
+    network = loader.build_network()
+    topology = network.topology
+    start_nodes = topology.start_nodes()
+    assert start_nodes == ["s1_start"]
+    first_edge = topology.edges["s1"]
+    assert first_edge.end_node_id == "s1_end"
+    second_edge = topology.edges["s2"]
+    assert second_edge.start_node_id == "s1_end"
+    third_edge = topology.edges["s3"]
+    assert third_edge.start_node_id == "s2_end"
+
+
 def test_loader_requires_section_length():
     raw = liquid_network_cfg()
     raw["network"]["sections"][0].pop("length")

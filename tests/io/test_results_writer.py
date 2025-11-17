@@ -482,3 +482,42 @@ def test_write_output_exports_topology_nodes(tmp_path: Path):
     assert sections_payload[0]["to_node"] == "node-mid"
     assert sections_payload[1]["from_node"] == "node-mid"
     assert sections_payload[1]["to_node"] == "node-end"
+
+
+def test_topology_node_state_uses_lowest_pressure(tmp_path: Path):
+    sec1 = build_section("sec-1")
+    sec2 = build_section("sec-2")
+    sec1.start_node_id = "node-split"
+    sec1.end_node_id = "node-merge"
+    sec2.start_node_id = "node-split"
+    sec2.end_node_id = "node-merge"
+    fluid = build_fluid()
+    network = Network(
+        name="merge",
+        description=None,
+        fluid=fluid,
+        direction="forward",
+        boundary_pressure=150000.0,
+        gas_flow_model="isothermal",
+        sections=[sec1, sec2],
+        boundary_temperature=300.0,
+        mass_flow_rate=4.0,
+    )
+    summary1 = make_summary(density=4.0)
+    summary2 = make_summary(density=4.0)
+    summary1.inlet.pressure = 1.0e5
+    summary2.inlet.pressure = 9.5e4
+    result1 = make_results(summary1, section_id="sec-1")
+    result2 = make_results(summary2, section_id="sec-2")
+    network_result = NetworkResult(
+        sections=[result1, result2],
+        aggregate=CalculationOutput(),
+        summary=summary1,
+    )
+    out_path = tmp_path / "merge.yaml"
+    results_io.write_output(out_path, network, network_result)
+    with out_path.open("r", encoding="utf-8") as handle:
+        data = yaml.safe_load(handle)
+    nodes = data["network"]["topology"]["nodes"]
+    center = next(node for node in nodes if node["id"] == "node-split")
+    assert center["state"]["pressure"] == pytest.approx(95000.0)

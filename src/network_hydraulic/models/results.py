@@ -78,3 +78,4 @@ class NetworkResult:
     sections: List[SectionResult] = field(default_factory=list)
     aggregate: CalculationOutput = field(default_factory=CalculationOutput)
     summary: ResultSummary = field(default_factory=ResultSummary)
+    node_pressures: dict[str, float] = field(default_factory=dict)

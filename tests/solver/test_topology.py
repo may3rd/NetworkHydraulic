@@ -121,3 +121,22 @@ def test_flow_splitting_factor_distributes_mass():
 
     assert branch_a.mass_flow_rate == pytest.approx(2.0)
     assert branch_b.mass_flow_rate == pytest.approx(1.0)
+
+
+def test_node_pressure_stores_min_of_merging_sections():
+    source = _make_pipeline_section("source", "node-inlet", "node-split")
+    branch_a = _make_pipeline_section("branch-a", "node-split", "node-merge")
+    branch_b = _make_pipeline_section("branch-b", "node-split", "node-merge")
+    branch_a.length = 20.0
+    branch_b.length = 5.0
+    network = _build_network([source, branch_a, branch_b])
+    solver = NetworkSolver()
+
+    result = solver.run(network)
+    section_map = {section.section_id: section for section in result.sections}
+    pressures = [
+        section_map["branch-a"].summary.outlet.pressure,
+        section_map["branch-b"].summary.outlet.pressure,
+    ]
+    expected = min(p for p in pressures if p is not None)
+    assert result.node_pressures["node-merge"] == pytest.approx(expected)

@@ -66,7 +66,7 @@
 
  - `pipe_diameter`, `inlet_diameter`, `outlet_diameter` – override derived diameters (m).
  - `control_valve`, `orifice` – component blocks (§3.3).
- - `user_specified_fixed_loss` – pressure drop (Pa) applied directly.
+- `user_specified_fixed_loss` – pressure drop (Pa) applied directly; it now adds on top of pipe/elevation losses (only control valves/orifices still block it).
  - `user_K`, `fitting_K`, `pipe_length_K`, `total_K`, `piping_and_fitting_safety_factor` – manual loss overrides (rare).
 - `boundary_pressure` – per-section pressure boundary (Pa).
 - `direction` – overrides network direction for that section.

@@ -47,6 +47,7 @@ network:
       fittings:
         - {type: elbow_90, count: 9}
         - {type: tee_elbow, count: 1}
+        - {type: pipe_entrance_normal, count: 1}
     - id: "2"
       schedule: "40"
       pipe_NPD: 8.0

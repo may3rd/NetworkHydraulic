@@ -123,18 +123,28 @@ def _default_node_id(section: PipeSection, suffix: str) -> str:
 def build_topology_from_sections(
     sections: Iterable[PipeSection],
     *,
-    start_node_supplier: Optional[Callable[[PipeSection], str]] = None,
-    end_node_supplier: Optional[Callable[[PipeSection], str]] = None,
+    start_node_supplier: Optional[Callable[[PipeSection], Optional[str]]] = None,
+    end_node_supplier: Optional[Callable[[PipeSection], Optional[str]]] = None,
 ) -> TopologyGraph:
     """Build a directed graph that mirrors the configured pipe sections."""
 
     graph = TopologyGraph()
-    start_supplier = start_node_supplier or (lambda sec: sec.from_pipe_id or _default_node_id(sec, "start"))
-    end_supplier = end_node_supplier or (lambda sec: sec.to_pipe_id or _default_node_id(sec, "end"))
+    start_supplier = (
+        start_node_supplier
+        or (lambda sec: sec.start_node_id if sec.start_node_id else None)
+    )
+    end_supplier = (
+        end_node_supplier or (lambda sec: sec.end_node_id if sec.end_node_id else None)
+    )
+    previous_end: Optional[str] = None
 
     for section in sections:
         start_node_id = start_supplier(section)
         end_node_id = end_supplier(section)
+        if not start_node_id:
+            start_node_id = previous_end or _default_node_id(section, "start")
+        if not end_node_id:
+            end_node_id = _default_node_id(section, "end")
         metadata = {
             "section_id": section.id,
             "section": section,
@@ -147,4 +157,5 @@ def build_topology_from_sections(
             end_node_id=end_node_id,
             metadata=metadata,
         )
+        previous_end = end_node_id
     return graph

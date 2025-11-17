@@ -401,10 +401,13 @@ def _topology_payload(network: "Network", result: "NetworkResult", converter: _O
     if not graph.nodes:
         return None
     nodes: List[Dict[str, Any]] = []
+    section_summaries = {
+        section.section_id: section.summary for section in result.sections
+    }
     for node_id in sorted(graph.nodes):
         incoming = graph.incoming_edges(node_id)
         outgoing = graph.outgoing_edges(node_id)
-        node_state = _node_state_from_edges(incoming, outgoing)
+        node_state = _node_state_from_edges(incoming, outgoing, section_summaries)
         nodes.append(
             {
                 "id": node_id,
@@ -419,14 +422,28 @@ def _topology_payload(network: "Network", result: "NetworkResult", converter: _O
 
 
 def _node_state_from_edges(
-    incoming: List["TopologyEdge"], outgoing: List["TopologyEdge"]
+    incoming: List["TopologyEdge"],
+    outgoing: List["TopologyEdge"],
+    section_summaries: Dict[str, "ResultSummary"],
 ) -> Optional["StatePoint"]:
-    for edge_list, is_inlet in ((outgoing, True), (incoming, False)):
-        if not edge_list:
+    """Pick the lowest-pressure state that terminates or originates at this node."""
+    candidates: List["StatePoint"] = []
+    for edge in outgoing:
+        candidates.extend(_extract_states_from_edge(edge, section_summaries, True))
+    for edge in incoming:
+        candidates.extend(_extract_states_from_edge(edge, section_summaries, False))
+    best_state: Optional["StatePoint"] = None
+    for state in candidates:
+        if not state or state.pressure is None:
             continue
-        section = edge_list[0].metadata.get("section")
-        if isinstance(section, PipeSection):
-            return section.result_summary.inlet if is_inlet else section.result_summary.outlet
+        if best_state is None or (state.pressure < best_state.pressure):
+            best_state = state
+    if best_state is not None:
+        return best_state
+    # Fall back to first available state if no pressures were present
+    for state in candidates:
+        if state:
+            return state
     return None
 
 
@@ -435,6 +452,28 @@ def _section_node_ids(section: "PipeSection", topology: TopologyGraph) -> tuple[
     if edge:
         return edge.start_node_id, edge.end_node_id
     return None, None
+
+
+def _extract_states_from_edge(
+    edge: "TopologyEdge",
+    summaries: Dict[str, "ResultSummary"],
+    is_inlet: bool,
+) -> List["StatePoint"]:
+    states: List["StatePoint"] = []
+    section_id = edge.metadata.get("section_id")
+    if section_id:
+        summary = summaries.get(section_id)
+        if summary:
+            state = summary.inlet if is_inlet else summary.outlet
+            if state:
+                states.append(state)
+                return states
+    section = edge.metadata.get("section")
+    if isinstance(section, PipeSection):
+        state = section.result_summary.inlet if is_inlet else section.result_summary.outlet
+        if state:
+            states.append(state)
+    return states
 
 
 def _fluid_dict(fluid: "Fluid", converter: _OutputUnitConverter) -> Dict[str, Any]:

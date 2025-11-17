@@ -97,12 +97,13 @@ class NetworkSolver:
             pressure_drop.piping_and_fitting_safety_factor = section.piping_and_fitting_safety_factor
             pressure_drop.total_K = section.total_K
 
-        self._apply_pressure_profile(
+        node_pressures = self._apply_pressure_profile(
             sections,
             network,
             direction=resolved_direction,
             boundary=self.boundary_pressure if self.boundary_pressure is not None else network.boundary_pressure,
         )
+        result.node_pressures = node_pressures
         self._populate_states(sections, network)
         self._set_network_summary(network, sections)
 
@@ -253,11 +254,10 @@ class NetworkSolver:
         network: Network,
         direction: str,
         boundary: Optional[float],
-    ) -> None:
+    ) -> dict[str, float]:
         sections = list(sections)
         if not sections:
             return
-        network.direction = direction
         forward = direction != "backward"
         ordered_sections = self._ordered_sections_by_topology(network, forward)
         iterator = ordered_sections
@@ -275,13 +275,26 @@ class NetworkSolver:
             default_pipe_diameter=self.default_pipe_diameter,
             mass_flow_rate=mass_flow,
         )
+        graph = network.topology
+        node_pressures: dict[str, Optional[float]] = {node_id: None for node_id in graph.nodes}
+        start_nodes = graph.start_nodes(forward)
+        if not start_nodes:
+            start_nodes = list(graph.nodes.keys())
+        for node_id in start_nodes:
+            self._set_node_pressure(node_pressures, node_id, boundary_hint)
 
         if network.fluid.is_gas():
             for section in iterator:
                 summary = section.result_summary
-                
-                # Use section's boundary pressure if provided, otherwise use the current pressure from the previous section
-                section_start_pressure = section.boundary_pressure if section.boundary_pressure is not None else current
+                start_node, end_node = self._section_node_ids(section, graph, forward)
+                node_pressure = node_pressures.get(start_node)
+                section_start_pressure = (
+                    section.boundary_pressure
+                    if section.boundary_pressure is not None
+                    else node_pressure
+                    if node_pressure is not None
+                    else current
+                )
 
                 if section_start_pressure is None:
                     break
@@ -320,6 +333,10 @@ class NetworkSolver:
                     exit_pressure = exit_state.pressure
                     if exit_pressure is not None:
                         current = exit_pressure
+                        self._set_node_pressure(node_pressures, end_node, exit_pressure)
+                        self._set_node_pressure(node_pressures, end_node, exit_pressure)
+                        self._set_node_pressure(node_pressures, end_node, exit_pressure)
+                        self._set_node_pressure(node_pressures, end_node, exit_pressure)
                     exit_temperature = exit_state.temperature
                     if exit_temperature is not None and exit_temperature > 0:
                         current_temperature = exit_temperature
@@ -563,9 +580,15 @@ class NetworkSolver:
         else: # Liquid flow logic
             for section in iterator:
                 summary = section.result_summary
-                
-                # Use section's boundary pressure if provided, otherwise use the current pressure from the previous section
-                section_start_pressure = section.boundary_pressure if section.boundary_pressure is not None else current
+                start_node, end_node = self._section_node_ids(section, graph, forward)
+                node_pressure = node_pressures.get(start_node)
+                section_start_pressure = (
+                    section.boundary_pressure
+                    if section.boundary_pressure is not None
+                    else node_pressure
+                    if node_pressure is not None
+                    else current
+                )
 
                 if section_start_pressure is None:
                     break
@@ -601,6 +624,7 @@ class NetworkSolver:
                 exit_pressure = exit_state.pressure
                 if exit_pressure is not None:
                     current = exit_pressure
+                    self._set_node_pressure(node_pressures, end_node, exit_pressure)
 
         if forward:
             network.result_summary.inlet.pressure = sections[0].result_summary.inlet.pressure
@@ -608,6 +632,13 @@ class NetworkSolver:
         else:
             network.result_summary.outlet.pressure = sections[-1].result_summary.outlet.pressure
             network.result_summary.inlet.pressure = sections[0].result_summary.inlet.pressure
+
+        node_pressures_cleaned = {
+            node_id: pressure
+            for node_id, pressure in node_pressures.items()
+            if pressure is not None
+        }
+        return node_pressures_cleaned
 
     def _apply_pressure_dependent_losses(
         self,
@@ -633,8 +664,6 @@ class NetworkSolver:
                 ignored.append("Control valve ignored because section includes a pipeline segment.")
             if section.orifice:
                 ignored.append("Orifice ignored because section includes a pipeline segment.")
-            if section.user_specified_fixed_loss:
-                ignored.append("User-defined fixed loss ignored because section includes a pipeline segment.")
             pressure_drop.control_valve_pressure_drop = 0.0
             pressure_drop.orifice_pressure_drop = 0.0
             return
@@ -646,8 +675,6 @@ class NetworkSolver:
             )
             if section.orifice:
                 ignored.append("Orifice ignored because control valve takes precedence in this section.")
-            if section.user_specified_fixed_loss:
-                ignored.append("User-defined fixed loss ignored because control valve takes precedence in this section.")
             pressure_drop.orifice_pressure_drop = 0.0
             return
 
@@ -658,7 +685,7 @@ class NetworkSolver:
                 mass_flow_override=mass_flow_override,
             )
             if section.user_specified_fixed_loss:
-                ignored.append("User-defined fixed loss ignored because orifice takes precedence in this section.")
+                ignored.append("User-defined fixed loss is additive to orifice losses.")
 
     def _update_gas_friction_losses(self, section: PipeSection) -> None:
         """Derive friction + normalized losses directly from gas solver pressures."""
@@ -1147,10 +1174,33 @@ class NetworkSolver:
         return ordered
 
     @staticmethod
+    def _section_node_ids(
+        section: PipeSection,
+        graph: TopologyGraph,
+        forward: bool,
+    ) -> tuple[Optional[str], Optional[str]]:
+        edge = graph.edges.get(section.id)
+        if not edge:
+            return None, None
+        return (
+            (edge.start_node_id, edge.end_node_id)
+            if forward
+            else (edge.end_node_id, edge.start_node_id)
+        )
+
+    @staticmethod
     def _topology_start_nodes(graph: TopologyGraph, forward: bool) -> List[str]:
         lookup = graph.reverse_adjacency if forward else graph.adjacency
         start_nodes = [node_id for node_id, edges in lookup.items() if not edges]
         return start_nodes
+
+    @staticmethod
+    def _set_node_pressure(node_pressures: dict[str, Optional[float]], node_id: Optional[str], pressure: Optional[float]) -> None:
+        if node_id is None or pressure is None:
+            return
+        existing = node_pressures.get(node_id)
+        if existing is None or pressure < existing:
+            node_pressures[node_id] = pressure
 
     def _resolve_direction(self, network: Network, requested: Optional[str]) -> str:
         candidate = (requested or "").lower()
