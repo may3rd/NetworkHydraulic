@@ -254,6 +254,12 @@ class ConfigurationLoader:
             len(sections),
             network.fluid.name or network.fluid.phase,
         )
+        network.rebuild_topology()
+        logger.info(
+            "Configured topology contains %d node(s) and %d edge(s)",
+            len(network.topology.nodes),
+            len(network.topology.edges),
+        )
         return network
 
     def _build_fluid(self, fluid_cfg: Dict[str, Any]) -> Fluid:

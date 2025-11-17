@@ -19,6 +19,7 @@ from network_hydraulic.models.fluid import Fluid
 from network_hydraulic.models.pipe_section import PipeSection
 from network_hydraulic.models.results import CalculationOutput, ResultSummary
 from network_hydraulic.models.output_units import OutputUnits
+from network_hydraulic.models.topology import TopologyGraph, build_topology_from_sections
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +39,7 @@ class Network:
     result_summary: ResultSummary = field(default_factory=ResultSummary)
     output_units: OutputUnits = field(default_factory=OutputUnits)
     design_margin: float = 0.0 # For design rate 110% set design_margin = 0.1
+    topology: TopologyGraph = field(default_factory=TopologyGraph)
 
     def __post_init__(self) -> None:
         errors: list[str] = []
@@ -93,8 +95,11 @@ class Network:
         if errors:
             raise ValueError("; ".join(errors))
 
+        self.rebuild_topology()
+
     def add_section(self, section: PipeSection) -> None:
         self.sections.append(section)
+        self.rebuild_topology()
 
     def current_volumetric_flow_rate(self) -> float:
         if self.mass_flow_rate is None:
@@ -103,3 +108,8 @@ class Network:
         if density == 0:
             raise ValueError("Cannot calculate volumetric flow rate with zero density")
         return self.mass_flow_rate / density
+
+    def rebuild_topology(self) -> TopologyGraph:
+        """Refresh the digraph that mirrors configured sections."""
+        self.topology = build_topology_from_sections(self.sections)
+        return self.topology

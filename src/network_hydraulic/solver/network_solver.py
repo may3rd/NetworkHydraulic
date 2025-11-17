@@ -14,11 +14,12 @@ Example:
 """
 from __future__ import annotations
 
+from collections import deque
 import logging
 from copy import deepcopy
 from dataclasses import dataclass
 from math import pi, sqrt
-from typing import Iterable, Optional
+from typing import Iterable, List, Optional
 
 from network_hydraulic.calculators.elevation import ElevationCalculator
 from network_hydraulic.calculators.fittings import FittingLossCalculator
@@ -37,6 +38,7 @@ from network_hydraulic.models.results import (
     SectionResult,
     StatePoint,
 )
+from network_hydraulic.models.topology import TopologyGraph
 from network_hydraulic.calculators.gas_flow import (
     UNIVERSAL_GAS_CONSTANT,
     GasState,
@@ -207,7 +209,8 @@ class NetworkSolver:
         resolved_direction = self._resolve_direction(network, self.direction)
         network.direction = resolved_direction
         forward = resolved_direction != "backward"
-        iterator = sections if forward else reversed(sections)
+        ordered_sections = self._ordered_sections_by_topology(network, forward)
+        iterator = ordered_sections
         boundary_hint = boundary if boundary is not None else network.boundary_pressure
         current = self._initial_pressure(network, forward, boundary_hint)
         current_temperature = network.boundary_temperature
@@ -1049,6 +1052,55 @@ class NetworkSolver:
             inlet=deepcopy(sections[0].result_summary.inlet),
             outlet=deepcopy(sections[-1].result_summary.outlet),
         )
+
+    def _ordered_sections_by_topology(self, network: Network, forward: bool) -> List[PipeSection]:
+        graph = network.topology
+        if not graph.edges:
+            return list(network.sections) if forward else list(reversed(network.sections))
+
+        start_nodes = self._topology_start_nodes(graph, forward)
+        if not start_nodes:
+            start_nodes = list(graph.nodes.keys())
+
+        ordered: List[PipeSection] = []
+        visited_edges: set[str] = set()
+        queue = deque()
+
+        for node_id in start_nodes:
+            neighbors = graph.outgoing_edges(node_id) if forward else graph.incoming_edges(node_id)
+            queue.extend(neighbors)
+
+        while queue:
+            edge = queue.popleft()
+            if edge.id in visited_edges:
+                continue
+            visited_edges.add(edge.id)
+            section = edge.metadata.get("section")
+            if isinstance(section, PipeSection):
+                ordered.append(section)
+            next_node = edge.end_node_id if forward else edge.start_node_id
+            neighbors = graph.outgoing_edges(next_node) if forward else graph.incoming_edges(next_node)
+            for neighbor in neighbors:
+                if neighbor.id not in visited_edges:
+                    queue.append(neighbor)
+
+        for edge in graph.edges.values():
+            if edge.id in visited_edges:
+                continue
+            section = edge.metadata.get("section")
+            if isinstance(section, PipeSection):
+                ordered.append(section)
+
+        if not ordered:
+            ordered = list(network.sections)
+
+        return ordered
+
+    @staticmethod
+    def _topology_start_nodes(graph: TopologyGraph, forward: bool) -> List[str]:
+        lookup = graph.reverse_adjacency if forward else graph.adjacency
+        start_nodes = [node_id for node_id, edges in lookup.items() if not edges]
+        return start_nodes
 
     def _resolve_direction(self, network: Network, requested: Optional[str]) -> str:
         candidate = (requested or "").lower()
