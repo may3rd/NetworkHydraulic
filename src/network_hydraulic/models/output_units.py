@@ -24,20 +24,18 @@ class OutputUnits:
     volumetric_flow_rate: str = "m^3/s"
     mass_flow_rate: str = "kg/s"
     flow_momentum: str = "Pa"
-    gas_flow_critical_pressure: str = "kPa"
-
+    gas_flow_critical_pressure: str = "Pa"
 
     def __post_init__(self) -> None:
-        self.pressure = self._normalize(self.pressure, "Pa")
-        self.pressure_drop = self._normalize(self.pressure_drop or self.pressure, self.pressure)
-        self.temperature = self._normalize(self.temperature, "K")
+        self.pressure = self._normalize(self.pressure, "kPag")
+        self.pressure_drop = self._normalize(self.pressure_drop, "kPa")
+        self.temperature = self._normalize(self.temperature, "degC")
         self.density = self._normalize(self.density, "kg/m^3")
         self.velocity = self._normalize(self.velocity, "m/s")
-        self.volumetric_flow_rate = self._normalize(self.volumetric_flow_rate, "m^3/s")
+        self.volumetric_flow_rate = self._normalize(self.volumetric_flow_rate, "m^3/h")
         self.mass_flow_rate = self._normalize(self.mass_flow_rate, "kg/s")
-        self.flow_momentum = self._normalize(self.flow_momentum, self.pressure_drop)
-        self.gas_flow_critical_pressure = self._normalize(self.gas_flow_critical_pressure, "Pa")
-
+        self.flow_momentum = self._normalize(self.flow_momentum, "kPa")
+        self.gas_flow_critical_pressure = self._normalize(self.gas_flow_critical_pressure or self.pressure_drop, "kPa")
 
         errors: list[str] = []
         for field_name in self.__dataclass_fields__:
