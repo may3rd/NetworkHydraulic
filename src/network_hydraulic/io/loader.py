@@ -80,6 +80,8 @@ SECTION_ALLOWED_KEYS = {
     "flow_splitting_factor",
     "from_pipe_id",
     "to_pipe_id",
+    "from_node_id",
+    "to_node_id",
 }
 
 def _yaml_loader() -> YAML:
@@ -283,7 +285,7 @@ class ConfigurationLoader:
             )
             if disconnected:
                 logger.warning(
-                    "Network '%s' has disconnected node(s) %s; verify from_pipe_id/to_pipe_id",
+                    "Network '%s' has disconnected node(s) %s; verify from_node_id/to_node_id (or from_pipe_id/to_pipe_id)",
                     network.name,
                     disconnected,
                 )
@@ -380,6 +382,8 @@ class ConfigurationLoader:
         if length <= 0.0 and not has_component:
             section_id = cfg.get("id", "<unknown>")
             raise ValueError(f"section.length must be provided for section '{section_id}'")
+        start_node = cfg.get("from_node_id") or cfg.get("from_pipe_id")
+        end_node = cfg.get("to_node_id") or cfg.get("to_pipe_id")
         pipe_section = PipeSection(
             id=cfg["id"],
             schedule=schedule,
@@ -408,8 +412,8 @@ class ConfigurationLoader:
             boundary_pressure=boundary_pressure,
             direction=cfg.get("direction"),
             flow_splitting_factor=self._coerce_optional_float(cfg.get("flow_splitting_factor"), "section.flow_splitting_factor") or 1.0,
-            from_pipe_id=cfg.get("from_pipe_id"),
-            to_pipe_id=cfg.get("to_pipe_id"),
+            from_pipe_id=start_node,
+            to_pipe_id=end_node,
         )
         return pipe_section
 

@@ -432,3 +432,53 @@ def test_write_results_with_none_values(tmp_path: Path):
     assert data["network"]["sections"][0]["calculation_result"]["pressure_drop"]["control_valve"] is None
     assert data["network"]["sections"][0]["calculation_result"]["pressure_drop"]["orifice"] is None
     # Removed assert data["network"]["sections"][0]["calculation_result"]["pressure_drop"]["elevation"] is None
+
+
+def test_write_output_exports_topology_nodes(tmp_path: Path):
+    sec1 = build_section("sec-1")
+    sec1.start_node_id = "node-start"
+    sec1.end_node_id = "node-mid"
+    sec2 = build_section("sec-2")
+    sec2.start_node_id = "node-mid"
+    sec2.end_node_id = "node-end"
+    fluid = build_fluid()
+    network = Network(
+        name="topology",
+        description=None,
+        fluid=fluid,
+        direction="forward",
+        boundary_pressure=150000.0,
+        gas_flow_model="isothermal",
+        sections=[sec1, sec2],
+        boundary_temperature=300.0,
+        mass_flow_rate=5.0,
+    )
+    summary1 = make_summary(density=4.0)
+    summary2 = make_summary(density=5.0)
+    sec1.mass_flow_rate = 2.0
+    sec2.mass_flow_rate = 3.0
+    result1 = make_results(summary1, section_id="sec-1")
+    result2 = make_results(summary2, section_id="sec-2")
+    network_result = NetworkResult(
+        sections=[result1, result2],
+        aggregate=CalculationOutput(),
+        summary=summary1,
+    )
+
+    out_path = tmp_path / "topology.yaml"
+    results_io.write_output(out_path, network, network_result)
+
+    with out_path.open("r", encoding="utf-8") as handle:
+        data = yaml.safe_load(handle)
+
+    topology = data["network"]["topology"]
+    nodes_by_id = {node["id"]: node for node in topology["nodes"]}
+    assert nodes_by_id["node-start"]["to_nodes"] == ["node-mid"]
+    assert nodes_by_id["node-mid"]["from_nodes"] == ["node-start"]
+    assert nodes_by_id["node-mid"]["to_nodes"] == ["node-end"]
+    assert nodes_by_id["node-end"]["incoming_sections"] == ["sec-2"]
+    sections_payload = data["network"]["sections"]
+    assert sections_payload[0]["from_node"] == "node-start"
+    assert sections_payload[0]["to_node"] == "node-mid"
+    assert sections_payload[1]["from_node"] == "node-mid"
+    assert sections_payload[1]["to_node"] == "node-end"

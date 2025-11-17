@@ -60,7 +60,7 @@ class NetworkSolver:
     gas_flow_model: Optional[str] = None
     friction_factor_type: str = "darcy"
 
-    def run(self, network: Network) -> NetworkResult:
+    def run(self, network: Network, direction_override: Optional[str] = None) -> NetworkResult:
 
         calculators = self._build_calculators(network)
         result = NetworkResult()
@@ -74,21 +74,22 @@ class NetworkSolver:
         for section in sections:
             self._reset_section(section)
 
+        resolved_direction = self._resolve_direction(network, direction_override or self.direction)
+        network.direction = resolved_direction
         base_mass_flow = network.mass_flow_rate
         self._assign_design_flows(sections, network, base_mass_flow)
+        self._distribute_mass_flow(network, resolved_direction != "backward")
 
         for section in sections:
             self._validate_section_prerequisites(section)
             for calculator in calculators:
                 calculator.calculate(section)
-            # Calculate total_K
             fitting_K = section.fitting_K or 0.0
             pipe_length_K = section.pipe_length_K or 0.0
             user_K = section.user_K or 0.0
             piping_and_fitting_safety_factor = section.piping_and_fitting_safety_factor or 1.0
             section.total_K = (fitting_K + pipe_length_K + user_K) * piping_and_fitting_safety_factor
 
-            # Assign K-factors to pressure_drop details
             pressure_drop = section.calculation_output.pressure_drop
             pressure_drop.fitting_K = section.fitting_K
             pressure_drop.pipe_length_K = section.pipe_length_K
@@ -99,7 +100,7 @@ class NetworkSolver:
         self._apply_pressure_profile(
             sections,
             network,
-            direction=self.direction or network.direction,
+            direction=resolved_direction,
             boundary=self.boundary_pressure if self.boundary_pressure is not None else network.boundary_pressure,
         )
         self._populate_states(sections, network)
@@ -179,11 +180,61 @@ class NetworkSolver:
             multiplier = self._design_multiplier(section, network)
             section.design_flow_multiplier = multiplier
             section.design_mass_flow_rate = (
-                base_mass_flow * multiplier * section.flow_splitting_factor if base_mass_flow is not None else None
+                base_mass_flow * multiplier if base_mass_flow is not None else None
             )
             section.mass_flow_rate = section.design_mass_flow_rate
             section.temperature = network.boundary_temperature
             section.pressure = network.boundary_pressure
+
+    def _distribute_mass_flow(self, network: Network, forward: bool) -> None:
+        base_mass_flow = network.mass_flow_rate
+        if base_mass_flow is None:
+            return
+        graph = network.topology
+        if not graph.nodes:
+            return
+        start_nodes = graph.start_nodes(forward=forward)
+        if not start_nodes:
+            start_nodes = list(graph.nodes.keys())
+        if not start_nodes:
+            return
+        node_mass: dict[str, float] = {node_id: 0.0 for node_id in graph.nodes}
+        share_per_start = base_mass_flow / len(start_nodes)
+        queue = deque()
+        for node_id in start_nodes:
+            node_mass[node_id] = share_per_start
+            queue.append(node_id)
+        while queue:
+            node_id = queue.popleft()
+            mass_available = node_mass.get(node_id, 0.0)
+            if mass_available <= 0:
+                continue
+            node_mass[node_id] = 0.0
+            edges = graph.outgoing_edges(node_id) if forward else graph.incoming_edges(node_id)
+            if not edges:
+                continue
+            sections = []
+            total_weight = 0.0
+            for edge in edges:
+                section = edge.metadata.get("section")
+                if not isinstance(section, PipeSection):
+                    continue
+                sections.append((edge, section))
+                total_weight += section.flow_splitting_factor
+            if not sections:
+                continue
+            if total_weight <= 0:
+                total_weight = len(sections)
+            for edge, section in sections:
+                multiplier = section.design_flow_multiplier or 1.0
+                weight = section.flow_splitting_factor if section.flow_splitting_factor > 0 else 1.0
+                share_ratio = weight / total_weight if total_weight > 0 else 1.0 / len(sections)
+                share = mass_available * share_ratio
+                section.mass_flow_rate = share
+                section.design_mass_flow_rate = share * multiplier
+                next_node_id = edge.end_node_id if forward else edge.start_node_id
+                node_mass[next_node_id] = node_mass.get(next_node_id, 0.0) + share
+                queue.append(next_node_id)
 
     @staticmethod
     def _design_multiplier(section: PipeSection, network: Network) -> float:
@@ -206,9 +257,8 @@ class NetworkSolver:
         sections = list(sections)
         if not sections:
             return
-        resolved_direction = self._resolve_direction(network, self.direction)
-        network.direction = resolved_direction
-        forward = resolved_direction != "backward"
+        network.direction = direction
+        forward = direction != "backward"
         ordered_sections = self._ordered_sections_by_topology(network, forward)
         iterator = ordered_sections
         boundary_hint = boundary if boundary is not None else network.boundary_pressure

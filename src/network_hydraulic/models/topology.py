@@ -135,7 +135,12 @@ def build_topology_from_sections(
     for section in sections:
         start_node_id = start_supplier(section)
         end_node_id = end_supplier(section)
-        metadata = {"section_id": section.id, "section": section}
+        metadata = {
+            "section_id": section.id,
+            "section": section,
+            "start_node_id": start_node_id,
+            "end_node_id": end_node_id,
+        }
         graph.add_edge(
             edge_id=section.id,
             start_node_id=start_node_id,

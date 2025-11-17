@@ -109,6 +109,21 @@ class PipeSection:
     flow_splitting_factor: float = 1.0
     from_pipe_id: Optional[str] = None
     to_pipe_id: Optional[str] = None
+    @property
+    def start_node_id(self) -> Optional[str]:
+        return self.from_pipe_id
+
+    @start_node_id.setter
+    def start_node_id(self, value: Optional[str]) -> None:
+        self.from_pipe_id = value
+
+    @property
+    def end_node_id(self) -> Optional[str]:
+        return self.to_pipe_id
+
+    @end_node_id.setter
+    def end_node_id(self, value: Optional[str]) -> None:
+        self.to_pipe_id = value
 
     def __post_init__(self) -> None:
         errors: list[str] = []

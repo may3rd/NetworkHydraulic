@@ -17,6 +17,8 @@ import yaml
 
 from network_hydraulic.models.fluid import GAS_CONSTANT
 from network_hydraulic.models.output_units import OutputUnits
+from network_hydraulic.models.pipe_section import PipeSection
+from network_hydraulic.models.topology import TopologyEdge, TopologyGraph
 from network_hydraulic.utils.units import convert as convert_units
 
 STANDARD_TEMPERATURE = 273.15  # 0 °C
@@ -95,6 +97,7 @@ def print_summary(network: "Network", result: "NetworkResult", *, debug: bool = 
         return text
 
     print("Network:", network.name)
+    _print_topology_nodes(network, result, converter, fmt, format_measure)
     for section_result in result.sections:
         section = section_lookup.get(section_result.section_id)
         pd = section_result.calculation.pressure_drop
@@ -160,7 +163,7 @@ def write_output(
 ) -> None:
     """Persist calculation results back to YAML honoring configured output units."""
     converter = _OutputUnitConverter(network.output_units)
-    network_cfg = _network_config(network, converter)
+    network_cfg = _network_config(network, converter, result)
     section_results = {
         section.section_id: section for section in result.sections}
     mass_flow_rate = network.mass_flow_rate
@@ -168,7 +171,7 @@ def write_output(
         network.fluid, STANDARD_TEMPERATURE, STANDARD_PRESSURE)
 
     for section in network.sections:
-        section_cfg = _section_config(section)
+        section_cfg = _section_config(section, network.topology)
         section_result = section_results.get(section.id)
         if section_result:
             section_cfg["calculation_result"] = _section_result_payload(
@@ -312,6 +315,42 @@ def _print_state_table(
         print(f"{prefix}  Remarks: {outlet.remarks}")
 
 
+def _print_topology_nodes(network: "Network", result: "NetworkResult", converter: _OutputUnitConverter, fmt, format_measure) -> None:
+    payload = _topology_payload(network, result, converter)
+    if not payload:
+        return
+    print("TOPOLOGY NODES")
+    units = network.output_units
+    for node in payload["nodes"]:
+        from_nodes = node.get("from_nodes") or []
+        to_nodes = node.get("to_nodes") or []
+        print(f"  Node {node['id']}:")
+        if from_nodes:
+            print(f"    From Nodes: {', '.join(from_nodes)}")
+        else:
+            print("    From Nodes: —")
+        if to_nodes:
+            print(f"    To Nodes: {', '.join(to_nodes)}")
+        else:
+            print("    To Nodes: —")
+        incoming_sections = node.get("incoming_sections") or []
+        outgoing_sections = node.get("outgoing_sections") or []
+        print(f"    Incoming Sections: {', '.join(incoming_sections) if incoming_sections else '—'}")
+        print(f"    Outgoing Sections: {', '.join(outgoing_sections) if outgoing_sections else '—'}")
+        state = node.get("state")
+        if state:
+            print(
+                f"    Pressure: {fmt(state.get('pressure'))} {units.pressure}"
+            )
+            print(
+                f"    Temperature: {fmt(state.get('temperature'))} {units.temperature}"
+            )
+            print(
+                f"    Density: {fmt(state.get('density'))} {units.density}"
+            )
+            print(
+                f"    Velocity: {fmt(state.get('velocity'))} {units.velocity}"
+            )
 def _print_fitting_breakdown(prefix: str, breakdown: Optional[List["FittingBreakdown"]]) -> None:
     if not breakdown:
         print(f"{prefix}FITTING DETAILS: none")
@@ -338,8 +377,8 @@ def _fitting_breakdown_dict(breakdown: Optional[List["FittingBreakdown"]]) -> Op
     ]
 
 
-def _network_config(network: "Network", converter: _OutputUnitConverter) -> Dict[str, Any]:
-    return {
+def _network_config(network: "Network", converter: _OutputUnitConverter, result: "NetworkResult") -> Dict[str, Any]:
+    payload = {
         "name": network.name,
         "description": network.description,
         "direction": network.direction,
@@ -351,6 +390,51 @@ def _network_config(network: "Network", converter: _OutputUnitConverter) -> Dict
         "sections": [],
         "output_units": network.output_units.as_dict(),
     }
+    topology_payload = _topology_payload(network, result, converter)
+    if topology_payload:
+        payload["topology"] = topology_payload
+    return payload
+
+
+def _topology_payload(network: "Network", result: "NetworkResult", converter: _OutputUnitConverter) -> Optional[Dict[str, Any]]:
+    graph = network.topology
+    if not graph.nodes:
+        return None
+    nodes: List[Dict[str, Any]] = []
+    for node_id in sorted(graph.nodes):
+        incoming = graph.incoming_edges(node_id)
+        outgoing = graph.outgoing_edges(node_id)
+        node_state = _node_state_from_edges(incoming, outgoing)
+        nodes.append(
+            {
+                "id": node_id,
+                "state": _state_dict(node_state, converter) if node_state else None,
+                "from_nodes": sorted({edge.start_node_id for edge in incoming}),
+                "to_nodes": sorted({edge.end_node_id for edge in outgoing}),
+                "incoming_sections": [edge.id for edge in incoming],
+                "outgoing_sections": [edge.id for edge in outgoing],
+            }
+        )
+    return {"nodes": nodes}
+
+
+def _node_state_from_edges(
+    incoming: List["TopologyEdge"], outgoing: List["TopologyEdge"]
+) -> Optional["StatePoint"]:
+    for edge_list, is_inlet in ((outgoing, True), (incoming, False)):
+        if not edge_list:
+            continue
+        section = edge_list[0].metadata.get("section")
+        if isinstance(section, PipeSection):
+            return section.result_summary.inlet if is_inlet else section.result_summary.outlet
+    return None
+
+
+def _section_node_ids(section: "PipeSection", topology: TopologyGraph) -> tuple[Optional[str], Optional[str]]:
+    edge = topology.edges.get(section.id)
+    if edge:
+        return edge.start_node_id, edge.end_node_id
+    return None, None
 
 
 def _fluid_dict(fluid: "Fluid", converter: _OutputUnitConverter) -> Dict[str, Any]:
@@ -368,7 +452,7 @@ def _fluid_dict(fluid: "Fluid", converter: _OutputUnitConverter) -> Dict[str, An
     }
 
 
-def _section_config(section: "PipeSection") -> Dict[str, Any]:
+def _section_config(section: "PipeSection", topology: TopologyGraph) -> Dict[str, Any]:
     base = {
         "id": section.id,
         "description": section.description,
@@ -392,6 +476,9 @@ def _section_config(section: "PipeSection") -> Dict[str, Any]:
         "erosional_constant": section.erosional_constant,
         "mach_number": section.mach_number,
     }
+    start_node, end_node = _section_node_ids(section, topology)
+    base["from_node"] = start_node
+    base["to_node"] = end_node
     if section.control_valve:
         base["control_valve"] = _control_valve_dict(section.control_valve)
     if section.orifice:

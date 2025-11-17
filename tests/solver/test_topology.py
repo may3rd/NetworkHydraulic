@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Iterable, List
 
+import pytest
+
 from network_hydraulic.models.fluid import Fluid
 from network_hydraulic.models.network import Network
 from network_hydraulic.models.pipe_section import Fitting, PipeSection
@@ -29,7 +31,7 @@ def _make_pipeline_section(
     end_node: str,
 ) -> PipeSection:
     """Build a minimal section that attaches to custom nodes."""
-    return PipeSection(
+    section = PipeSection(
         id=section_id,
         schedule="40",
         roughness=1e-5,
@@ -53,6 +55,9 @@ def _make_pipeline_section(
         from_pipe_id=start_node,
         to_pipe_id=end_node,
     )
+    section.start_node_id = start_node
+    section.end_node_id = end_node
+    return section
 
 
 def _build_network(sections: Iterable[PipeSection]) -> Network:
@@ -100,3 +105,19 @@ def test_ordered_sections_by_topology_backward_reverses_forward():
 
     assert set(backward_ids) == set(forward_ids)
     assert backward_ids[-1] == "main"
+
+
+def test_flow_splitting_factor_distributes_mass():
+    main = _make_pipeline_section("source", "node-start", "node-junction")
+    branch_a = _make_pipeline_section("branch-a", "node-junction", "node-a")
+    branch_b = _make_pipeline_section("branch-b", "node-junction", "node-b")
+    branch_a.flow_splitting_factor = 2.0
+    branch_b.flow_splitting_factor = 1.0
+    network = _build_network([main, branch_a, branch_b])
+    network.mass_flow_rate = 3.0
+    solver = NetworkSolver()
+    solver._assign_design_flows(network.sections, network, network.mass_flow_rate)
+    solver._distribute_mass_flow(network, forward=True)
+
+    assert branch_a.mass_flow_rate == pytest.approx(2.0)
+    assert branch_b.mass_flow_rate == pytest.approx(1.0)

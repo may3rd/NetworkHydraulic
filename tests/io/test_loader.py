@@ -179,8 +179,8 @@ def test_loader_captures_section_description():
 def _branching_network_cfg() -> dict:
     raw = liquid_network_cfg()
     raw["network"]["sections"] = [
-        section_cfg(id="sec-a", from_pipe_id="node-source", to_pipe_id="node-split"),
-        section_cfg(id="sec-b", from_pipe_id="node-other", to_pipe_id="node-leaf"),
+        section_cfg(id="sec-a", from_node_id="node-source", to_node_id="node-split"),
+        section_cfg(id="sec-b", from_node_id="node-other", to_node_id="node-leaf"),
     ]
     return raw
 
@@ -188,8 +188,8 @@ def _branching_network_cfg() -> dict:
 def _cycle_network_cfg() -> dict:
     raw = liquid_network_cfg()
     raw["network"]["sections"] = [
-        section_cfg(id="sec-loop-a", from_pipe_id="node-loop-1", to_pipe_id="node-loop-2"),
-        section_cfg(id="sec-loop-b", from_pipe_id="node-loop-2", to_pipe_id="node-loop-1"),
+        section_cfg(id="sec-loop-a", from_node_id="node-loop-1", to_node_id="node-loop-2"),
+        section_cfg(id="sec-loop-b", from_node_id="node-loop-2", to_node_id="node-loop-1"),
     ]
     return raw
 
