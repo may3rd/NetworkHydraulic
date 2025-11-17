@@ -53,6 +53,13 @@ def optimize_control_valves(
 
     if upstream_pressure is None or downstream_pressure is None:
         return None
+    if downstream_pressure > upstream_pressure:
+        raise ValueError(
+            f"Downstream pressure {downstream_pressure:.2f} Pa exceeds upstream pressure {upstream_pressure:.2f} Pa; unable to tune adjustable valve."
+        )
+
+    if upstream_pressure is None or downstream_pressure is None:
+        return None
 
     drop = max(upstream_pressure - downstream_pressure, 0.0)
     if drop < tolerance:

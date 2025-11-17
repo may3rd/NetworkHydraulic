@@ -684,10 +684,11 @@ class NetworkSolver:
         if valve and valve.adjustable:
             saved_drop = valve.pressure_drop
         if valve and valve.adjustable and saved_drop is not None:
-            pressure_drop.control_valve_pressure_drop = saved_drop
             valve.pressure_drop = saved_drop
-            baseline = pressure_drop.total_segment_loss or 0.0
-            pressure_drop.total_segment_loss = baseline + saved_drop
+            control_valve_calculator.calculate(
+                section,
+                inlet_pressure_override=inlet_pressure,
+            )
             if section.orifice:
                 ignored.append("Orifice ignored because control valve takes precedence in this section.")
             pressure_drop.orifice_pressure_drop = 0.0
