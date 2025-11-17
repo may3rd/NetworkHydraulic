@@ -19,4 +19,6 @@ if __name__ == "__main__":
     solver = NetworkSolver()
     result = solver.run(network)
     results_io.print_summary(network, result, debug=False)
-    print(f"Optimizer control valve pressure drop: {converts(residual, "Pa", "kPa"):.3f} kPa.")
+    
+    if residual is not None:
+        print(f"Optimizer control valve pressure drop: {converts(residual, "Pa", "kPa"):.3f} kPa.")
