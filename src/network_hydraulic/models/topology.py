@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, Iterable, List, Optional, Callable
+from typing import Any, Dict, Iterable, List, Optional, Callable, Set
 
 from network_hydraulic.models.pipe_section import PipeSection
 
@@ -89,6 +89,30 @@ class TopologyGraph:
         for node_id in node_ids:
             edges.extend(self.outgoing_edges(node_id))
         return edges
+
+    def start_nodes(self, forward: bool = True) -> List[str]:
+        """Return the nodes that have no incoming edges (forward) or no outgoing edges (backward)."""
+        lookup = self.reverse_adjacency if forward else self.adjacency
+        return [node_id for node_id, edges in lookup.items() if not edges]
+
+    def reachable_nodes(self, start_nodes: Iterable[str], forward: bool = True) -> Set[str]:
+        """Perform a traversal from the provided start nodes to find reachable junctions."""
+        visited: Set[str] = set()
+        adjacency = self.adjacency if forward else self.reverse_adjacency
+        stack: List[str] = list(start_nodes)
+        while stack:
+            node = stack.pop()
+            if node in visited:
+                continue
+            visited.add(node)
+            for edge_id in adjacency.get(node, []):
+                edge = self.edges.get(edge_id)
+                if edge is None:
+                    continue
+                next_node = edge.end_node_id if forward else edge.start_node_id
+                if next_node not in visited:
+                    stack.append(next_node)
+        return visited
 
 
 def _default_node_id(section: PipeSection, suffix: str) -> str:

@@ -260,6 +260,33 @@ class ConfigurationLoader:
             len(network.topology.nodes),
             len(network.topology.edges),
         )
+        start_nodes = network.topology.start_nodes()
+        if not start_nodes:
+            logger.warning(
+                "Network '%s' topology has no start node; specify 'direction' or tie sections to a common inlet",
+                network.name,
+            )
+        elif len(start_nodes) > 1:
+            logger.warning(
+                "Network '%s' has multiple (%d) start node(s) %s; branching detected",
+                network.name,
+                len(start_nodes),
+                start_nodes,
+            )
+        else:
+            logger.info("Network '%s' source node '%s' will drive flow direction", network.name, start_nodes[0])
+
+        if start_nodes:
+            reachable = network.topology.reachable_nodes(start_nodes)
+            disconnected = sorted(
+                node_id for node_id in network.topology.nodes if node_id not in reachable
+            )
+            if disconnected:
+                logger.warning(
+                    "Network '%s' has disconnected node(s) %s; verify from_pipe_id/to_pipe_id",
+                    network.name,
+                    disconnected,
+                )
         return network
 
     def _build_fluid(self, fluid_cfg: Dict[str, Any]) -> Fluid:

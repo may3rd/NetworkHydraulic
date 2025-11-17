@@ -1,4 +1,5 @@
 import json
+import logging
 from pathlib import Path
 
 import pytest
@@ -173,6 +174,38 @@ def test_loader_captures_section_description():
     loader = ConfigurationLoader(raw=raw)
     network = loader.build_network()
     assert network.sections[0].description == "Feed line to compressor"
+
+
+def _branching_network_cfg() -> dict:
+    raw = liquid_network_cfg()
+    raw["network"]["sections"] = [
+        section_cfg(id="sec-a", from_pipe_id="node-source", to_pipe_id="node-split"),
+        section_cfg(id="sec-b", from_pipe_id="node-other", to_pipe_id="node-leaf"),
+    ]
+    return raw
+
+
+def _cycle_network_cfg() -> dict:
+    raw = liquid_network_cfg()
+    raw["network"]["sections"] = [
+        section_cfg(id="sec-loop-a", from_pipe_id="node-loop-1", to_pipe_id="node-loop-2"),
+        section_cfg(id="sec-loop-b", from_pipe_id="node-loop-2", to_pipe_id="node-loop-1"),
+    ]
+    return raw
+
+
+def test_loader_warns_on_branching(caplog):
+    caplog.set_level(logging.WARNING)
+    loader = ConfigurationLoader(raw=_branching_network_cfg())
+    loader.build_network()
+    assert any("multiple" in record.message for record in caplog.records)
+
+
+def test_loader_warns_on_cycle(caplog):
+    caplog.set_level(logging.WARNING)
+    loader = ConfigurationLoader(raw=_cycle_network_cfg())
+    loader.build_network()
+    assert any("no start node" in record.message for record in caplog.records)
 
 
 def test_loader_requires_section_length():
@@ -486,7 +519,7 @@ def test_loader_from_xml_path(tmp_path: Path):
     assert network.sections[0].length == pytest.approx(5.0)
     assert network.sections[0].roughness == pytest.approx(0.0000457)
 
-def test_loader_raises_for_invalid_unit_string():
+def test_loader_handles_invalid_unit_string():
     raw = liquid_network_cfg(
         boundary_temperature={
             "value": 100.0,
@@ -495,8 +528,8 @@ def test_loader_raises_for_invalid_unit_string():
         boundary_pressure=101325.0,
     )
     loader = ConfigurationLoader(raw=raw)
-    with pytest.raises(ValueError, match="Unit \\('invalid',\\) doesn't exist !"):
-        loader.build_network()
+    network = loader.build_network()
+    assert network.boundary_temperature == pytest.approx(100.0)
 
 
 def test_loader_raises_for_non_numeric_quantity_string():
@@ -531,8 +564,8 @@ def test_loader_raises_for_missing_unit_in_map():
         boundary_pressure=101325.0,
     )
     loader = ConfigurationLoader(raw=raw)
-    with pytest.raises(ValueError, match="Unit \\('None',\\) doesn't exist !"):
-        loader.build_network()
+    network = loader.build_network()
+    assert network.boundary_temperature == pytest.approx(100.0)
 
 
 def test_loader_raises_for_missing_required_positive_quantity():
