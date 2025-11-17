@@ -256,7 +256,7 @@ class NetworkSolver:
         )
         if margin is None:
             return 1.0
-        return 1.0 + margin / 100.0
+        return 1.0 + margin
 
     def _apply_pressure_profile(
         self,
@@ -343,9 +343,6 @@ class NetworkSolver:
                     exit_pressure = exit_state.pressure
                     if exit_pressure is not None:
                         current = exit_pressure
-                        self._set_node_pressure(node_pressures, end_node, exit_pressure)
-                        self._set_node_pressure(node_pressures, end_node, exit_pressure)
-                        self._set_node_pressure(node_pressures, end_node, exit_pressure)
                         self._set_node_pressure(node_pressures, end_node, exit_pressure)
                     exit_temperature = exit_state.temperature
                     if exit_temperature is not None and exit_temperature > 0:
