@@ -3,8 +3,7 @@ from __future__ import annotations
 
 from typing import Final, List
 
-# from unit_converter.unit_converter.converter import converts
-from network_hydraulic.units import u_convert_float as converts
+from network_hydraulic.utils.pint_units import u_convert_float as converts
 
 DEGREE_C: Final[str] = "\N{DEGREE SIGN}C"
 DEGREE_F: Final[str] = "\N{DEGREE SIGN}F"

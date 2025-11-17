@@ -20,7 +20,6 @@ Cheat sheet for coding agents who need quick context about the hydraulic solver 
 | `config/` | Sample configs and expected outputs (`sample_network.yaml`, fittings reference). |
 | `examples/`, `docs/` | Usage demos and architecture notes. |
 | `tests/` | Pytest suites for calculators, IO, models, solver integration. |
-| `src/unit_converter/` | Vendored third-party package kept for future integration (rarely edited). |
 
 ## Domain & Data Model Notes
 - **Units**: Configuration loader accepts either bare SI numbers or `{value, unit}` dicts. See `ConfigurationLoader._quantity` for supported units; values normalize to SI for internal storage. Include units in new config fields to avoid ambiguity.

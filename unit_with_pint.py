@@ -1,4 +1,4 @@
-from network_hydraulic.units import u, P_atm, P_atm_pascal, P_atm_bar, P_atm_ksc, P_atm_psi
+from network_hydraulic.utils.pint_units import u, P_atm, P_atm_pascal, P_atm_bar, P_atm_ksc, P_atm_psi
 
 # --- Examples ---
 
