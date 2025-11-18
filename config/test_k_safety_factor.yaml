@@ -49,5 +49,5 @@ network:
         - {type: elbow_90, count: 9}
         - {type: tee_elbow, count: 1}
         - {type: pipe_entrance_normal, count: 1}
-      piping_and_fitting_safety_factor: 1.0
+      piping_and_fitting_safety_factor: null
       

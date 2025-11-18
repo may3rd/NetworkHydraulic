@@ -358,7 +358,8 @@ class NetworkSolver:
                 friction_factor = section.calculation_output.pressure_drop.frictional_factor
                 k_total = section.total_K
                 pipe_k = section.pipe_length_K or 0.0
-                k_additional = max((k_total or 0.0) - pipe_k, 0.0)
+                # k_additional = max((k_total or 0.0) - pipe_k, 0.0)
+                k_additional = 0.0
                 diameter = section.pipe_diameter or self.default_pipe_diameter
                 roughness = section.roughness or 0.0
                 viscosity = network.fluid.viscosity
@@ -611,7 +612,6 @@ class NetworkSolver:
                     orifice_calculator=orifice_calculator,
                     mass_flow_override=section.mass_flow_rate,
                 )
-                self._apply_liquid_safety_factor(section)
                 loss = section.calculation_output.pressure_drop.total_segment_loss or 0.0
                 if forward:
                     summary.inlet.pressure = section_start_pressure
@@ -744,32 +744,13 @@ class NetworkSolver:
         frictional_loss = max(0.0, total_drop - other_losses)
         pd.pipe_and_fittings = frictional_loss
 
-        pipe_k = section.pipe_length_K or 0.0
-        total_k = pipe_k + (section.fitting_K or 0.0)
-        pipe_only_drop = None
-        if pipe_k > 0 and total_k > 0:
-            pipe_only_drop = frictional_loss * (pipe_k / total_k)
-
-        length = section.length or 0.0
-        if pipe_only_drop is not None and length > 0:
+        total_k = section.total_K
+        length = section.equivalent_length or 0.0
+        if total_k is not None and total_k > 0 and length > 0:
             # Report pipe-only drop scaled to a 100 m reference length.
-            pd.normalized_friction_loss = pipe_only_drop / length * 100.0
+            pd.normalized_friction_loss = frictional_loss / length * 100.0
         else:
             pd.normalized_friction_loss = None
-
-    def _apply_liquid_safety_factor(self, section: PipeSection) -> None:
-        factor = section.piping_and_fitting_safety_factor or 1.0
-        if factor == 1.0:
-            return
-        pressure_drop = section.calculation_output.pressure_drop
-        pipe_and_fitting_loss = pressure_drop.pipe_and_fittings
-        if pipe_and_fitting_loss is None or pipe_and_fitting_loss <= 0:
-            return
-        scaled_loss = pipe_and_fitting_loss * factor
-        delta = scaled_loss - pipe_and_fitting_loss
-        pressure_drop.pipe_and_fittings = scaled_loss
-        total = pressure_drop.total_segment_loss or 0.0
-        pressure_drop.total_segment_loss = total + delta
 
     @staticmethod
     def _apply_section_entry_state(

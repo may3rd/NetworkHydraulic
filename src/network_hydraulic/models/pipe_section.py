@@ -109,6 +109,7 @@ class PipeSection:
     flow_splitting_factor: float = 1.0
     from_pipe_id: Optional[str] = None
     to_pipe_id: Optional[str] = None
+    equivalent_length: Optional[float] = None
     @property
     def start_node_id(self) -> Optional[str]:
         return self.from_pipe_id
@@ -151,7 +152,7 @@ class PipeSection:
         if self.outlet_diameter is not None and self.outlet_diameter <= 0:
             errors.append("PipeSection outlet_diameter must be positive if provided")
         
-        if self.piping_and_fitting_safety_factor is not None and self.piping_and_fitting_safety_factor <= 0:
+        if self.piping_and_fitting_safety_factor is not None and self.piping_and_fitting_safety_factor < 0:
             errors.append("PipeSection piping_and_fitting_safety_factor must be positive if provided")
         
         if self.piping_and_fitting_safety_factor is not None and self.piping_and_fitting_safety_factor > 0:

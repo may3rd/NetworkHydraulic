@@ -55,6 +55,15 @@ class FrictionCalculator(LossCalculator):
         section.pipe_length_K = pipe_k
         fitting_k = section.fitting_K or 0.0
         total_k = pipe_k + fitting_k
+        # apply safety factor
+        if section.piping_and_fitting_safety_factor:
+            total_k *= section.piping_and_fitting_safety_factor
+        section.total_K = total_k
+        # determine equivalent length
+        if friction > 0.0 and total_k > 0.0:
+            section.equivalent_length = total_k * diameter / friction
+        else:
+            section.equivalent_length = None
         if total_k <= 0:
             delta_p = 0.0
         else:

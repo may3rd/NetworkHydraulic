@@ -43,3 +43,4 @@ network:
         unit: m
       erosional_constant: 100
       fitting_type: LR
+      piping_and_fitting_safety_factor: 1.0
