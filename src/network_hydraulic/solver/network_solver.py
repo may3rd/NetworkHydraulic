@@ -45,7 +45,6 @@ from network_hydraulic.calculators.gas_flow import (
     solve_adiabatic,
     solve_isothermal,
 )
-from network_hydraulic.utils import pipe_dimensions
 
 EROSIONAL_CONVERSION = 0.3048 * sqrt(16.018463)
 logger = logging.getLogger(__name__)
@@ -612,6 +611,7 @@ class NetworkSolver:
                     orifice_calculator=orifice_calculator,
                     mass_flow_override=section.mass_flow_rate,
                 )
+                self._apply_liquid_safety_factor(section)
                 loss = section.calculation_output.pressure_drop.total_segment_loss or 0.0
                 if forward:
                     summary.inlet.pressure = section_start_pressure
@@ -656,6 +656,10 @@ class NetworkSolver:
         orifice_calculator: OrificeCalculator,
         mass_flow_override: Optional[float] = None,
     ) -> None:
+        """
+        Add the component's loss to the pipe_section by considering that only one of 
+        `control valve`, `orifice`, or `pipeline`.
+        """
         if inlet_pressure is None or inlet_pressure <= 0:
             if section.control_valve or section.orifice:
                 raise ValueError(
@@ -667,14 +671,12 @@ class NetworkSolver:
         ignored = section.calculation_output.ignored_components
 
         component = self._primary_loss_component(section)
-        pipeline_active = component == "pipeline"
 
-        if section.has_pipeline_segment and not pipeline_active:
+        if not component == "pipeline" and section.has_pipeline_segment:
             reason = "control valve" if component == "control_valve" else "orifice"
             ignored.append(f"Pipeline ignored because {reason} takes precedence in this section.")
 
-        valve = section.control_valve
-        if component == "control_valve" and valve:
+        if component == "control_valve" and section.control_valve:
             control_valve_calculator.calculate(
                 section,
                 inlet_pressure_override=inlet_pressure,
@@ -708,7 +710,7 @@ class NetworkSolver:
             return "orifice"
         if section.has_pipeline_segment:
             return "pipeline"
-        if section.user_specified_fixed_loss is not None:
+        if section.user_specified_fixed_loss:
             return "user_loss"
         return "none"
 
@@ -754,6 +756,20 @@ class NetworkSolver:
             pd.normalized_friction_loss = pipe_only_drop / length * 100.0
         else:
             pd.normalized_friction_loss = None
+
+    def _apply_liquid_safety_factor(self, section: PipeSection) -> None:
+        factor = section.piping_and_fitting_safety_factor or 1.0
+        if factor == 1.0:
+            return
+        pressure_drop = section.calculation_output.pressure_drop
+        pipe_and_fitting_loss = pressure_drop.pipe_and_fittings
+        if pipe_and_fitting_loss is None or pipe_and_fitting_loss <= 0:
+            return
+        scaled_loss = pipe_and_fitting_loss * factor
+        delta = scaled_loss - pipe_and_fitting_loss
+        pressure_drop.pipe_and_fittings = scaled_loss
+        total = pressure_drop.total_segment_loss or 0.0
+        pressure_drop.total_segment_loss = total + delta
 
     @staticmethod
     def _apply_section_entry_state(

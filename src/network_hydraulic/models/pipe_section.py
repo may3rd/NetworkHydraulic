@@ -154,6 +154,9 @@ class PipeSection:
         if self.piping_and_fitting_safety_factor is not None and self.piping_and_fitting_safety_factor <= 0:
             errors.append("PipeSection piping_and_fitting_safety_factor must be positive if provided")
         
+        if self.piping_and_fitting_safety_factor is not None and self.piping_and_fitting_safety_factor > 0:
+            self.piping_and_fitting_safety_factor += 1.0
+        
         if self.erosional_constant is not None and self.erosional_constant <= 0:
             errors.append("PipeSection erosional_constant must be positive if provided")
         
