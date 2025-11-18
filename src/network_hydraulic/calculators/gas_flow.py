@@ -414,7 +414,7 @@ def solve_adiabatic(
             _gas_state(boundary_pressure, temperature, mass_flow,
                        diameter, molar_mass, z_factor, gamma)
 
-    print(k_total, k_additional)
+    # print(k_total, k_additional)
     k_total = k_total + k_additional
 
     if k_total == 0.0:

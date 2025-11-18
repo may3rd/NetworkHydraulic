@@ -14,7 +14,7 @@ from network_hydraulic.optimizer.advanced_valve_optimizer import advanced_optimi
 from network_hydraulic.cli.app import _execute_run
 
 if __name__ == "__main__":
-    config_path = Path("config/test_valve_network.yaml")
+    config_path = Path("config/sample_network.yaml")
     loader = ConfigurationLoader.from_yaml_path(config_path)
     network = loader.build_network()
     residual = optimize_control_valves(network)

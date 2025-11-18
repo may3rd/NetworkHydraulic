@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "network-hydraulic"
-version = "0.2.0"
+version = "0.3.0"
 description = "Hydraulic calculation framework for pipe networks"
 authors = [{ name = "Hydraulic Framework Team" }]
 readme = "README.md"

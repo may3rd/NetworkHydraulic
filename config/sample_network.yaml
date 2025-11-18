@@ -2,9 +2,15 @@ network:
   name: sample_network
   description: Test
   direction: forward
+  mass_flow_rate:
+    value: 90513.6
+    unit: kg/h
   boundary_pressure:
-    value: 101.008
+    value: 101.08
     unit: kPag
+  boundary_temperature:
+    value: 103.42
+    unit: degC
   gas_flow_model: null
   design_margin: 0.0
   output_units:
@@ -19,12 +25,6 @@ network:
     gas_flow_critical_pressure: kPa
     length: m
     small_length: mm
-  mass_flow_rate:
-    value: 90513.6
-    unit: kg/h
-  boundary_temperature:
-    value: 103.42
-    unit: degC
   fluid:
     name: liquid
     phase: liquid

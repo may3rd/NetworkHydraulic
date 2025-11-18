@@ -756,7 +756,13 @@ def _print_section_overview(
     direction = (
         section.direction if section and section.direction else network.direction) or "—"
     boundary_pressure = (
-        section.boundary_pressure if section and section.boundary_pressure is not None else network.boundary_pressure
+        section.boundary_pressure
+        if section and section.boundary_pressure is not None
+        else (
+            network.upstream_pressure
+            if network.direction != "backward"
+            else network.downstream_pressure
+        )
     )
     flow_type = network.gas_flow_model if fluid.is_gas() else "N/A"
 
@@ -766,15 +772,25 @@ def _print_section_overview(
     if section:
         reference_density = section.result_summary.inlet.density
     if not (reference_density and reference_density > 0):
+        reference_pressure = (
+            network.upstream_pressure
+            if network.direction != "backward"
+            else network.downstream_pressure
+        )
         reference_density = fluid.current_density(
-            network.boundary_temperature, network.boundary_pressure)
+            network.boundary_temperature, reference_pressure)
     if actual_mass_flow is not None and reference_density and reference_density > 0:
         actual_vol_flow = actual_mass_flow / reference_density
 
     standard_flow = fluid.standard_flow_rate if fluid.is_gas() else None
     temperature = network.boundary_temperature
+    reference_pressure = (
+        network.upstream_pressure
+        if network.direction != "backward"
+        else network.downstream_pressure
+    )
     density = fluid.current_density(
-        network.boundary_temperature, network.boundary_pressure)
+        network.boundary_temperature, reference_pressure)
 
     def pipe_value(value: Optional[float], unit: Optional[str] = None) -> str:
         if value is None:

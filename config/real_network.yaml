@@ -1,11 +1,11 @@
 network:
   name: sample_network
   description: Vapor Line
-  direction: forward
+  direction: backward
   boundary_pressure:
     value: 100.0
     unit: kPag
-  gas_flow_model: adiabatic
+  gas_flow_model: isothermal
   temperature:
     value: 273.11
     unit: degC

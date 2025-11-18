@@ -106,12 +106,11 @@ git ls-files -ci --exclude-from=.gitignore -z | xargs -0 git rm --cached
 ## Gaps and Potential Improvements
 
 ### 1. Network Topology (Most Significant Gap)
-*   **Current Limitation**: The solver currently only handles linear, sequential pipelines (a simple list of `PipeSection` objects). It cannot model real-world networks with branches (tees) or loops.
-*   **Improvement**: Evolve the `Network` model into a graph-based structure (e.g., using `networkx`). This would enable the implementation of a true network solver (e.g., using the Hardy Cross method or a simultaneous equation approach) to balance flows and pressures across a complex system.
+*   **Addressed**: The core solver now accepts graph-based `Network` instances with explicit upstream/downstream boundary pressures and can be orchestrated through a `NetworkSystemSolver` that manages multiple linked networks (shared nodes, optimizer hooks). Multi-network configs can define global solver/optimizer settings, demonstrating branch handling at the system level.
+*   **Remaining Improvement**: Enable the single-network solver to automatically balance arbitrarily complex graphs (loops, tees) without relying on external system orchestration. Options include a Hardy Cross-style flow balancing loop or a simultaneous nonlinear equation solver so that even standalone networks can contain loops and still converge without manual decomposition.
 
 ### 2. Component Library
 *   **Gap**: No support for components that add energy, such as **pumps** or **compressors**.
-*   **Gap**: Control valve and orifice models are passive (calculating drop for a given flow) and do not simulate active control (e.g., a valve maintaining a set downstream pressure).
 *   **Improvement**: Introduce new calculator and model classes for pumps and compressors. Enhance valve models to support iterative solutions for achieving setpoint conditions.
 
 ### 3. Fluid & Thermal Modeling
@@ -121,5 +120,5 @@ git ls-files -ci --exclude-from=.gitignore -z | xargs -0 git rm --cached
 *   **Improvement**: Introduce two-phase flow correlations. Implement a thermal model to track temperature changes and update fluid properties dynamically. Integrate with a dedicated thermodynamic property library.
 
 ### 4. Solver Flexibility
-*   **Gap**: It can only solve for pressure given a fixed flow rate. A common requirement is to solve for the flow rate given fixed inlet and outlet pressures.
-*   **Improvement**: Implement a new solver mode that iteratively adjusts the flow rate until the calculated outlet pressure matches the specified boundary condition. This would be a natural extension of a more advanced network solver.
+*   **Gap**: Single-network runs still solve for pressure given a fixed flow rate. A common requirement is to solve for the flow rate given fixed inlet and outlet pressures.
+*   **Improvement**: Implement a new solver mode that iteratively adjusts the flow rate until the calculated outlet pressure matches the specified boundary condition.

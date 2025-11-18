@@ -3,7 +3,7 @@ network:
   description: Two-section gas network solved backward
   gas_flow_model: isothermal
   direction: backward
-  boundary_pressure:
+  downstream_pressure:
     value: 300
     unit: kPag
   temperature:
