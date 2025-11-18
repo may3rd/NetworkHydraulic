@@ -6,13 +6,15 @@
 
  ## 1. YAML Skeleton
 
- ```yaml
- network:
-   name: my_network
-   description: Optional human-readable label
-   direction: auto | forward | backward
-   boundary_pressure: {value: 101.3, unit: kPag}
-   boundary_temperature: {value: 25, unit: degC}  # K, required
+```yaml
+network:
+  name: my_network
+  description: Optional human-readable label
+  direction: auto | forward | backward
+  upstream_pressure: {value: 101.3, unit: kPag}     # optional
+  downstream_pressure: {value: 90, unit: kPag}      # optional
+  # legacy: boundary_pressure is still accepted and maps to upstream_pressure
+  boundary_temperature: {value: 25, unit: degC}  # K, required
    gas_flow_model: isothermal | adiabatic        # required for gas, ignored for liquid
    design_margin: 10.0                           # percent, optional
    mass_flow_rate: 1.0                           # kg/s, required
@@ -69,7 +71,7 @@
 - `user_specified_fixed_loss` – pressure drop (Pa) applied directly; it now adds on top of pipe/elevation losses (only control valves/orifices still block it).
  - `user_K`, `fitting_K`, `pipe_length_K`, `total_K`, `piping_and_fitting_safety_factor` – manual loss overrides (rare).
 - `boundary_pressure` – per-section pressure boundary (Pa).
-- `downstream_pressure` – optional outlet pressure (Pa) that seeds the graph when `direction` is `backward`; otherwise the solver uses `boundary_pressure` as the source.
+- `downstream_pressure` – optional outlet pressure (Pa) that seeds the graph when `direction` is `backward`; otherwise the solver uses the network's upstream pressure as the source.
 - `direction` – overrides network direction for that section.
 - `design_margin` – percent overriding network-level margin.
 - `erosional_constant` – used for erosional velocity checks.
@@ -113,6 +115,7 @@ links:
 - Each entry under `networks` mirrors the original schema plus an optional `id` (defaulting to `name`). The `links[]` array ties nodes across those networks; the first `members[]` entry acts as the pressure “leader,” and the solver pushes that node’s pressure into the remaining members.
 - Set `primary: true` inside any network block to force that network to become the leader for linked nodes (useful when the shared node should inherit pressure from a specific upstream/downstream model). When no `primary` is specified, the solver defaults to the first member for forward/auto networks and the last member if every participating network runs backward.
 - When multiple networks share a config file you can keep a single `output_units:` block at the root; every network inherits those units unless it defines its own `output_units` override inside the individual entry.
+- Legacy network configs that only specify `boundary_pressure` continue to work; the loader maps that value to `upstream_pressure`.
 - Optional `system_solver` block lets you tune the system-level iteration:
 
 ```yaml
@@ -123,7 +126,26 @@ system_solver:
 ```
 
 - If `system_solver` is omitted, defaults from `NetworkSystemSolver` are used (currently 4 iterations, 1 Pa tolerance, 0.7 relaxation).
-- Use `ConfigurationLoader.build_network_system()` to construct a `NetworkSystem` and run it via `NetworkSystemSolver`. The CLI auto-detects the new format, runs every bundle, prints per-network summaries, and writes a combined results file via `write_system_output`.
+- Optional `system_optimizer` block lets you run the valve optimizer automatically before solving:
+
+```yaml
+system_optimizer:
+  enable: true
+  tolerance: 500.0
+  damping_factor: 0.65
+  max_iterations: 20
+  networks:
+    supply:
+      method: advanced
+      downstream_pressure: 330 kPag
+    branch:
+      method: simple
+```
+
+  - `enable` toggles the optimizer globally; `networks` maps network IDs to per-network overrides.
+  - You can override method (`advanced` or `simple`), downstream pressure targets, tolerances, damping factors, and iteration caps per bundle; unspecified fields fall back to the global values above.
+
+- Use `ConfigurationLoader.build_network_system()` to construct a `NetworkSystem` and run it via `NetworkSystemSolver`. The CLI auto-detects the new format, runs the valve optimizer when enabled, solves every bundle, prints per-network summaries, and writes a combined results file via `write_system_output`.
 
  ### 3.1 Auto-Swage
 
@@ -194,7 +216,7 @@ system_solver:
  network:
    name: demo
    direction: auto
- boundary_pressure: {value: 300, unit: kPa}
+ upstream_pressure: {value: 300, unit: kPa}
  mass_flow_rate: 2.5
   boundary_temperature: {value: 35, unit: degC}
    fluid:

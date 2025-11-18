@@ -8,7 +8,9 @@ import sys
 
 from network_hydraulic.io.loader import ConfigurationLoader
 from network_hydraulic.solver.network_solver import NetworkSolver
-from network_hydraulic.testing.snapshots import snapshot_payload
+from network_hydraulic.solver.network_system_solver import NetworkSystemSolver
+from network_hydraulic.optimizer.system_optimizer import NetworkSystemOptimizer
+from network_hydraulic.testing.snapshots import snapshot_payload, system_snapshot_payload
 
 
 def update_snapshots(
@@ -18,21 +20,32 @@ def update_snapshots(
     base_path: Path,
 ) -> None:
     solver = NetworkSolver()
+    system_solver = NetworkSystemSolver()
     for config_path in sorted(networks_dir.glob("*.yaml")):
         loader = ConfigurationLoader.from_yaml_path(config_path)
-        network = loader.build_network()
-        result = solver.run(network)
-
         try:
             relative_config = config_path.relative_to(base_path)
         except ValueError:
             relative_config = config_path
 
-        payload = snapshot_payload(
-            network_name=network.name,
-            config_path=str(relative_config),
-            result=result,
-        )
+        if loader.has_network_collection:
+            system = loader.build_network_system()
+            optimizer = NetworkSystemOptimizer(system.optimizer_settings)
+            optimizer.run(system)
+            result = system_solver.run(system)
+            payload = system_snapshot_payload(
+                config_path=str(relative_config),
+                result=result,
+            )
+        else:
+            network = loader.build_network()
+            result = solver.run(network)
+            payload = snapshot_payload(
+                network_name=network.name,
+                config_path=str(relative_config),
+                result=result,
+            )
+
         output_path = expected_dir / f"{config_path.stem}.json"
         output_path.parent.mkdir(parents=True, exist_ok=True)
         with output_path.open("w", encoding="utf-8") as handle:

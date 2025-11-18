@@ -27,6 +27,8 @@ from network_hydraulic.models.network_system import (
     NetworkBundle,
     NetworkSystem,
     NetworkSystemSettings,
+    NetworkOptimizerSettings,
+    SystemOptimizerSettings,
     SharedNodeGroup,
     SharedNodeMember,
 )
@@ -229,25 +231,34 @@ class ConfigurationLoader:
         )
         logger.info(f"{boundary_temperature} is loaded successfully.")
 
-        raw_boundary_pressure = (
-            network_cfg.get("boundary_pressure")
-            if network_cfg.get("boundary_pressure") is not None
-            else network_cfg.get("pressure")
-        )
-        boundary_pressure = self._require_positive_quantity(
-            raw_boundary_pressure,
-            "network.boundary_pressure",
+        upstream_pressure = self._quantity(
+            network_cfg.get("upstream_pressure"),
+            "network.upstream_pressure",
             target_unit="Pa",
         )
-        logger.info(f"{boundary_pressure} is loaded successfully.")
-
         downstream_pressure = self._quantity(
             network_cfg.get("downstream_pressure"),
             "network.downstream_pressure",
             target_unit="Pa",
         )
-        if downstream_pressure is not None:
-            logger.info("Downstream pressure %.3f Pa is configured.", downstream_pressure)
+        legacy_pressure = self._quantity(
+            network_cfg.get("boundary_pressure") or network_cfg.get("pressure"),
+            "network.boundary_pressure",
+            target_unit="Pa",
+        )
+        configured_direction = str(network_cfg.get("direction", "auto")).strip().lower()
+        if upstream_pressure is None and downstream_pressure is None:
+            if legacy_pressure is None:
+                raise ValueError("Either upstream_pressure or downstream_pressure must be provided")
+            if configured_direction == "backward":
+                downstream_pressure = legacy_pressure
+            else:
+                upstream_pressure = legacy_pressure
+        logger.info(
+            "Loaded pressures: upstream=%s Pa downstream=%s Pa",
+            upstream_pressure,
+            downstream_pressure,
+        )
 
         mass_flow_rate_val = self._require_positive_quantity(
             network_cfg.get("mass_flow_rate"),
@@ -283,7 +294,9 @@ class ConfigurationLoader:
             description=network_cfg.get("description"),
             fluid=fluid,
             boundary_temperature=boundary_temperature,
-            boundary_pressure=boundary_pressure,
+            upstream_pressure=upstream_pressure,
+            downstream_pressure=downstream_pressure,
+            boundary_pressure=upstream_pressure,
             direction=direction,
             mass_flow_rate=mass_flow_rate_val,
             gas_flow_model=gas_flow_model,
@@ -292,7 +305,6 @@ class ConfigurationLoader:
             design_margin=self._coerce_optional_float(
                 network_cfg.get("design_margin"), "network.design_margin"
             ),
-            downstream_pressure=downstream_pressure,
             primary=bool(network_cfg.get("primary", False)),
         )
         logger.info(
@@ -376,10 +388,12 @@ class ConfigurationLoader:
             raise ValueError("links must be provided as a list")
         shared_nodes = self._build_shared_node_groups(bundles, links_cfg)
         solver_settings = self._build_system_solver_settings(self.raw.get("system_solver"))
+        optimizer_settings = self._build_system_optimizer_settings(self.raw.get("system_optimizer"))
         return NetworkSystem(
             bundles=bundles,
             shared_nodes=shared_nodes,
             solver_settings=solver_settings,
+            optimizer_settings=optimizer_settings,
         )
 
     def _build_fluid(self, fluid_cfg: Dict[str, Any]) -> Fluid:
@@ -552,6 +566,75 @@ class ConfigurationLoader:
             if not (0 < relaxation <= 1):
                 raise ValueError("system_solver.relaxation must be in (0, 1]")
             settings.relaxation = relaxation
+        return settings
+
+    def _build_system_optimizer_settings(
+        self,
+        cfg: Optional[Dict[str, Any]],
+    ) -> SystemOptimizerSettings:
+        settings = SystemOptimizerSettings()
+        if not cfg:
+            return settings
+        settings.enabled = bool(cfg.get("enable", False))
+        if "tolerance" in cfg and cfg["tolerance"] is not None:
+            try:
+                settings.tolerance = float(cfg["tolerance"])
+            except (TypeError, ValueError) as exc:
+                raise ValueError("system_optimizer.tolerance must be numeric") from exc
+        if "damping_factor" in cfg and cfg["damping_factor"] is not None:
+            try:
+                settings.damping_factor = float(cfg["damping_factor"])
+            except (TypeError, ValueError) as exc:
+                raise ValueError("system_optimizer.damping_factor must be numeric") from exc
+        if "max_iterations" in cfg and cfg["max_iterations"] is not None:
+            try:
+                value = int(cfg["max_iterations"])
+            except (TypeError, ValueError) as exc:
+                raise ValueError("system_optimizer.max_iterations must be an integer") from exc
+            settings.max_iterations = value
+        settings.verbose = bool(cfg.get("verbose", False))
+        networks_cfg = cfg.get("networks") or {}
+        if not isinstance(networks_cfg, dict):
+            raise ValueError("system_optimizer.networks must be a mapping")
+        for network_id, entry in networks_cfg.items():
+            if not isinstance(entry, dict):
+                raise ValueError("system_optimizer network entries must be mappings")
+            method = str(entry.get("method", "advanced")).strip().lower() or "advanced"
+            downstream_pressure = self._quantity(
+                entry.get("downstream_pressure"),
+                f"system_optimizer.networks['{network_id}'].downstream_pressure",
+                target_unit="Pa",
+            )
+            tolerance = entry.get("tolerance")
+            damping = entry.get("damping_factor")
+            max_iterations = entry.get("max_iterations")
+            network_settings = NetworkOptimizerSettings(
+                network_id=str(network_id),
+                downstream_pressure=downstream_pressure,
+                method=method,
+            )
+            if tolerance is not None:
+                try:
+                    network_settings.tolerance = float(tolerance)
+                except (TypeError, ValueError) as exc:
+                    raise ValueError(
+                        f"system_optimizer.networks['{network_id}'].tolerance must be numeric"
+                    ) from exc
+            if damping is not None:
+                try:
+                    network_settings.damping_factor = float(damping)
+                except (TypeError, ValueError) as exc:
+                    raise ValueError(
+                        f"system_optimizer.networks['{network_id}'].damping_factor must be numeric"
+                    ) from exc
+            if max_iterations is not None:
+                try:
+                    network_settings.max_iterations = int(max_iterations)
+                except (TypeError, ValueError) as exc:
+                    raise ValueError(
+                        f"system_optimizer.networks['{network_id}'].max_iterations must be an integer"
+                    ) from exc
+            settings.networks[network_settings.network_id] = network_settings
         return settings
 
     def _align_adjacent_diameters(self, sections: List[PipeSection]) -> None:

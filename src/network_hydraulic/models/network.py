@@ -30,7 +30,9 @@ class Network:
     description: Optional[str]
     fluid: Fluid
     boundary_temperature: float
-    boundary_pressure: float
+    upstream_pressure: Optional[float] = None
+    downstream_pressure: Optional[float] = None
+    boundary_pressure: Optional[float] = None
     direction: str = "auto"
     mass_flow_rate: Optional[float] = None
     gas_flow_model: Optional[str] = None
@@ -40,7 +42,6 @@ class Network:
     output_units: OutputUnits = field(default_factory=OutputUnits)
     design_margin: float = 0.0 # For design rate 110% set design_margin = 0.1
     topology: TopologyGraph = field(default_factory=TopologyGraph)
-    downstream_pressure: Optional[float] = None
     primary: bool = False
 
     def __post_init__(self) -> None:
@@ -48,10 +49,16 @@ class Network:
 
         if self.boundary_temperature is None or self.boundary_temperature <= 0:
             errors.append("network.boundary_temperature must be positive")
-        if self.boundary_pressure is None or self.boundary_pressure <= 0:
-            errors.append("network.boundary_pressure must be positive")
+        if self.upstream_pressure is None and self.boundary_pressure is not None:
+            self.upstream_pressure = self.boundary_pressure
+        if self.boundary_pressure is None and self.upstream_pressure is not None:
+            self.boundary_pressure = self.upstream_pressure
+        if self.upstream_pressure is None and self.downstream_pressure is None:
+            errors.append("Either upstream_pressure or downstream_pressure must be provided")
+        if self.upstream_pressure is not None and self.upstream_pressure <= 0:
+            errors.append("network.upstream_pressure must be positive if provided")
         if self.downstream_pressure is not None and self.downstream_pressure <= 0:
-            errors.append("network.downstream_pressure must be positive")
+            errors.append("network.downstream_pressure must be positive if provided")
 
         if self.mass_flow_rate is None:
             errors.append("mass_flow_rate must be provided for the network")
@@ -62,6 +69,12 @@ class Network:
         if normalized_direction not in {"auto", "forward", "backward"}:
             errors.append(f"Network direction '{self.direction}' must be 'auto', 'forward', or 'backward'")
         self.direction = normalized_direction
+
+        if self.direction == "auto":
+            if self.upstream_pressure is not None and self.downstream_pressure is None:
+                self.direction = "forward"
+            elif self.downstream_pressure is not None and self.upstream_pressure is None:
+                self.direction = "backward"
 
         normalized_gas_flow_model = (self.gas_flow_model or "").strip().lower()
         fluid_is_gas = False
@@ -109,7 +122,10 @@ class Network:
     def current_volumetric_flow_rate(self) -> float:
         if self.mass_flow_rate is None:
             raise ValueError("mass_flow_rate must be set to calculate volumetric flow rate")
-        density = self.fluid.current_density(self.boundary_temperature, self.boundary_pressure)
+        reference_pressure = self.upstream_pressure or self.downstream_pressure
+        if reference_pressure is None or reference_pressure <= 0:
+            raise ValueError("A valid upstream or downstream pressure is required")
+        density = self.fluid.current_density(self.boundary_temperature, reference_pressure)
         if density == 0:
             raise ValueError("Cannot calculate volumetric flow rate with zero density")
         return self.mass_flow_rate / density

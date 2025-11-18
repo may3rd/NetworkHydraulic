@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import pytest
 
+from pathlib import Path
+
 from network_hydraulic.io.loader import ConfigurationLoader
+from network_hydraulic.optimizer.system_optimizer import NetworkSystemOptimizer
 from network_hydraulic.solver.network_system_solver import NetworkSystemSolver
 
 
@@ -89,3 +92,25 @@ def test_network_system_solver_transfers_shared_pressures():
     assert branch_pressure == pytest.approx(supply_pressure, rel=1e-6)
     canonical_id = next(b for b in system.bundles if b.id == "supply").node_mapping["node-junction"]
     assert result.shared_node_pressures[canonical_id] == pytest.approx(supply_pressure, rel=1e-6)
+
+
+def test_system_solver_respects_global_settings_fixture():
+    loader = ConfigurationLoader.from_yaml_path(Path("tests/fixtures/networks/system_solver_only.yaml"))
+    system = loader.build_network_system()
+    solver = NetworkSystemSolver(
+        max_iterations=system.solver_settings.max_iterations or 4,
+        tolerance=system.solver_settings.tolerance or 1.0,
+        relaxation=system.solver_settings.relaxation or 0.7,
+    )
+    result = solver.run(system)
+    assert len(result.bundles) == 2
+
+
+def test_system_optimizer_fixture_runs():
+    loader = ConfigurationLoader.from_yaml_path(Path("tests/fixtures/networks/system_optimizer.yaml"))
+    system = loader.build_network_system()
+    optimizer = NetworkSystemOptimizer(system.optimizer_settings)
+    optimizer.run(system)
+    solver = NetworkSystemSolver()
+    result = solver.run(system)
+    assert len(result.bundles) == 2

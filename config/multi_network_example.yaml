@@ -16,6 +16,20 @@ system_solver:
   tolerance: 0.5
   relaxation: 0.7
 
+system_optimizer:
+  enable: true
+  tolerance: 500.0
+  damping_factor: 0.65
+  max_iterations: 20
+  networks:
+    supply:
+      method: advanced
+      downstream_pressure:
+        value: 330
+        unit: kPag
+    branch:
+      method: simple
+
 networks:
   - id: supply
     name: upstream_supply

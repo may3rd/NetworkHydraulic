@@ -44,12 +44,37 @@ class NetworkSystemSettings:
 
 
 @dataclass(slots=True)
+class NetworkOptimizerSettings:
+    """Per-network valve optimizer options."""
+
+    network_id: str
+    downstream_pressure: float | None = None
+    method: str = "advanced"
+    tolerance: float | None = None
+    damping_factor: float | None = None
+    max_iterations: int | None = None
+
+
+@dataclass(slots=True)
+class SystemOptimizerSettings:
+    """Global valve optimizer configuration for a network system."""
+
+    enabled: bool = False
+    tolerance: float | None = None
+    damping_factor: float | None = None
+    max_iterations: int | None = None
+    verbose: bool = False
+    networks: Dict[str, NetworkOptimizerSettings] = field(default_factory=dict)
+
+
+@dataclass(slots=True)
 class NetworkSystem:
     """Encapsulates multiple networks plus shared-node metadata."""
 
     bundles: List[NetworkBundle] = field(default_factory=list)
     shared_nodes: Dict[str, SharedNodeGroup] = field(default_factory=dict)
     solver_settings: NetworkSystemSettings = field(default_factory=NetworkSystemSettings)
+    optimizer_settings: SystemOptimizerSettings = field(default_factory=SystemOptimizerSettings)
 
 
 @dataclass(slots=True)

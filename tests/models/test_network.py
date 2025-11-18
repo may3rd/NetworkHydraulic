@@ -22,26 +22,32 @@ def make_fluid(**overrides) -> Fluid:
 
 
 def make_network(**overrides) -> Network:
-    fluid = overrides.pop("fluid", make_fluid())
+    fluid = overrides.get("fluid", make_fluid())
+    overrides = overrides.copy()
+    overrides.pop("fluid", None)
     defaults = dict(
         name="test_network",
         description=None,
         fluid=fluid,
         boundary_temperature=300.0,
-        boundary_pressure=101325.0,
+        upstream_pressure=101325.0,
+        downstream_pressure=None,
+        boundary_pressure=None,
         direction="auto",
         mass_flow_rate=10.0,
         gas_flow_model=None,
         sections=[],
         design_margin=None,
     )
+    if "boundary_pressure" in overrides and "upstream_pressure" not in overrides:
+        overrides["upstream_pressure"] = overrides["boundary_pressure"]
     defaults.update(overrides)
     return Network(**defaults)
 
 
 def test_network_post_init_valid_inputs():
     network = make_network()
-    assert network.direction == "auto"
+    assert network.direction == "forward"
     assert network.gas_flow_model is None
     assert network.design_margin is None
 
@@ -50,6 +56,10 @@ def test_network_post_init_normalizes_direction():
     network = make_network(direction="FORWARD ")
     assert network.direction == "forward"
 
+
+def test_network_auto_direction_backward_with_only_downstream():
+    network = make_network(upstream_pressure=None, boundary_pressure=None, downstream_pressure=80000.0, direction="auto")
+    assert network.direction == "backward"
 
 def test_network_post_init_normalizes_gas_flow_model():
     network = make_network(gas_flow_model=" ADIABATIC")
@@ -71,9 +81,9 @@ def test_network_post_init_raises_for_non_positive_boundary_conditions():
         make_network(boundary_temperature=0.0)
     with pytest.raises(ValueError, match="network.boundary_temperature must be positive"):
         make_network(boundary_temperature=-10.0)
-    with pytest.raises(ValueError, match="network.boundary_pressure must be positive"):
+    with pytest.raises(ValueError, match="network.upstream_pressure must be positive"):
         make_network(boundary_pressure=0.0)
-    with pytest.raises(ValueError, match="network.boundary_pressure must be positive"):
+    with pytest.raises(ValueError, match="network.upstream_pressure must be positive"):
         make_network(boundary_pressure=-10.0)
 
 
@@ -100,8 +110,8 @@ def test_network_post_init_raises_for_negative_mass_flow_rate():
 
 def test_current_volumetric_flow_rate_calculates_from_mass():
     fluid = make_fluid(density=998.2)
-    network = make_network(fluid=fluid, mass_flow_rate=5.0, boundary_temperature=300.0, boundary_pressure=101325.0)
-    expected = 5.0 / fluid.current_density(network.boundary_temperature, network.boundary_pressure)
+    network = make_network(fluid=fluid, mass_flow_rate=5.0, boundary_temperature=300.0, upstream_pressure=101325.0)
+    expected = 5.0 / fluid.current_density(network.boundary_temperature, network.upstream_pressure)
     assert network.current_volumetric_flow_rate() == pytest.approx(expected)
 
 def test_current_volumetric_flow_rate_raises_if_no_mass_flow():
@@ -112,7 +122,7 @@ def test_current_volumetric_flow_rate_raises_if_no_mass_flow():
 
 def test_current_volumetric_flow_rate_raises_if_zero_density():
     fluid = make_fluid(density=1.0) # Create a valid fluid first
-    network = make_network(fluid=fluid, mass_flow_rate=5.0, boundary_temperature=300.0, boundary_pressure=101325.0)
+    network = make_network(fluid=fluid, mass_flow_rate=5.0, boundary_temperature=300.0, upstream_pressure=101325.0)
     fluid.density = 0.0 # Then set density to 0.0 for the test
     with pytest.raises(ValueError, match="density must be positive to determine flow parameters"):
         network.current_volumetric_flow_rate()

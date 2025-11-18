@@ -20,6 +20,7 @@ from network_hydraulic.io import results as results_io
 from network_hydraulic.io.loader import ConfigurationLoader
 from network_hydraulic.solver.network_solver import NetworkSolver
 from network_hydraulic.solver.network_system_solver import NetworkSystemSolver
+from network_hydraulic.optimizer.system_optimizer import NetworkSystemOptimizer
 from network_hydraulic.utils.logging_config import configure_logging
 
 app = typer.Typer(help="Hydraulic calculation framework")
@@ -44,6 +45,8 @@ def _execute_run(
                 len(system.bundles),
                 config,
             )
+            optimizer = NetworkSystemOptimizer(system.optimizer_settings)
+            optimizer.run(system)
             solver_settings = system.solver_settings
             solver_kwargs = {}
             if solver_settings.max_iterations is not None:

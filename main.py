@@ -14,6 +14,7 @@ from network_hydraulic.io.loader import ConfigurationLoader
 from network_hydraulic.io import results as result_io
 from network_hydraulic.solver.network_solver import NetworkSolver
 from network_hydraulic.solver.network_system_solver import NetworkSystemSolver
+from network_hydraulic.optimizer.system_optimizer import NetworkSystemOptimizer
 
 
 def parse_args() -> argparse.Namespace:
@@ -42,6 +43,8 @@ def main() -> None:
     loader = ConfigurationLoader.from_yaml_path(args.config)
     if loader.has_network_collection:
         system = loader.build_network_system()
+        optimizer = NetworkSystemOptimizer(system.optimizer_settings)
+        optimizer.run(system)
         solver_settings = system.solver_settings
         solver_kwargs = {}
         if solver_settings.max_iterations is not None:

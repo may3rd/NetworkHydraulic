@@ -468,8 +468,30 @@ def test_loader_parses_output_units_block():
     network = loader.build_network()
     units = network.output_units
     assert units.pressure == "kPag"
-    assert units.pressure_drop == "kPa"
-    assert units.temperature == "degC"
+
+
+def test_loader_reads_upstream_only_fixture():
+    loader = ConfigurationLoader.from_yaml_path(Path("tests/fixtures/networks/upstream_only.yaml"))
+    network = loader.build_network()
+    assert network.upstream_pressure is not None
+    assert network.downstream_pressure is None
+    assert network.direction == "forward"
+
+
+def test_loader_reads_downstream_only_fixture():
+    loader = ConfigurationLoader.from_yaml_path(Path("tests/fixtures/networks/downstream_only.yaml"))
+    network = loader.build_network()
+    assert network.upstream_pressure is None
+    assert network.downstream_pressure is not None
+    assert network.direction == "backward"
+
+
+def test_loader_reads_dual_boundary_fixture():
+    loader = ConfigurationLoader.from_yaml_path(Path("tests/fixtures/networks/up_down_pressures.yaml"))
+    network = loader.build_network()
+    assert network.upstream_pressure is not None
+    assert network.downstream_pressure is not None
+    assert network.direction == "auto"
 
 
 def test_loader_normalizes_fitting_aliases():

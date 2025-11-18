@@ -201,7 +201,12 @@ class NetworkSolver:
             )
             section.mass_flow_rate = section.design_mass_flow_rate
             section.temperature = network.boundary_temperature
-            section.pressure = network.boundary_pressure
+            boundary = (
+                network.upstream_pressure
+                if network.direction != "backward"
+                else network.downstream_pressure
+            )
+            section.pressure = boundary
 
     def _distribute_mass_flow(self, network: Network, forward: bool) -> None:
         base_mass_flow = network.mass_flow_rate

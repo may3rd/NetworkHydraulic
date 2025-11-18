@@ -9,6 +9,7 @@ from network_hydraulic.models.results import (
     SectionResult,
     StatePoint,
 )
+from network_hydraulic.models.network_system import NetworkSystemResult, NetworkResultBundle
 
 
 def _round_value(value: Optional[float], precision: int = 9) -> Optional[float]:
@@ -78,4 +79,24 @@ def snapshot_payload(
         "network": network_name,
         "config": config_path,
         "result": serialize_result(result),
+    }
+
+
+def system_snapshot_payload(
+    *,
+    config_path: str,
+    result: NetworkSystemResult,
+) -> Dict[str, Any]:
+    """Build payload for multi-network snapshots."""
+    return {
+        "config": config_path,
+        "bundles": [
+            {
+                "id": bundle.bundle_id,
+                "network": bundle.network.name,
+                "result": serialize_result(bundle.result),
+            }
+            for bundle in result.bundles
+        ],
+        "shared_nodes": {node: _round_value(pressure) for node, pressure in result.shared_node_pressures.items()},
     }
