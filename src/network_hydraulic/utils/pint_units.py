@@ -19,7 +19,6 @@ P_atm_bar = P_atm.to(u.bar).magnitude
 u.define("ksc = kilogram_force / centimeter**2")
 
 # You can also add aliases
-u.define("kgf_cm2 = ksc")
 P_atm_ksc = P_atm.to(u.ksc).magnitude
 
 # 3. Define the new gauge pressure units
@@ -64,8 +63,8 @@ u.define("kg_cm2g = 1 * ksc; offset: 1.033227452799886")    # exactly 1 atm in k
 u.define("@alias kg_cm2g = kg/cm²g = kg/cm2g = kgf/cm²g = kgf/cm2g = atg")
 
 # Optional short forms that many engineers type
-u.define("@alias kg_cm2  = kgcm2")
-u.define("@alias kg_cm2g = kgcm2g")
+u.define("@alias kg_cm2  = kgcm2 = kgfcm2 = kgf_cm2")
+u.define("@alias kg_cm2g = kgcm2g = kgfcm2g = kgf_cm2g")
 
 # Conventional water column units (ρ_water = 1000 kg/m³, g = 9.80665 m/s²)
 u.define("mmH2O = 9.80665 pascal = mmH₂O = mmH2O_g = mmWG = mmwg = millimeter_water")

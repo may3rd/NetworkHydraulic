@@ -29,8 +29,6 @@ def _execute_run(
     *,
     config: Path,
     output: Path | None,
-    default_diameter: float | None,
-    flow_rate: float | None,
     debug_fittings: bool,
 ) -> None:
     configure_logging()
@@ -41,21 +39,7 @@ def _execute_run(
         network = loader.build_network()
         logger.info("Loaded network '%s' with %d section(s)", network.name, len(network.sections))
 
-        solver = NetworkSolver(
-            default_pipe_diameter=default_diameter,
-        )
-        if flow_rate is not None:
-            try:
-                density = network.fluid.current_density(network.boundary_temperature, network.boundary_pressure)
-                network.mass_flow_rate = flow_rate * density
-                logger.info(
-                    "Overriding network mass_flow_rate to %.2f kg/s (from %.2f m^3/s)",
-                    network.mass_flow_rate,
-                    flow_rate,
-                )
-            except ValueError as exc:
-                typer.secho(f"Fluid property error: {exc}", fg=typer.colors.RED)
-                raise typer.Exit(code=1) from exc
+        solver = NetworkSolver()
         result = solver.run(network)
     except ValueError as exc:
         typer.secho(f"Configuration error: {exc}", fg=typer.colors.RED)
@@ -90,18 +74,6 @@ def run(
         "-o",
         help="Optional path to write the calculation results (YAML unless suffix is .json).",
     ),
-    default_diameter: float | None = typer.Option(
-        None,
-        "--default-diameter",
-        "-d",
-        help="Fallback pipe diameter in meters when a section omits pipe_diameter.",
-    ),
-    flow_rate: float | None = typer.Option(
-        None,
-        "--flow-rate",
-        "-f",
-        help="Override volumetric flow rate (m^3/s) passed to calculators.",
-    ),
     debug_fittings: bool = typer.Option(
         False,
         "--debug-fittings",
@@ -112,8 +84,6 @@ def run(
     _execute_run(
         config=config,
         output=output,
-        default_diameter=default_diameter,
-        flow_rate=flow_rate,
         debug_fittings=debug_fittings,
     )
 
