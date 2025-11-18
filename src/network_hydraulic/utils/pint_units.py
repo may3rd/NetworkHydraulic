@@ -54,6 +54,22 @@ u.define(f"ksc_gauge = 1 * ksc; offset: {P_atm_ksc}")
 
 # You can also add an alias with 'g'
 u.define("@alias ksc_gauge = kscg")
+# ----------------------------------------------------------------------
+# kg/cm² (absolute) – very widely used in Asia, Latin America, and older European documentation
+# ----------------------------------------------------------------------
+u.define("kg_cm2 = kilogram_force / centimeter**2")           # same physical unit as ksc
+
+# kg/cm² gauge – the gauge variant you actually need in daily work
+u.define("kg_cm2g = 1 * ksc; offset: 1.033227452799886")    # exactly 1 atm in kg/cm²
+u.define("@alias kg_cm2g = kg/cm²g = kg/cm2g = kgf/cm²g = kgf/cm2g = atg")
+
+# Optional short forms that many engineers type
+u.define("@alias kg_cm2  = kgcm2")
+u.define("@alias kg_cm2g = kgcm2g")
+
+# Conventional water column units (ρ_water = 1000 kg/m³, g = 9.80665 m/s²)
+u.define("mmH2O = 9.80665 pascal = mmH₂O = mmH2O_g = mmWG = mmwg = millimeter_water")
+u.define("cmH2O = 10 * mmH2O = cmH₂O = cmH2O_g = cmWG = cmwg = centimeter_water")
 
 def u_convert_float(value: float, from_unit: str, to_unit: str) -> float:
     """
@@ -142,6 +158,7 @@ if __name__ == "__main__":
     print(f"{pressure_g_3} = {pressure_g_3.to(u.psi):.5f} (absolute)")
     print(f"{pressure_g_3} = {pressure_g_3.to(u.psig):.5f} (gauge)")
     print(f"{pressure_g_3} = {pressure_g_3.to(u.kscg):.5f} (gauge)")
+    print(f"{pressure_g_3} = {pressure_g_3.to(u.kg_cm2g):.5f} (gauge)")
     print("-" * 40)
 
 

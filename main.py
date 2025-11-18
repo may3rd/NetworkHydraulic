@@ -29,12 +29,6 @@ def parse_args() -> argparse.Namespace:
         help="Optional path to write calculation results as YAML",
     )
     parser.add_argument(
-        "--default-diameter",
-        type=float,
-        default=0.1,
-        help="Default pipe diameter to use if not specified in section configs",
-    )
-    parser.add_argument(
         "--debug-fittings",
         action="store_true",
         help="Print per-fitting K contributions for each section",
