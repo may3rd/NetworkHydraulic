@@ -19,6 +19,7 @@ from network_hydraulic.models.fluid import GAS_CONSTANT
 from network_hydraulic.models.output_units import OutputUnits
 from network_hydraulic.models.pipe_section import PipeSection
 from network_hydraulic.models.topology import TopologyEdge, TopologyGraph
+from network_hydraulic.models.results import PressureDropDetails
 from network_hydraulic.utils.units import convert as convert_units
 
 STANDARD_TEMPERATURE = 273.15  # 0 °C
@@ -116,9 +117,20 @@ def print_summary(network: "Network", result: "NetworkResult", *, debug: bool = 
         print(
             f"  Piping and Fitting Factor: {pd.piping_and_fitting_safety_factor or 0:.5f}")
         print(f"  Total K: {pd.total_K or 0:.5f}")
+        equivalent_length = _equivalent_length(section, pd)
+        # convert equivalent_length to ouput unit
+        equivalent_unit = network.output_units.length or "m"
+        if equivalent_length is not None:
+            equivalent_length = convert_units(
+                equivalent_length, "m", equivalent_unit)
+        else:
+            equivalent_unit = "m"
+        print(
+            f"  Equivalent Length: {fmt(equivalent_length)} {equivalent_unit}"
+        )
         if debug:
             _print_fitting_breakdown("    ", pd.fitting_breakdown)
-        _print_control_elements(section)
+        _print_control_valve_and_orifice_elements(section)
         print(f"CHARACTERISTIC SUMMARY")
         print(f"  Reynolds Number: {pd.reynolds_number or 0:.3f}")
         print(f"  Flow Regime: {pd.flow_scheme or 'N/A'}")
@@ -229,6 +241,19 @@ def _pressure_drop_dict(details, length: float | None, converter: _OutputUnitCon
             else converter.pressure_drop(details.normalized_friction_loss)
         ),
     }
+
+
+def _equivalent_length(section: Optional[PipeSection], pd: PressureDropDetails) -> Optional[float]:
+    if section is None:
+        return None
+    diameter = section.pipe_diameter
+    if diameter is None or diameter <= 0:
+        return None
+    friction = pd.frictional_factor
+    total_k = pd.total_K
+    if friction is None or friction <= 0 or total_k is None or total_k <= 0:
+        return None
+    return total_k * diameter / friction
 
 
 def _summary_dict(summary: "ResultSummary", converter: _OutputUnitConverter) -> Dict[str, Any]:
@@ -678,7 +703,8 @@ def _print_section_overview(
     def pipe_value(value: Optional[float], unit: Optional[str] = None) -> str:
         if value is None:
             return "—"
-        text = fmt(float(value))
+        converted_value = convert_units(value, "m", unit or "m")
+        text = fmt(float(converted_value))
         return f"{text} {unit}" if unit else text
 
     print(f"Section ID: {section_id or '—'}")
@@ -750,23 +776,23 @@ def _print_section_overview(
     print(f"  Pipe NPD: {pipe_value(section.pipe_NPD) if section else '—'}")
     print(f"  Schedule: {fmt(section.schedule) if section else '—'}")
     print(
-        f"  Inlet Diameter: {pipe_value(section.inlet_diameter, 'm') if section else '—'}")
+        f"  Inlet Diameter: {pipe_value(section.inlet_diameter, network.output_units.small_length) if section else '—'}")
     print(
-        f"  Pipe Diameter: {pipe_value(section.pipe_diameter, 'm') if section else '—'}")
+        f"  Pipe Diameter: {pipe_value(section.pipe_diameter, network.output_units.small_length) if section else '—'}")
     print(
-        f"  Outlet Diameter: {pipe_value(section.outlet_diameter, 'm') if section else '—'}")
+        f"  Outlet Diameter: {pipe_value(section.outlet_diameter, network.output_units.small_length) if section else '—'}")
     print(
-        f"  Roughness: {pipe_value(section.roughness, 'm') if section else '—'}")
+        f"  Roughness: {pipe_value(section.roughness, network.output_units.small_length) if section else '—'}")
     print(
-        f"  Pipe Length: {pipe_value(section.length, 'm') if section else '—'}")
+        f"  Pipe Length: {pipe_value(section.length, network.output_units.length) if section else '—'}")
     print(
-        f"  Elevation Change: {pipe_value(section.elevation_change, 'm') if section else '—'}")
+        f"  Elevation Change: {pipe_value(section.elevation_change, network.output_units.length) if section else '—'}")
     print(
         f"  Erosional Constant: {pipe_value(section.erosional_constant) if section else '—'}")
     print(f"  Fitting Type: {fmt(section.fitting_type) if section else '—'}")
 
 
-def _print_control_elements(section: Optional["PipeSection"]) -> None:
+def _print_control_valve_and_orifice_elements(section: Optional["PipeSection"]) -> None:
     if section is None:
         return
     if section.control_valve:

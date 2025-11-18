@@ -26,6 +26,8 @@ network:
     mass_flow_rate: kg/h
     flow_momentum: Pa
     gas_flow_critical_pressure: kPa
+    length: m
+    small_length: mm
   fluid:
     name: liquid
     phase: liquid

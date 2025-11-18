@@ -25,6 +25,10 @@ class OutputUnits:
     mass_flow_rate: str = "kg/s"
     flow_momentum: str = "Pa"
     gas_flow_critical_pressure: str = "Pa"
+    length: str = "m"
+    small_length: str = "mm"
+    area: str = "m^2"
+
 
     def __post_init__(self) -> None:
         self.pressure = self._normalize(self.pressure, "kPag")
@@ -36,6 +40,9 @@ class OutputUnits:
         self.mass_flow_rate = self._normalize(self.mass_flow_rate, "kg/s")
         self.flow_momentum = self._normalize(self.flow_momentum, "kPa")
         self.gas_flow_critical_pressure = self._normalize(self.gas_flow_critical_pressure or self.pressure_drop, "kPa")
+        self.length = self._normalize(self.length, "m")
+        self.small_length = self._normalize(self.small_length, "mm")
+        self.area = self._normalize(self.area, "m^2")
 
         errors: list[str] = []
         for field_name in self.__dataclass_fields__:

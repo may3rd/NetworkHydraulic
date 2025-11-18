@@ -17,6 +17,8 @@ network:
     mass_flow_rate: kg/h
     flow_momentum: Pa
     gas_flow_critical_pressure: kPa
+    length: m
+    small_length: mm
   mass_flow_rate:
     value: 1000.0
     unit: kg/h
