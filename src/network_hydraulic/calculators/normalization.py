@@ -11,6 +11,9 @@ from network_hydraulic.models.pipe_section import PipeSection
 class NormalizedLossCalculator(LossCalculator):
     def calculate(self, section: PipeSection) -> None:
         pressure_drop = section.calculation_output.pressure_drop
+        if not section.has_pipeline_segment or section.control_valve or section.orifice:
+            pressure_drop.normalized_friction_loss = None
+            return
         total_k = section.total_K or 0.0
         equivalent_length = section.equivalent_length or 0.0
         friction_drop = pressure_drop.pipe_and_fittings

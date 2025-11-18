@@ -19,7 +19,7 @@ import logging
 from copy import deepcopy
 from dataclasses import dataclass
 from math import pi, sqrt
-from typing import Iterable, List, Optional
+from typing import Dict, Iterable, List, Optional
 
 from network_hydraulic.calculators.elevation import ElevationCalculator
 from network_hydraulic.calculators.fittings import FittingLossCalculator
@@ -59,7 +59,13 @@ class NetworkSolver:
     gas_flow_model: Optional[str] = None
     friction_factor_type: str = "darcy"
 
-    def run(self, network: Network, direction_override: Optional[str] = None) -> NetworkResult:
+    def run(
+        self,
+        network: Network,
+        direction_override: Optional[str] = None,
+        *,
+        node_pressure_overrides: Optional[Dict[str, float]] = None,
+    ) -> NetworkResult:
 
         calculators = self._build_calculators(network)
         result = NetworkResult()
@@ -111,6 +117,7 @@ class NetworkSolver:
             network,
             direction=resolved_direction,
             boundary=boundary_hint,
+            node_pressure_overrides=node_pressure_overrides,
         )
         result.node_pressures = node_pressures
         self._populate_states(sections, network)
@@ -263,6 +270,7 @@ class NetworkSolver:
         network: Network,
         direction: str,
         boundary: Optional[float],
+        node_pressure_overrides: Optional[Dict[str, float]],
     ) -> dict[str, float]:
         sections = list(sections)
         if not sections:
@@ -286,10 +294,17 @@ class NetworkSolver:
         )
         graph = network.topology
         node_pressures: dict[str, Optional[float]] = {node_id: None for node_id in graph.nodes}
+        overrides = node_pressure_overrides or {}
+        for node_id, override in overrides.items():
+            if node_id not in node_pressures:
+                node_pressures[node_id] = None
+            self._set_node_pressure(node_pressures, node_id, override)
         start_nodes = graph.start_nodes(forward)
         if not start_nodes:
             start_nodes = list(graph.nodes.keys())
         for node_id in start_nodes:
+            if node_id in overrides and overrides[node_id] is not None:
+                continue
             self._set_node_pressure(node_pressures, node_id, boundary_hint)
 
         if network.fluid.is_gas():
@@ -700,6 +715,8 @@ class NetworkSolver:
         if component != "pipeline":
             section.pipe_length_K = 0.0
             section.fitting_K = 0.0
+            section.equivalent_length = None
+            section.calculation_output.pressure_drop.pipe_and_fittings = 0.0
             self._remove_pipeline_elevation(section)
 
     @staticmethod

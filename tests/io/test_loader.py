@@ -194,6 +194,57 @@ def _cycle_network_cfg() -> dict:
     return raw
 
 
+def _multi_network_cfg() -> dict:
+    fluid = {
+        "name": "water",
+        "phase": "liquid",
+        "density": 1000.0,
+        "viscosity": 1e-3,
+    }
+    supply_section = section_cfg(
+        id="supply",
+        from_node_id="node-source",
+        to_node_id="node-junction",
+    )
+    branch_section = section_cfg(
+        id="branch",
+        from_node_id="node-junction",
+        to_node_id="node-leaf",
+    )
+    return {
+        "networks": [
+            {
+                "id": "supply-net",
+                "name": "Supply",
+                "direction": "forward",
+                "mass_flow_rate": 1.0,
+                "boundary_temperature": 300.0,
+                "boundary_pressure": 101325.0,
+                "fluid": fluid,
+                "sections": [supply_section],
+            },
+            {
+                "id": "branch-net",
+                "name": "Branch",
+                "direction": "forward",
+                "mass_flow_rate": 0.5,
+                "boundary_temperature": 300.0,
+                "boundary_pressure": 90000.0,
+                "fluid": fluid,
+                "sections": [branch_section],
+            },
+        ],
+        "links": [
+            {
+                "members": [
+                    {"network": "supply-net", "node": "node-junction"},
+                    {"network": "branch-net", "node": "node-junction"},
+                ]
+            }
+        ],
+    }
+
+
 def test_loader_warns_on_branching(caplog):
     caplog.set_level(logging.WARNING)
     loader = ConfigurationLoader(raw=_branching_network_cfg())
@@ -607,3 +658,43 @@ def test_loader_raises_for_invalid_fluid_phase():
     loader = ConfigurationLoader(raw=raw)
     with pytest.raises(ValueError, match="fluid.phase must be 'liquid', 'gas', or 'vapor'"):
         loader.build_network()
+
+
+def test_build_network_system_links_nodes():
+    loader = ConfigurationLoader(raw=_multi_network_cfg())
+    system = loader.build_network_system()
+    assert len(system.bundles) == 2
+    supply = next(bundle for bundle in system.bundles if bundle.id == "supply-net")
+    branch = next(bundle for bundle in system.bundles if bundle.id == "branch-net")
+    # Junction node should share a canonical ID
+    assert supply.node_mapping["node-junction"] == branch.node_mapping["node-junction"]
+    shared_id = supply.node_mapping["node-junction"]
+    assert shared_id in system.shared_nodes
+    group = system.shared_nodes[shared_id]
+    assert len(group.members) == 2
+
+
+def test_build_network_raises_when_multiple_networks_defined():
+    loader = ConfigurationLoader(raw=_multi_network_cfg())
+    with pytest.raises(ValueError, match="build_network_system"):
+        loader.build_network()
+
+
+def test_primary_network_member_becomes_leader():
+    raw = _multi_network_cfg()
+    raw["networks"][1]["primary"] = True
+    loader = ConfigurationLoader(raw=raw)
+    system = loader.build_network_system()
+    group = next(group for group in system.shared_nodes.values() if len(group.members) > 1)
+    assert group.members[0].network_id == "branch-net"
+
+
+def test_backward_direction_defaults_to_last_member_leader():
+    raw = _multi_network_cfg()
+    for entry in raw["networks"]:
+        entry["direction"] = "backward"
+        entry.pop("primary", None)
+    loader = ConfigurationLoader(raw=raw)
+    system = loader.build_network_system()
+    group = next(group for group in system.shared_nodes.values() if len(group.members) > 1)
+    assert group.members[0].network_id == "branch-net"

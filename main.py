@@ -13,6 +13,7 @@ if str(SRC_PATH) not in sys.path:
 from network_hydraulic.io.loader import ConfigurationLoader
 from network_hydraulic.io import results as result_io
 from network_hydraulic.solver.network_solver import NetworkSolver
+from network_hydraulic.solver.network_system_solver import NetworkSystemSolver
 
 
 def parse_args() -> argparse.Namespace:
@@ -39,6 +40,22 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     loader = ConfigurationLoader.from_yaml_path(args.config)
+    if loader.has_network_collection:
+        system = loader.build_network_system()
+        solver = NetworkSystemSolver()
+        try:
+            system_result = solver.run(system)
+        except ValueError as exc:
+            print(f"Configuration Error: {exc}")
+            return
+        except Exception as exc:  # pragma: no cover - manual testing helper
+            print(f"An unexpected error occurred during calculation: {exc}")
+            return
+        result_io.print_system_summary(system, system_result, debug=args.debug_fittings)
+        if args.output:
+            result_io.write_system_output(args.output, system_result)
+        return
+
     network = loader.build_network()
     solver = NetworkSolver()
     try:

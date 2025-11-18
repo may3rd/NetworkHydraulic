@@ -74,6 +74,10 @@ class FittingLossCalculator(LossCalculator):
         if not section.has_pipeline_segment:
             section.fitting_K = 0.0
             return
+        if section.control_valve or section.orifice:
+            section.fitting_K = 0.0
+            details.fitting_breakdown = []
+            return
         if not section.fittings:
             section.fitting_K = 0.0
             return

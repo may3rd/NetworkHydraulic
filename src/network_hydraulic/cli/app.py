@@ -19,6 +19,7 @@ import typer
 from network_hydraulic.io import results as results_io
 from network_hydraulic.io.loader import ConfigurationLoader
 from network_hydraulic.solver.network_solver import NetworkSolver
+from network_hydraulic.solver.network_system_solver import NetworkSystemSolver
 from network_hydraulic.utils.logging_config import configure_logging
 
 app = typer.Typer(help="Hydraulic calculation framework")
@@ -36,6 +37,22 @@ def _execute_run(
 
     try:
         loader = _load_configuration(config)
+        if loader.has_network_collection:
+            system = loader.build_network_system()
+            logger.info(
+                "Loaded %d network(s) from '%s'",
+                len(system.bundles),
+                config,
+            )
+            solver = NetworkSystemSolver()
+            system_result = solver.run(system)
+            results_io.print_system_summary(system, system_result, debug=debug_fittings)
+            if output:
+                results_io.write_system_output(output, system_result)
+            for bundle in system_result.bundles:
+                logger.info("Completed solver run for network '%s'", bundle.network.name)
+            return
+
         network = loader.build_network()
         logger.info("Loaded network '%s' with %d section(s)", network.name, len(network.sections))
 

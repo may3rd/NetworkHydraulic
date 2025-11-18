@@ -41,6 +41,7 @@ class Network:
     design_margin: float = 0.0 # For design rate 110% set design_margin = 0.1
     topology: TopologyGraph = field(default_factory=TopologyGraph)
     downstream_pressure: Optional[float] = None
+    primary: bool = False
 
     def __post_init__(self) -> None:
         errors: list[str] = []
@@ -98,6 +99,7 @@ class Network:
         if errors:
             raise ValueError("; ".join(errors))
 
+        self.primary = bool(self.primary)
         self.rebuild_topology()
 
     def add_section(self, section: PipeSection) -> None:

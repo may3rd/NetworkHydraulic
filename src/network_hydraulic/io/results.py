@@ -37,6 +37,11 @@ if TYPE_CHECKING:  # pragma: no cover - hints only
     )
     from network_hydraulic.models.fluid import Fluid
     from network_hydraulic.models.pipe_section import Fitting
+    from network_hydraulic.models.network_system import (
+        NetworkResultBundle,
+        NetworkSystem,
+        NetworkSystemResult,
+    )
 
 
 @dataclass(slots=True)
@@ -174,13 +179,41 @@ def write_output(
     result: "NetworkResult",
 ) -> None:
     """Persist calculation results back to YAML honoring configured output units."""
+    payload = _serialize_network_payload(network, result)
+    data = {"network": payload}
+    _write_structured_output(path, data)
+
+
+def write_system_output(
+    path: Path,
+    system_result: "NetworkSystemResult",
+) -> None:
+    """Persist multi-network calculation results."""
+    networks_payload: List[Dict[str, Any]] = []
+    for bundle in system_result.bundles:
+        payload = _serialize_network_payload(bundle.network, bundle.result)
+        payload["id"] = bundle.bundle_id
+        networks_payload.append(payload)
+    data = {
+        "networks": networks_payload,
+        "shared_nodes": system_result.shared_node_pressures,
+    }
+    _write_structured_output(path, data)
+
+
+def _serialize_network_payload(
+    network: "Network",
+    result: "NetworkResult",
+) -> Dict[str, Any]:
     converter = _OutputUnitConverter(network.output_units)
     network_cfg = _network_config(network, converter, result)
-    section_results = {
-        section.section_id: section for section in result.sections}
+    section_results = {section.section_id: section for section in result.sections}
     mass_flow_rate = network.mass_flow_rate
     standard_density = _standard_gas_density(
-        network.fluid, STANDARD_TEMPERATURE, STANDARD_PRESSURE)
+        network.fluid,
+        STANDARD_TEMPERATURE,
+        STANDARD_PRESSURE,
+    )
 
     for section in network.sections:
         section_cfg = _section_config(section, network.topology)
@@ -197,20 +230,44 @@ def write_output(
         network_cfg["sections"].append(section_cfg)
 
     flow_summary = _flow_dict(
-        result.summary, mass_flow_rate, standard_density, converter)
+        result.summary,
+        mass_flow_rate,
+        standard_density,
+        converter,
+    )
     network_cfg["summary"] = {
         "state": _summary_dict(result.summary, converter),
         "pressure_drop": _pressure_drop_dict(result.aggregate.pressure_drop, None, converter),
         "flow": flow_summary,
     }
+    return network_cfg
 
-    data = {"network": network_cfg}
+
+def _write_structured_output(path: Path, data: Dict[str, Any]) -> None:
     suffix = path.suffix.lower()
     with path.open("w", encoding="utf-8") as handle:
         if suffix == ".json":
             json.dump(data, handle, indent=2)
         else:
             yaml.safe_dump(data, handle, sort_keys=False)
+
+
+def print_system_summary(
+    system: "NetworkSystem",
+    result: "NetworkSystemResult",
+    *,
+    debug: bool = False,
+) -> None:
+    """Print a summary for each network in a system run."""
+    for bundle in result.bundles:
+        print_summary(bundle.network, bundle.result, debug=debug)
+    if result.shared_node_pressures:
+        print("Shared Nodes:")
+        for node_id in sorted(result.shared_node_pressures):
+            pressure = result.shared_node_pressures[node_id]
+            if pressure is None:
+                continue
+            print(f"  {node_id}: {pressure:.3f} Pa")
 
 
 def _pressure_drop_dict(details, length: float | None, converter: _OutputUnitConverter) -> Dict[str, Any]:

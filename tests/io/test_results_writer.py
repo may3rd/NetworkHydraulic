@@ -17,6 +17,7 @@ from network_hydraulic.models.results import (
     StatePoint,
 )
 from network_hydraulic.models.output_units import OutputUnits
+from network_hydraulic.models.network_system import NetworkResultBundle, NetworkSystemResult
 from network_hydraulic.utils.units import convert
 
 
@@ -511,3 +512,61 @@ def test_topology_node_state_uses_lowest_pressure(tmp_path: Path):
     nodes = data["network"]["topology"]["nodes"]
     center = next(node for node in nodes if node["id"] == "node-split")
     assert center["state"]["pressure"] == pytest.approx(95000.0)
+
+
+def test_write_system_output_writes_multiple_networks(tmp_path: Path):
+    section_a = build_section("a")
+    section_b = build_section("b")
+    fluid = build_fluid()
+    network_a = Network(
+        name="north",
+        description=None,
+        fluid=fluid,
+        direction="forward",
+        boundary_pressure=150000.0,
+        gas_flow_model="isothermal",
+        sections=[section_a],
+        boundary_temperature=300.0,
+        mass_flow_rate=2.0,
+    )
+    network_b = Network(
+        name="south",
+        description=None,
+        fluid=fluid,
+        direction="forward",
+        boundary_pressure=140000.0,
+        gas_flow_model="isothermal",
+        sections=[section_b],
+        boundary_temperature=295.0,
+        mass_flow_rate=1.0,
+    )
+    summary_a = make_summary(density=4.0)
+    summary_b = make_summary(density=5.0)
+    result_a = NetworkResult(
+        sections=[make_results(summary_a, section_id="a")],
+        aggregate=CalculationOutput(),
+        summary=summary_a,
+    )
+    result_b = NetworkResult(
+        sections=[make_results(summary_b, section_id="b")],
+        aggregate=CalculationOutput(),
+        summary=summary_b,
+    )
+    system_result = NetworkSystemResult(
+        bundles=[
+            NetworkResultBundle(bundle_id="north-bundle", network=network_a, result=result_a),
+            NetworkResultBundle(bundle_id="south-bundle", network=network_b, result=result_b),
+        ],
+        shared_node_pressures={"north::junction": 101325.0},
+    )
+
+    out_path = tmp_path / "system.yaml"
+    results_io.write_system_output(out_path, system_result)
+
+    with out_path.open("r", encoding="utf-8") as handle:
+        data = yaml.safe_load(handle)
+
+    assert len(data["networks"]) == 2
+    ids = {entry["id"] for entry in data["networks"]}
+    assert ids == {"north-bundle", "south-bundle"}
+    assert data["shared_nodes"]["north::junction"] == pytest.approx(101325.0)

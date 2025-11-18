@@ -22,7 +22,7 @@ class ElevationCalculator(LossCalculator):
 
     def calculate(self, section: PipeSection) -> None:
         pressure_drop = section.calculation_output.pressure_drop
-        if not section.has_pipeline_segment:
+        if not section.has_pipeline_segment or section.control_valve or section.orifice:
             pressure_drop.elevation_change = 0.0
             return
         if self.fluid.phase.lower() in GAS_PHASES:

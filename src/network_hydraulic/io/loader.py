@@ -23,6 +23,18 @@ from ruamel.yaml import YAML
 from network_hydraulic.models.components import ControlValve, Orifice
 from network_hydraulic.models.fluid import Fluid
 from network_hydraulic.models.network import Network
+from network_hydraulic.models.network_system import (
+    NetworkBundle,
+    NetworkSystem,
+    SharedNodeGroup,
+    SharedNodeMember,
+)
+from network_hydraulic.models.network_system import (
+    NetworkBundle,
+    NetworkSystem,
+    SharedNodeGroup,
+    SharedNodeMember,
+)
 from network_hydraulic.models.pipe_section import Fitting, PipeSection
 from network_hydraulic.models.output_units import OutputUnits
 from network_hydraulic.utils.pipe_dimensions import inner_diameter_from_nps
@@ -179,13 +191,25 @@ class ConfigurationLoader:
             raw = {root.tag: raw_data}
         return cls(raw=raw)
 
+    @property
+    def has_network_collection(self) -> bool:
+        networks_cfg = self.raw.get("networks")
+        if isinstance(networks_cfg, list):
+            return len(networks_cfg) > 0
+        return False
+
     def build_network(self) -> Network:
+        if self.has_network_collection:
+            raise ValueError(
+                "Configuration defines multiple networks; call build_network_system() instead."
+            )
         network_cfg = self.raw.get("network", {})
+        return self._build_network_from_config(network_cfg)
+
+    def _build_network_from_config(self, network_cfg: Dict[str, Any]) -> Network:
         logger.info("Building network configuration from loader data")
-        
-        # self._validate_keys(network_cfg, NETWORK_ALLOWED_KEYS, context="network")
         logger.info("'%s' is loaded successfully.", network_cfg.get("name", "network"))
-        
+
         raw_boundary_temperature = (
             network_cfg.get("boundary_temperature")
             if network_cfg.get("boundary_temperature") is not None
@@ -197,7 +221,7 @@ class ConfigurationLoader:
             target_unit="K",
         )
         logger.info(f"{boundary_temperature} is loaded successfully.")
-        
+
         raw_boundary_pressure = (
             network_cfg.get("boundary_pressure")
             if network_cfg.get("boundary_pressure") is not None
@@ -221,16 +245,15 @@ class ConfigurationLoader:
         mass_flow_rate_val = self._require_positive_quantity(
             network_cfg.get("mass_flow_rate"),
             "network.mass_flow_rate",
-            target_unit="kg/s"
+            target_unit="kg/s",
         )
         logger.info(f"{mass_flow_rate_val} is loaded successfully.")
-        
-        # Load Fluid configuration
+
         fluid_cfg = network_cfg.get("fluid", {})
         if fluid_cfg is None or fluid_cfg == {}:
             raise ValueError("network.fluid must be provided")
         fluid = self._build_fluid(fluid_cfg)
-        
+
         sections_cfg: List[Dict[str, Any]] = network_cfg.get("sections", [])
         sections = [self._build_section(cfg) for cfg in sections_cfg]
         self._align_adjacent_diameters(sections)
@@ -256,8 +279,11 @@ class ConfigurationLoader:
             gas_flow_model=gas_flow_model,
             sections=sections,
             output_units=output_units,
-            design_margin=self._coerce_optional_float(network_cfg.get("design_margin"), "network.design_margin"),
+            design_margin=self._coerce_optional_float(
+                network_cfg.get("design_margin"), "network.design_margin"
+            ),
             downstream_pressure=downstream_pressure,
+            primary=bool(network_cfg.get("primary", False)),
         )
         logger.info(
             "Built network '%s' with %d section(s) and fluid '%s'",
@@ -285,7 +311,9 @@ class ConfigurationLoader:
                 start_nodes,
             )
         else:
-            logger.info("Network '%s' source node '%s' will drive flow direction", network.name, start_nodes[0])
+            logger.info(
+                "Network '%s' source node '%s' will drive flow direction", network.name, start_nodes[0]
+            )
 
         if start_nodes:
             reachable = network.topology.reachable_nodes(start_nodes)
@@ -299,6 +327,38 @@ class ConfigurationLoader:
                     disconnected,
                 )
         return network
+
+    def build_network_system(self) -> NetworkSystem:
+        networks_cfg = self.raw.get("networks")
+        bundles: List[NetworkBundle] = []
+        if networks_cfg:
+            if not isinstance(networks_cfg, list):
+                raise ValueError("networks must be a list of network definitions")
+            for index, entry in enumerate(networks_cfg):
+                if not isinstance(entry, dict):
+                    raise ValueError("Each item in networks must be a mapping")
+                entry_cfg = entry.get("network") if isinstance(entry.get("network"), dict) else entry
+                network_cfg = dict(entry_cfg)
+                network_id = (
+                    network_cfg.pop("id", None)
+                    or network_cfg.get("name")
+                    or f"network-{index + 1}"
+                )
+                network = self._build_network_from_config(network_cfg)
+                bundles.append(self._create_bundle(str(network_id), network))
+        else:
+            network_cfg = self.raw.get("network")
+            if not network_cfg:
+                raise ValueError("network configuration is required")
+            network = self._build_network_from_config(dict(network_cfg))
+            network_id = network_cfg.get("id") or network_cfg.get("name") or "network"
+            bundles.append(self._create_bundle(str(network_id), network))
+
+        links_cfg = self.raw.get("links") or []
+        if links_cfg and not isinstance(links_cfg, list):
+            raise ValueError("links must be provided as a list")
+        shared_nodes = self._build_shared_node_groups(bundles, links_cfg)
+        return NetworkSystem(bundles=bundles, shared_nodes=shared_nodes)
 
     def _build_fluid(self, fluid_cfg: Dict[str, Any]) -> Fluid:
         # self._validate_keys(fluid_cfg, {"name", "phase", "viscosity"}, context="fluid")
@@ -658,3 +718,154 @@ class ConfigurationLoader:
             return float(value)
         except (TypeError, ValueError) as exc:
             raise ValueError(f"{name} must be numeric") from exc
+
+    def _create_bundle(self, bundle_id: str, network: Network) -> NetworkBundle:
+        node_mapping: Dict[str, str] = {}
+        for node_id in network.topology.nodes.keys():
+            local_id = str(node_id)
+            node_mapping[local_id] = f"{bundle_id}::{local_id}"
+        return NetworkBundle(id=bundle_id, network=network, node_mapping=node_mapping)
+
+    def _build_shared_node_groups(
+        self,
+        bundles: List[NetworkBundle],
+        links_cfg: List[Dict[str, Any]],
+    ) -> Dict[str, SharedNodeGroup]:
+        union = _NodeUnion()
+        for bundle in bundles:
+            for canonical in bundle.node_mapping.values():
+                union.add(canonical)
+
+        bundle_lookup = {bundle.id: bundle for bundle in bundles}
+        for link_idx, link in enumerate(links_cfg):
+            if not isinstance(link, dict):
+                raise ValueError("links entries must be mappings")
+            members_cfg = link.get("members")
+            if not isinstance(members_cfg, list) or len(members_cfg) < 2:
+                raise ValueError("Each link must include at least two members")
+            canonical_members: List[str] = []
+            for member in members_cfg:
+                if not isinstance(member, dict):
+                    raise ValueError("link members must be mappings")
+                network_id = member.get("network")
+                node_id = member.get("node")
+                if not network_id or not node_id:
+                    raise ValueError("link members must define 'network' and 'node'")
+                bundle = bundle_lookup.get(str(network_id))
+                if bundle is None:
+                    raise ValueError(f"Unknown network '{network_id}' referenced in links[{link_idx}]")
+                canonical = bundle.node_mapping.get(str(node_id))
+                if canonical is None:
+                    raise ValueError(
+                        f"Network '{network_id}' has no node '{node_id}' referenced in links[{link_idx}]"
+                    )
+                canonical_members.append(canonical)
+            anchor = canonical_members[0]
+            for other in canonical_members[1:]:
+                union.union(anchor, other)
+
+        bias_map: Dict[str, float] = {}
+        leader_lookup: Dict[str, SharedNodeMember] = {}
+        for link_idx, link in enumerate(links_cfg):
+            members_cfg = link.get("members") or []
+            if not members_cfg:
+                continue
+            resolved_members: List[tuple[str, str, NetworkBundle]] = []
+            for member in members_cfg:
+                bundle_id = str(member.get("network"))
+                node_id = str(member.get("node"))
+                bundle = bundle_lookup.get(bundle_id)
+                if bundle is None:
+                    continue
+                canonical = bundle.node_mapping.get(node_id)
+                if canonical is None:
+                    continue
+                resolved_members.append((bundle_id, node_id, bundle))
+            if not resolved_members:
+                continue
+            first_bundle = resolved_members[0][2]
+            root = union.find(first_bundle.node_mapping[resolved_members[0][1]])
+            leader_member = self._select_leader_member(resolved_members)
+            leader_lookup.setdefault(
+                root,
+                SharedNodeMember(
+                    network_id=leader_member[0],
+                    node_id=leader_member[1],
+                ),
+            )
+            bias = self._coerce_optional_float(
+                link.get("pressure_bias"),
+                f"links[{link_idx}].pressure_bias",
+            )
+            if bias is None:
+                bias = 0.0
+            existing_bias = bias_map.get(root)
+            if existing_bias is not None and abs(existing_bias - bias) > 1e-6:
+                raise ValueError(
+                    f"Conflicting pressure_bias values for linked nodes in links[{link_idx}]"
+                )
+            bias_map[root] = bias
+
+        groups: Dict[str, SharedNodeGroup] = {}
+        for bundle in bundles:
+            for node_id, canonical in list(bundle.node_mapping.items()):
+                root = union.find(canonical)
+                bundle.node_mapping[node_id] = root
+                group = groups.get(root)
+                if group is None:
+                    group = SharedNodeGroup(
+                        canonical_node_id=root,
+                        pressure_bias=bias_map.get(root, 0.0),
+                    )
+                    groups[root] = group
+                group.members.append(SharedNodeMember(network_id=bundle.id, node_id=node_id))
+
+        for group in groups.values():
+            leader = leader_lookup.get(group.canonical_node_id)
+            if leader is None and group.members:
+                leader = group.members[0]
+            if leader is None:
+                continue
+            group.members.sort(
+                key=lambda member: 0
+                if (member.network_id == leader.network_id and member.node_id == leader.node_id)
+                else 1,
+            )
+        return groups
+
+    @staticmethod
+    def _select_leader_member(
+        resolved_members: List[tuple[str, str, NetworkBundle]],
+    ) -> tuple[str, str, NetworkBundle]:
+        primary_members = [member for member in resolved_members if member[2].network.primary]
+        if primary_members:
+            return primary_members[0]
+        forward_members = [
+            member for member in resolved_members if member[2].network.direction != "backward"
+        ]
+        if forward_members:
+            return forward_members[0]
+        return resolved_members[-1]
+
+
+class _NodeUnion:
+    def __init__(self) -> None:
+        self.parent: Dict[str, str] = {}
+
+    def add(self, item: str) -> None:
+        if item not in self.parent:
+            self.parent[item] = item
+
+    def find(self, item: str) -> str:
+        if item not in self.parent:
+            self.parent[item] = item
+        if self.parent[item] != item:
+            self.parent[item] = self.find(self.parent[item])
+        return self.parent[item]
+
+    def union(self, a: str, b: str) -> None:
+        root_a = self.find(a)
+        root_b = self.find(b)
+        if root_a == root_b:
+            return
+        self.parent[root_b] = root_a

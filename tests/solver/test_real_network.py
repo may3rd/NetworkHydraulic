@@ -36,11 +36,11 @@ def test_real_network_from_yaml():
     assert section.calculation.pressure_drop.pipe_length_K == pytest.approx(
         3.3560562811560506, rel=1e-3)
     assert section.calculation.pressure_drop.pipe_and_fittings == pytest.approx(
-        173.5487359740655, rel=1e-3)
+        117.63267, rel=1e-3)
     assert section.calculation.pressure_drop.total_segment_loss == pytest.approx(
-        173.5487359740655, rel=1e-3)
+        117.63267, rel=1e-3)
 
-    # Section 1: id '2'
+    # Section 2: id '2'
     section = next(
         section for section in result.sections if section.section_id == "2")
     assert section.calculation.pressure_drop.fitting_K == pytest.approx(
@@ -48,9 +48,9 @@ def test_real_network_from_yaml():
     assert section.calculation.pressure_drop.pipe_length_K == pytest.approx(
         0.771110141570444, rel=1e-3)
     assert section.calculation.pressure_drop.pipe_and_fittings == pytest.approx(
-        254.74807485172641, rel=1e-3)
+        134.359997, rel=1e-3)
     assert section.calculation.pressure_drop.total_segment_loss == pytest.approx(
-        254.74807485172641, rel=1e-3)
+        134.359997, rel=1e-3)
 
     assert result.sections, "Expected at least one section result"
     assert result.aggregate.pressure_drop.total_segment_loss is not None

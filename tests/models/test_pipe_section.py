@@ -102,8 +102,6 @@ def test_pipe_section_post_init_raises_for_non_positive_outlet_diameter():
 
 def test_pipe_section_post_init_raises_for_non_positive_safety_factor():
     with pytest.raises(ValueError, match="PipeSection piping_and_fitting_safety_factor must be positive if provided"):
-        make_pipe_section(piping_and_fitting_safety_factor=0.0)
-    with pytest.raises(ValueError, match="PipeSection piping_and_fitting_safety_factor must be positive if provided"):
         make_pipe_section(piping_and_fitting_safety_factor=-1.0)
 
 

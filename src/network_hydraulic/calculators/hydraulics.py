@@ -24,9 +24,10 @@ class FrictionCalculator(LossCalculator):
 
     def calculate(self, section: PipeSection) -> None:
         pressure_drop = section.calculation_output.pressure_drop
-        if not section.has_pipeline_segment:
+        if not section.has_pipeline_segment or section.control_valve or section.orifice:
             section.pipe_length_K = 0.0
             pressure_drop.pipe_and_fittings = 0.0
+            section.equivalent_length = None
             return
         diameter = self._pipe_diameter(section)
         area = 0.25 * pi * diameter * diameter
