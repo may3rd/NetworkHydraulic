@@ -27,3 +27,5 @@ htmlcov/
 .python-version
 
 hydraulic-webapp/node_modules/
+unit_with_pint.py
+sophisticated_gas_flow_convergence.py
