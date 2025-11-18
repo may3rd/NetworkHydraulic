@@ -42,7 +42,15 @@ def main() -> None:
     loader = ConfigurationLoader.from_yaml_path(args.config)
     if loader.has_network_collection:
         system = loader.build_network_system()
-        solver = NetworkSystemSolver()
+        solver_settings = system.solver_settings
+        solver_kwargs = {}
+        if solver_settings.max_iterations is not None:
+            solver_kwargs["max_iterations"] = solver_settings.max_iterations
+        if solver_settings.tolerance is not None:
+            solver_kwargs["tolerance"] = solver_settings.tolerance
+        if solver_settings.relaxation is not None:
+            solver_kwargs["relaxation"] = solver_settings.relaxation
+        solver = NetworkSystemSolver(**solver_kwargs)
         try:
             system_result = solver.run(system)
         except ValueError as exc:

@@ -24,12 +24,15 @@ class NetworkSystemSolver:
     network_solver: NetworkSolver = field(default_factory=NetworkSolver)
     max_iterations: int = 4
     tolerance: float = 1.0  # Pascals
+    relaxation: float = 0.7
 
     def run(self, system: NetworkSystem) -> NetworkSystemResult:
         shared_nodes = system.shared_nodes
         all_global_ids = list(shared_nodes.keys())
         canonical_pressures: Dict[str, float] = {}
         latest_results: Dict[str, NetworkResultBundle] = {}
+        relaxation = max(0.0, min(self.relaxation, 1.0))
+        final_residual = 0.0
 
         for iteration in range(self.max_iterations):
             new_pressures: Dict[str, float] = {}
@@ -50,18 +53,38 @@ class NetworkSystemSolver:
                     shared_nodes,
                     new_pressures,
                 )
+            max_residual = 0.0
+            had_previous = bool(canonical_pressures)
             for global_id in all_global_ids:
-                if global_id not in new_pressures and global_id in canonical_pressures:
-                    new_pressures[global_id] = canonical_pressures[global_id]
+                old_value = canonical_pressures.get(global_id)
+                new_value = new_pressures.get(global_id)
+                if new_value is None and old_value is not None:
+                    new_value = old_value
+                if new_value is None:
+                    continue
+                if old_value is None:
+                    canonical_pressures[global_id] = new_value
+                    continue
+                residual = abs(new_value - old_value)
+                if residual > max_residual:
+                    max_residual = residual
+                damped = old_value + relaxation * (new_value - old_value)
+                canonical_pressures[global_id] = damped
 
-            if canonical_pressures and self._has_converged(canonical_pressures, new_pressures):
-                canonical_pressures = new_pressures
+            final_residual = max_residual
+            logger.info(
+                "Network system iteration %02d residual %.6f Pa",
+                iteration + 1,
+                max_residual,
+            )
+            if had_previous and max_residual <= self.tolerance:
+                logger.info("Network system converged in %d iteration(s)", iteration + 1)
                 break
-            canonical_pressures = new_pressures
         else:
             logger.warning(
-                "Network system solver reached max iterations (%d) without convergence",
+                "Network system solver reached max iterations (%d) without convergence (residual %.6f Pa)",
                 self.max_iterations,
+                final_residual,
             )
 
         ordered_results = [

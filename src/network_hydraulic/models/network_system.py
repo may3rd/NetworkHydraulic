@@ -35,11 +35,21 @@ class SharedNodeGroup:
 
 
 @dataclass(slots=True)
+class NetworkSystemSettings:
+    """Solver tuning parameters shared by the system solver."""
+
+    max_iterations: int | None = None
+    tolerance: float | None = None
+    relaxation: float | None = None
+
+
+@dataclass(slots=True)
 class NetworkSystem:
     """Encapsulates multiple networks plus shared-node metadata."""
 
     bundles: List[NetworkBundle] = field(default_factory=list)
     shared_nodes: Dict[str, SharedNodeGroup] = field(default_factory=dict)
+    solver_settings: NetworkSystemSettings = field(default_factory=NetworkSystemSettings)
 
 
 @dataclass(slots=True)

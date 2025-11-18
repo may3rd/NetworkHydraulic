@@ -727,3 +727,25 @@ def test_network_output_units_override_global_defaults():
     branch = next(bundle for bundle in system.bundles if bundle.id == "branch-net")
     assert supply.network.output_units.pressure == "psig"
     assert branch.network.output_units.pressure == "kPag"
+
+
+def test_system_solver_settings_are_parsed():
+    raw = _multi_network_cfg()
+    raw["system_solver"] = {
+        "max_iterations": 8,
+        "tolerance": 0.25,
+        "relaxation": 0.6,
+    }
+    loader = ConfigurationLoader(raw=raw)
+    system = loader.build_network_system()
+    assert system.solver_settings.max_iterations == 8
+    assert system.solver_settings.tolerance == 0.25
+    assert system.solver_settings.relaxation == 0.6
+
+
+def test_invalid_relaxation_raises_value_error():
+    raw = _multi_network_cfg()
+    raw["system_solver"] = {"relaxation": 1.5}
+    loader = ConfigurationLoader(raw=raw)
+    with pytest.raises(ValueError, match="system_solver.relaxation"):
+        loader.build_network_system()

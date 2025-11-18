@@ -26,6 +26,7 @@ from network_hydraulic.models.network import Network
 from network_hydraulic.models.network_system import (
     NetworkBundle,
     NetworkSystem,
+    NetworkSystemSettings,
     SharedNodeGroup,
     SharedNodeMember,
 )
@@ -374,7 +375,12 @@ class ConfigurationLoader:
         if links_cfg and not isinstance(links_cfg, list):
             raise ValueError("links must be provided as a list")
         shared_nodes = self._build_shared_node_groups(bundles, links_cfg)
-        return NetworkSystem(bundles=bundles, shared_nodes=shared_nodes)
+        solver_settings = self._build_system_solver_settings(self.raw.get("system_solver"))
+        return NetworkSystem(
+            bundles=bundles,
+            shared_nodes=shared_nodes,
+            solver_settings=solver_settings,
+        )
 
     def _build_fluid(self, fluid_cfg: Dict[str, Any]) -> Fluid:
         # self._validate_keys(fluid_cfg, {"name", "phase", "viscosity"}, context="fluid")
@@ -514,6 +520,39 @@ class ConfigurationLoader:
                 continue
             normalized[key] = str(value).strip()
         return OutputUnits(**normalized)
+
+    def _build_system_solver_settings(
+        self,
+        cfg: Optional[Dict[str, Any]],
+    ) -> NetworkSystemSettings:
+        if not cfg:
+            return NetworkSystemSettings()
+        settings = NetworkSystemSettings()
+        if "max_iterations" in cfg and cfg["max_iterations"] is not None:
+            try:
+                value = int(cfg["max_iterations"])
+            except (TypeError, ValueError) as exc:
+                raise ValueError("system_solver.max_iterations must be an integer") from exc
+            if value <= 0:
+                raise ValueError("system_solver.max_iterations must be positive")
+            settings.max_iterations = value
+        if "tolerance" in cfg and cfg["tolerance"] is not None:
+            try:
+                tolerance = float(cfg["tolerance"])
+            except (TypeError, ValueError) as exc:
+                raise ValueError("system_solver.tolerance must be numeric") from exc
+            if tolerance <= 0:
+                raise ValueError("system_solver.tolerance must be positive")
+            settings.tolerance = tolerance
+        if "relaxation" in cfg and cfg["relaxation"] is not None:
+            try:
+                relaxation = float(cfg["relaxation"])
+            except (TypeError, ValueError) as exc:
+                raise ValueError("system_solver.relaxation must be numeric") from exc
+            if not (0 < relaxation <= 1):
+                raise ValueError("system_solver.relaxation must be in (0, 1]")
+            settings.relaxation = relaxation
+        return settings
 
     def _align_adjacent_diameters(self, sections: List[PipeSection]) -> None:
         if not sections:
