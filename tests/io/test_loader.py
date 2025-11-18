@@ -698,3 +698,32 @@ def test_backward_direction_defaults_to_last_member_leader():
     system = loader.build_network_system()
     group = next(group for group in system.shared_nodes.values() if len(group.members) > 1)
     assert group.members[0].network_id == "branch-net"
+
+
+def test_root_output_units_apply_to_single_network():
+    raw = liquid_network_cfg()
+    raw["output_units"] = {"pressure": "kPag"}
+    loader = ConfigurationLoader(raw=raw)
+    network = loader.build_network()
+    assert network.output_units.pressure == "kPag"
+
+
+def test_global_output_units_apply_to_multi_networks():
+    raw = _multi_network_cfg()
+    raw["output_units"] = {"pressure": "kPag"}
+    loader = ConfigurationLoader(raw=raw)
+    system = loader.build_network_system()
+    for bundle in system.bundles:
+        assert bundle.network.output_units.pressure == "kPag"
+
+
+def test_network_output_units_override_global_defaults():
+    raw = _multi_network_cfg()
+    raw["output_units"] = {"pressure": "kPag"}
+    raw["networks"][0]["output_units"] = {"pressure": "psig"}
+    loader = ConfigurationLoader(raw=raw)
+    system = loader.build_network_system()
+    supply = next(bundle for bundle in system.bundles if bundle.id == "supply-net")
+    branch = next(bundle for bundle in system.bundles if bundle.id == "branch-net")
+    assert supply.network.output_units.pressure == "psig"
+    assert branch.network.output_units.pressure == "kPag"

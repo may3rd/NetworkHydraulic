@@ -123,3 +123,16 @@ links:
         node: junction
       - network: branch
         node: junction
+
+output_units:
+  pressure: kPag
+  pressure_drop: kPa
+  temperature: degC
+  density: kg/m^3
+  velocity: m/s
+  volumetric_flow_rate: m^3/h
+  mass_flow_rate: kg/h
+  flow_momentum: Pa
+  gas_flow_critical_pressure: kPa
+  length: m
+  small_length: mm

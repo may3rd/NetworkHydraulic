@@ -204,9 +204,15 @@ class ConfigurationLoader:
                 "Configuration defines multiple networks; call build_network_system() instead."
             )
         network_cfg = self.raw.get("network", {})
-        return self._build_network_from_config(network_cfg)
+        default_units = self.raw.get("output_units")
+        return self._build_network_from_config(network_cfg, default_output_units_cfg=default_units)
 
-    def _build_network_from_config(self, network_cfg: Dict[str, Any]) -> Network:
+    def _build_network_from_config(
+        self,
+        network_cfg: Dict[str, Any],
+        *,
+        default_output_units_cfg: Optional[Dict[str, Any]] = None,
+    ) -> Network:
         logger.info("Building network configuration from loader data")
         logger.info("'%s' is loaded successfully.", network_cfg.get("name", "network"))
 
@@ -267,7 +273,10 @@ class ConfigurationLoader:
                 gas_flow_model = "isothermal" if fluid.is_gas() else None
             else:
                 gas_flow_model = text_value
-        output_units = self._build_output_units(network_cfg.get("output_units"))
+        units_cfg = network_cfg.get("output_units")
+        if units_cfg is None:
+            units_cfg = default_output_units_cfg
+        output_units = self._build_output_units(units_cfg)
         network = Network(
             name=network_cfg.get("name", "network"),
             description=network_cfg.get("description"),
@@ -330,6 +339,7 @@ class ConfigurationLoader:
 
     def build_network_system(self) -> NetworkSystem:
         networks_cfg = self.raw.get("networks")
+        default_units = self.raw.get("output_units")
         bundles: List[NetworkBundle] = []
         if networks_cfg:
             if not isinstance(networks_cfg, list):
@@ -344,13 +354,19 @@ class ConfigurationLoader:
                     or network_cfg.get("name")
                     or f"network-{index + 1}"
                 )
-                network = self._build_network_from_config(network_cfg)
+                network = self._build_network_from_config(
+                    network_cfg,
+                    default_output_units_cfg=default_units,
+                )
                 bundles.append(self._create_bundle(str(network_id), network))
         else:
             network_cfg = self.raw.get("network")
             if not network_cfg:
                 raise ValueError("network configuration is required")
-            network = self._build_network_from_config(dict(network_cfg))
+            network = self._build_network_from_config(
+                dict(network_cfg),
+                default_output_units_cfg=default_units,
+            )
             network_id = network_cfg.get("id") or network_cfg.get("name") or "network"
             bundles.append(self._create_bundle(str(network_id), network))
 
@@ -831,7 +847,8 @@ class ConfigurationLoader:
                 if (member.network_id == leader.network_id and member.node_id == leader.node_id)
                 else 1,
             )
-        return groups
+        pruned = {gid: group for gid, group in groups.items() if len(group.members) > 1}
+        return pruned
 
     @staticmethod
     def _select_leader_member(

@@ -112,6 +112,7 @@ links:
 
 - Each entry under `networks` mirrors the original schema plus an optional `id` (defaulting to `name`). The `links[]` array ties nodes across those networks; the first `members[]` entry acts as the pressure “leader,” and the solver pushes that node’s pressure into the remaining members.
 - Set `primary: true` inside any network block to force that network to become the leader for linked nodes (useful when the shared node should inherit pressure from a specific upstream/downstream model). When no `primary` is specified, the solver defaults to the first member for forward/auto networks and the last member if every participating network runs backward.
+- When multiple networks share a config file you can keep a single `output_units:` block at the root; every network inherits those units unless it defines its own `output_units` override inside the individual entry.
 - Use `ConfigurationLoader.build_network_system()` to construct a `NetworkSystem` and run it via `NetworkSystemSolver`. The CLI auto-detects the new format, runs every bundle, prints per-network summaries, and writes a combined results file via `write_system_output`.
 
  ### 3.1 Auto-Swage

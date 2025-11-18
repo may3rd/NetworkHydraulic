@@ -261,13 +261,32 @@ def print_system_summary(
     """Print a summary for each network in a system run."""
     for bundle in result.bundles:
         print_summary(bundle.network, bundle.result, debug=debug)
-    if result.shared_node_pressures:
+    shared_groups = [
+        (group_id, group)
+        for group_id, group in system.shared_nodes.items()
+        if len(group.members) > 1
+    ]
+    if shared_groups:
         print("Shared Nodes:")
-        for node_id in sorted(result.shared_node_pressures):
-            pressure = result.shared_node_pressures[node_id]
-            if pressure is None:
+        bundle_lookup = {bundle.id: bundle for bundle in system.bundles}
+        for group_id, group in shared_groups:
+            canonical = result.shared_node_pressures.get(group_id)
+            if canonical is None:
                 continue
-            print(f"  {node_id}: {pressure:.3f} Pa")
+            leader = group.members[0] if group.members else None
+            for member in group.members:
+                bundle = bundle_lookup.get(member.network_id)
+                if bundle is None:
+                    continue
+                converter = _OutputUnitConverter(bundle.network.output_units)
+                is_leader = leader and member.network_id == leader.network_id and member.node_id == leader.node_id
+                member_pressure = canonical
+                if not is_leader:
+                    member_pressure = canonical + (group.pressure_bias or 0.0)
+                converted = converter.pressure(member_pressure)
+                unit = bundle.network.output_units.pressure or "Pa"
+                value = converted if converted is not None else member_pressure
+                print(f"  {member.network_id}::{member.node_id}: {value:.3f} {unit}")
 
 
 def _pressure_drop_dict(details, length: float | None, converter: _OutputUnitConverter) -> Dict[str, Any]:
