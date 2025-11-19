@@ -437,74 +437,51 @@ def solve_adiabatic(
         is_forward: bool
     ) -> Tuple[float, float, float, float]:
         """
-        Solves for Mach numbers and temperature ratios in adiabatic gas flow using Fanno flow theory.
-
-        This function iteratively solves the coupled equations for Mach number evolution
-        through a pipe section with friction and minor losses. It uses a two-stage
-        iteration process:
-        1. First stage solves for the upstream Mach number from mass flow and conditions
-        2. Second stage solves for the downstream Mach number considering friction losses
-
-        Args:
-            pressure (float): Static pressure at the reference point (Pa).
-            temperature (float): Static temperature at the reference point (K).
-            mass_flow (float): Mass flow rate through the pipe (kg/s).
-            diameter (float): Internal pipe diameter (m).
-            molar_mass (float): Molar mass of the gas (kg/kmol).
-            z_factor (float): Compressibility factor for the gas (dimensionless).
-            gamma (float): Ratio of specific heats Cp/Cv (dimensionless).
-            is_forward (bool): True for forward flow direction, False for reverse.
-
-        Returns:
-            Tuple[float, float, float, float]:
-            - MA1: Upstream Mach number
-            - MA2: Downstream Mach number
-            - Y1: Upstream temperature ratio (T/T*)
-            - Y2: Downstream temperature ratio (T/T*)
-
-        Raises:
-            ValueError: If convergence is not achieved within MAX_ADIABATIC_ITER iterations.
+        Solves for Mach numbers using exact Fanno Flow integration (brentq).
+        
+        Returns: (MA_known, MA_unknown, Y_known, Y_unknown)
         """
         area = pi * diameter * diameter / 4.0
 
-        # Initialize MA
-        MA = (mass_flow / area) / pressure * sqrt(
-            temperature * UNIVERSAL_GAS_CONSTANT * z_factor / molar_mass / gamma
-        )
-        MA_guess = MA
-        for _ in range(MAX_ADIABATIC_ITER):
-            y = _calculate_y(gamma, MA_guess)
-            MA_new = MA / y
+        # 1. Calculate Known Mach Number at Boundary (M_known)
+        # Uses real gas sonic speed
+        sonic = sqrt(gamma * z_factor * UNIVERSAL_GAS_CONSTANT * temperature / molar_mass)
+        density = (pressure * molar_mass) / (z_factor * UNIVERSAL_GAS_CONSTANT * temperature)
+        velocity = mass_flow / (density * area)
+        M_known = velocity / sonic
 
-            if abs(MA_new - MA_guess) <= ADIABATIC_TOL:
-                MA = MA_new
-                break
-            MA_guess = MA_new
+        # 2. Calculate Fanno Parameter for Known State
+        # fL_D_known represents the dimensionless length to choke (M=1)
+        fL_D_known = _fanno_fL_D(M_known, gamma)
 
-        MA1 = MA_new
-        Y1 = _calculate_y(gamma, MA1)
-
-        direction_factor = 1.0 if is_forward else -1.0
-        MA2_guess = (1.0 + direction_factor * 0.01) * MA1
-        for _ in range(MAX_ADIABATIC_ITER):
-            Y2_guess = _calculate_y(gamma, MA2_guess)
-            BigA = (gamma + 1) / 2 * (MA2_guess ** 2 * Y1) / \
-                (MA1 ** 2 * Y2_guess) + k_total * gamma
-            denom = 1 - BigA * MA1 ** 2 * direction_factor
-            if denom <= 0:
-                MA2 = 1.0 - 1e-6 if direction_factor > 0 else 1.0 + 1e-6
-                break
-            MA2_new = sqrt((MA1 ** 2) / denom)
-
-            if abs(MA2_new - MA2_guess) <= ADIABATIC_TOL:
-                MA2 = MA2_new
-                break
-            MA2_guess = MA2_new
+        # 3. Calculate Target Fanno Parameter
+        # Physics: Friction always moves Mach -> 1. Therefore fL*/D always decreases in flow direction.
+        # Forward (Inlet -> Outlet):  fL_D_outlet = fL_D_inlet - K
+        # Backward (Outlet -> Inlet): fL_D_inlet  = fL_D_outlet + K
+        if is_forward:
+            fL_D_target = fL_D_known - k_total
         else:
-            MA2 = MA2_guess
-        Y2 = _calculate_y(gamma, MA2)
+            fL_D_target = fL_D_known + k_total
 
-        return MA1, MA2, Y1, Y2
+        # 4. Solve for Unknown Mach Number
+        if fL_D_target <= 0:
+            # Choked Flow Condition: Pipe is longer than physically possible for this inlet M.
+            # We clamp to M=1.0 (Sonic) as the limiting condition.
+            M_target = 1.0
+        else:
+            # Use the existing root finder to get exact solution
+            try:
+                M_target = _fanno_mach_from_fL_D(fL_D_target, gamma, initial_guess_mach=M_known)
+            except ValueError:
+                # Fallback for extreme edge cases
+                M_target = 1.0
+
+        # 5. Calculate Y ratios (Temperature ratios T/T*)
+        # Y = 1 + (gamma-1)/2 * M^2
+        Y_known = _calculate_y(gamma, M_known)
+        Y_target = _calculate_y(gamma, M_target)
+
+        return M_known, M_target, Y_known, Y_target
 
     if is_forward:
         MA1, MA2, Y1, Y2 = _find_ma(boundary_pressure, temperature,
